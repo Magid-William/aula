@@ -10,6 +10,7 @@ import type { AgentTool } from '../../ai/model'
 import { plainSnippet, searchCourse } from '../../search/course'
 import type { VectorSearcher } from '../../search/hybrid'
 import type { PackStore } from '../../store/packStore'
+import { isCheckedAttachmentFiles } from '../attachments'
 import { outError, outJSON, Schema, tool, type ToolArgs } from '../toolkit'
 
 function safePack(store: PackStore) {
@@ -54,11 +55,14 @@ export async function searchMaterials(store: PackStore, a: ToolArgs, vectors?: V
   const limit = Math.min(12, Math.max(1, a.int('limit') ?? 6))
   const ids = a.strings('source_ids')
   const idSet = ids ? new Set(ids) : undefined
-  let hits: SourceHit[]
-  try {
-    hits = await searchCourse(store.directory, q, { limit, sourceIDs: idSet, vectors })
-  } catch {
-    hits = []
+  let hits: SourceHit[] = []
+  // El índice reabre rutas por su cuenta. En reintentos se lee sólo mediante los descriptores verificados del almacén.
+  if (!isCheckedAttachmentFiles(store)) {
+    try {
+      hits = await searchCourse(store.directory, q, { limit, sourceIDs: idSet, vectors })
+    } catch {
+      hits = []
+    }
   }
   if (!hits.length) hits = naiveSearch(store, q, limit, idSet)
   const titles = new Map((safePack(store)?.sources ?? []).map((s) => [s.id, s.title] as const))
@@ -76,7 +80,7 @@ export function searchSourcesTool(store: () => PackStore, vectors?: (dir: string
     ['source_ids', Schema.array(Schema.string(), 'Restrict to these sources')]
   ], ['query']), async (a) => {
     const s = store()
-    const r = await searchMaterials(s, a, vectors?.(s.directory))
+    const r = await searchMaterials(s, a, isCheckedAttachmentFiles(s) ? undefined : vectors?.(s.directory))
     return typeof r === 'string' ? outError(r) : outJSON(r)
   })
 }

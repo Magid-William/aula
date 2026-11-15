@@ -3,7 +3,6 @@
 // CLI, por el relevo MCP que monta el propio modelo) y entrega la respuesta mientras llega. Las tarjetas que esperan al
 // estudiante se responden con el `broker`; al contestar a mitad de turno, el trozo en curso se cierra y su respuesta aparece como
 // mensaje del estudiante (`segmentBreak`).
-import { readFileSync } from 'node:fs'
 import { messageTrust, studentTextOf, clip, extractCitations, isoLocal, oneLine, textOfBlocks } from '@engine/assistant'
 import type { AssistantCalendar } from '@engine/calendar'
 import type { ContentValidator } from '@engine/content/validator'
@@ -34,6 +33,7 @@ import type { WebAccess } from '../tools/context'
 import { assistantTools } from './tools'
 import { fact } from './tools/common'
 import { toolBaseName } from '@engine/assistant'
+import { checkedAttachmentFiles, checkRetryAttachments, readStoredAttachmentFile, storedAttachmentAssetPath } from './attachments'
 
 /** Lo que va pasando en un turno. */
 export interface TurnEvents {
@@ -72,6 +72,8 @@ export interface TurnDeps {
   web?: WebAccess
   /** false = nadie puede contestar tarjetas (adaptadores sin interfaz): las preguntas caducan y los permisos se deniegan al momento. */
   interactive: boolean
+  /** Un reintento no debe omitir silenciosamente los adjuntos que ya tenía la pregunta. */
+  strictAttachments?: boolean
   vectors?: (packDir: string) => VectorSearcher | undefined
   navigate?: (target: AssistantTarget) => void
   courseChanged?: (courseID: string) => void
@@ -244,16 +246,15 @@ export function describeAttachments(attachments: readonly AssistantAttachment[],
 
 // MARK: Otra IA mira las imágenes
 
-function imagesOf(a: AssistantAttachment, files: PackStore, max: number): ImagePart[] {
+function imagesOf(a: AssistantAttachment, files: PackStore, max: number, root: string, strict = false): ImagePart[] {
   const out: ImagePart[] = []
   for (const asset of a.imageAssets.slice(0, max)) {
-    const p = files.assetPath(asset)
-    if (!p) continue
     try {
-      const data = readFileSync(p)
+      const p = storedAttachmentAssetPath(files, asset)
+      const data = readStoredAttachmentFile(p, root)
       const ext = p.toLowerCase().split('.').pop() ?? 'jpg'
       out.push({ mediaType: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg', base64: data.toString('base64') })
-    } catch { /* sin imagen */ }
+    } catch (error) { if (strict) throw error /* sin imagen en adjuntos ordinarios que ya no están */ }
   }
   return out
 }
@@ -343,10 +344,14 @@ export async function runTurn(input: TurnInput, deps: TurnDeps, events: TurnEven
     }
   }
   const anyFiles = message.attachments.length > 0 || thread.messages.some((m) => m.attachments.length > 0)
+  const ownFiles = (create: boolean): PackStore => {
+    if (deps.strictAttachments) return checkedAttachmentFiles(deps.store.filesHandle(thread.id), deps.store.root, signal)
+    return create ? deps.store.files(thread.id) : deps.store.filesHandle(thread.id)
+  }
   const goals = new GoalStore(deps.store.root)
   const earlierSets = thread.messages.flatMap((m) => m.cards).flatMap((c) => (c.studySet ? [c.studySet] : []))
   const env: ToolEnv = {
-    library, files: () => deps.store.files(thread.id), filesHandle: () => (!course || anyFiles ? deps.store.files(thread.id) : deps.store.filesHandle(thread.id)), io, control: deps.control, team: deps.team,
+    library, files: () => ownFiles(true), filesHandle: () => ownFiles(!course || anyFiles), io, control: deps.control, team: deps.team,
     calendar: deps.calendar, validator: deps.validator, dailyMinutes: deps.dailyMinutes, allowWeb: deps.allowWeb, web: deps.web, threadID: thread.id, goals, defaultCourseID: course?.pack.id,
     studySets: (id) => deps.studySetOverride?.(id) ?? seg.studySet(id) ?? [...earlierSets].reverse().find((s) => s.id === id), platform: deps.platform, trust, vectors: deps.vectors,
     navigate: deps.navigate, courseChanged: deps.courseChanged, signal
@@ -369,7 +374,7 @@ export async function runTurn(input: TurnInput, deps: TurnDeps, events: TurnEven
   if (pictures.length) {
     if (canSee(model)) {
       for (const a of pictures) {
-        for (const img of imagesOf(a, filesStore, a.kind === 'video' ? 6 : 1)) {
+        for (const img of imagesOf(a, filesStore, a.kind === 'video' ? 6 : 1, deps.store.root, deps.strictAttachments)) {
           if (images.length >= 10) break
           images.push(img)
           imageNames.add(a.name)
@@ -383,7 +388,7 @@ export async function runTurn(input: TurnInput, deps: TurnDeps, events: TurnEven
         let failedHere = false
         attachments = await Promise.all(attachments.map(async (a) => {
           if (failedHere || !a.imageAssets.length || a.visionNote) return a
-          const parts = imagesOf(a, filesStore, a.kind === 'video' ? 6 : 1)
+          const parts = imagesOf(a, filesStore, a.kind === 'video' ? 6 : 1, deps.store.root, deps.strictAttachments)
           if (!parts.length) return a
           const note = await describeImages(parts, a, helper, signal)
           if (!note) { failedHere = true; return a }
@@ -413,10 +418,12 @@ export async function runTurn(input: TurnInput, deps: TurnDeps, events: TurnEven
   }
   const runs = (await deps.control?.runs?.().catch(() => [])) ?? []
   const mentions = describeMentions(message.mentions, library)
+  if (deps.strictAttachments) checkRetryAttachments(attachments, filesStore, deps.store.root)
   const attachText = describeAttachments(attachments, imageNames, filesStore, { scoped: !!course })
   const earlierAtt = thread.messages.filter((m) => m.role === 'user' && m.id !== message.id).flatMap((m) => m.attachments).slice(-12)
   const earlier = describeAttachments(earlierAtt, new Set(), filesStore, { brief: true, scoped: !!course })
-  const history = thread.messages.slice(0, Math.max(0, thread.messages.findIndex((m) => m.id === message.id)))
+  // Reintentar reutiliza el user guardado: las acciones del intento fallido posteriores a él siguen siendo historia.
+  const history = deps.strictAttachments ? thread.messages : thread.messages.slice(0, Math.max(0, thread.messages.findIndex((m) => m.id === message.id)))
   const budget = budgetForWindow(model.capabilities.contextWindow)
   // memoria del estudiante: lo que Aula recuerda que viene al caso, delante del contexto del turno
   const memoryBlock = await memoryContext(deps.memory, studentTextOf(message), memoryCourse).catch(() => '')

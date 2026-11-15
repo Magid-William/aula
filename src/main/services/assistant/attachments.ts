@@ -3,15 +3,19 @@
 //   - documentos (PDF, Word, PowerPoint, Excel, EPUB, texto…): su texto con el lector de materiales (y OCR si es escaneado);
 //   - imágenes: una copia (reducida si se puede) para la IA que ve imágenes + el texto que reconozca el OCR;
 //   - vídeo y audio: la transcripción y los fotogramas solo si quien monta el servicio sabe hacerlo (`AttachmentMedia`).
-import { closeSync, openSync, readFileSync, readSync, statSync } from 'node:fs'
-import { basename, extname } from 'node:path'
+import { chmodSync, closeSync, constants, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { IDs } from '@engine/base/ids'
 import { tr } from '@shared/ai/i18n'
 import type { AssistantAttachment } from '@shared/assistant/types'
+import { decodePack, decodeSourceChunk, type Pack, type SourceChunk, type SourceMeta } from '@shared/schema'
 import { EmptySourceError, importSourceIntoPack } from '../ingest'
 import { imageInfo } from '../ingest/extract/imageInfo'
 import { log } from '../log'
-import type { PackStore } from '../store/packStore'
+import { PackStore } from '../store/packStore'
+import { SafePath } from '../store/safePath'
+import { AulaError } from '../errors'
 import { attachmentKind } from './models'
 
 /** Lado mayor de las imágenes que se mandan a la IA (los proveedores reducen por encima de ~1,15 megapíxeles). */
@@ -20,6 +24,175 @@ export const MAX_ATTACHMENT_BYTES = 200 * 1024 * 1024
 /** Sin poder reducirla, una imagen más grande no se manda a la IA (solo su texto). */
 const MAX_RAW_IMAGE_BYTES = 4 * 1024 * 1024
 export const MAX_ATTACHMENTS = 10
+
+const unavailableAttachment = (): AulaError => new AulaError('attachment_unavailable', tr('No se puede recuperar uno de los adjuntos guardados. Vuelve a adjuntarlo para enviar la pregunta.', 'One of the saved attachments is unavailable. Attach it again to send your question.'))
+const snapshotLimit = (): AulaError => new AulaError('attachment_limit', tr('Este reintento puede pasar al curso hasta 10 adjuntos y 200 MB en total. Añade menos archivos desde Crear curso.', 'This retry can pass up to 10 attachments and 200 MB in total to a course. Add fewer files from Create course.'))
+
+/** Sin enlaces bajo el almacén propio, también cuando se sustituyó una carpeta completa (assets, sources o el hilo). */
+function checkedPath(path: string, root: string): void {
+  const rel = relative(resolve(root), resolve(path))
+  if (!rel || isAbsolute(rel) || rel.split(sep).some(p => p === '..')) throw unavailableAttachment()
+  let current = resolve(root)
+  for (const part of rel.split(sep)) {
+    current = join(current, part)
+    if (lstatSync(current).isSymbolicLink()) throw unavailableAttachment()
+  }
+  if (!SafePath.isInside(realpathSync(path), realpathSync(root))) throw unavailableAttachment()
+}
+
+/** Lee el descriptor comprobado, no vuelve a abrir una ruta tras esperar al proveedor. No acepta rutas del renderer. */
+export function readStoredAttachmentFile(path: string, root: string, maxBytes = MAX_ATTACHMENT_BYTES): Buffer {
+  let fd: number | undefined
+  try {
+    checkedPath(path, root)
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+    const opened = fstatSync(fd)
+    if (!opened.isFile() || opened.size > maxBytes) throw unavailableAttachment()
+    // Detecta un cambio de destino entre comprobar y abrir; el descriptor mantiene el archivo comprobado al leer.
+    checkedPath(path, root)
+    const named = statSync(path)
+    if (opened.dev !== named.dev || opened.ino !== named.ino) throw unavailableAttachment()
+    const bytes = Buffer.alloc(opened.size)
+    let offset = 0
+    while (offset < bytes.length) {
+      const n = readSync(fd, bytes, offset, bytes.length - offset, offset)
+      if (!n) throw unavailableAttachment()
+      offset += n
+    }
+    if (fstatSync(fd).size !== opened.size) throw unavailableAttachment()
+    return bytes
+  } catch { throw unavailableAttachment() }
+  finally { if (fd !== undefined) closeSync(fd) }
+}
+
+export function storedAttachmentAssetPath(files: PackStore, asset: string): string {
+  if (!SafePath.isComponent(asset)) throw unavailableAttachment()
+  return join(files.assetsDirectory, asset)
+}
+
+const checkedFiles = new WeakMap<PackStore, { root: string; signal?: AbortSignal }>()
+export const isCheckedAttachmentFiles = (files: PackStore): boolean => checkedFiles.has(files)
+
+/** Vista de lectura del almacén del reintento: las herramientas vuelven a comprobar las rutas cuando realmente leen. */
+export function checkedAttachmentFiles(files: PackStore, root: string, signal?: AbortSignal): PackStore {
+  class CheckedFiles extends PackStore {
+    override loadPack(): Pack {
+      return decodePack(JSON.parse(readStoredAttachmentFile(this.packPath, root, 16 * 1024 * 1024).toString('utf8')))
+    }
+    override loadChunks(sourceID: string): SourceChunk[] {
+      if (!SafePath.isComponent(sourceID)) throw unavailableAttachment()
+      const raw: unknown = JSON.parse(readStoredAttachmentFile(this.chunksPath(sourceID), root).toString('utf8'))
+      if (!Array.isArray(raw)) throw unavailableAttachment()
+      return raw.flatMap(value => { const chunk = decodeSourceChunk(value); return chunk ? [chunk] : [] })
+    }
+    override assetPath(asset: string): string | undefined {
+      try {
+        const path = storedAttachmentAssetPath(this, asset)
+        checkedPath(path, root)
+        return statSync(path).isFile() ? realpathSync(path) : undefined
+      } catch { return undefined }
+    }
+    override originalPath(source: SourceMeta): string | undefined {
+      if (!source.filename) return undefined
+      try {
+        if (!SafePath.isComponent(source.id) || !SafePath.isComponent(source.filename)) return undefined
+        const path = join(this.sourceDirectory(source.id), source.filename)
+        checkedPath(path, root)
+        return statSync(path).isFile() ? realpathSync(path) : undefined
+      } catch { return undefined }
+    }
+  }
+  const checked = new CheckedFiles(files.id, files.directory)
+  checkedFiles.set(checked, { root, signal })
+  return checked
+}
+
+/** Las tareas que releen una ruta después de esperar reciben copias privadas; se conservan hasta terminar la ingestión. */
+export async function withAttachmentOriginals<T>(files: PackStore | undefined, ids: readonly string[], use: (paths: string[], signal?: AbortSignal) => Promise<T>): Promise<T> {
+  const checked = files && checkedFiles.get(files)
+  checked?.signal?.throwIfAborted()
+  if (!files || !ids.length) return use([], checked?.signal)
+  let sources: SourceMeta[]
+  try { sources = files.loadPack().sources } catch (err) {
+    if (checked) throw err
+    return use([])
+  }
+  let staging: string | undefined
+  try {
+    const selected = checked ? [...new Set(ids)] : ids
+    if (checked && selected.length > MAX_ATTACHMENTS) throw snapshotLimit()
+    const originals: string[] = []
+    let expectedBytes = 0
+    for (const id of selected) {
+      checked?.signal?.throwIfAborted()
+      const source = sources.find(s => s.id === id)
+      if (!source) { if (checked) throw unavailableAttachment(); continue }
+      const path = files.originalPath(source)
+      if (!path) { if (checked && source.filename) throw unavailableAttachment(); continue }
+      if (!checked) { originals.push(path); continue }
+      // Conserva el prefijo léxico del almacén (/var y /private/var son alias en macOS); la lectura verifica el destino real.
+      const ownPath = join(files.sourceDirectory(source.id), source.filename!)
+      expectedBytes += statSync(ownPath).size
+      if (expectedBytes > MAX_ATTACHMENT_BYTES) throw snapshotLimit()
+      originals.push(ownPath)
+    }
+    if (!checked) return await use(originals)
+    const paths: string[] = []
+    let copiedBytes = 0
+    for (const path of originals) {
+      checked.signal?.throwIfAborted()
+      const bytes = readStoredAttachmentFile(path, checked.root, MAX_ATTACHMENT_BYTES - copiedBytes)
+      copiedBytes += bytes.length
+      if (!staging) {
+        staging = mkdtempSync(join(tmpdir(), 'aula-retry-originals-'))
+        chmodSync(staging, 0o700)
+      }
+      // Dos materiales pueden llamarse igual; conservamos sus nombres/extensiones sin sobrescribirlos.
+      const directory = join(staging, String(paths.length))
+      mkdirSync(directory, { mode: 0o700 })
+      const copy = join(directory, basename(path))
+      writeFileSync(copy, bytes, { flag: 'wx', mode: 0o600 })
+      paths.push(copy)
+    }
+    checked.signal?.throwIfAborted()
+    return await use(paths, checked.signal)
+  } finally {
+    if (staging) rmSync(staging, { recursive: true, force: true })
+  }
+}
+
+/** Antes de reintentar: todos los recursos del mensaje siguen disponibles en SU almacén, sin importar rutas antiguas. */
+export function checkRetryAttachments(attachments: readonly AssistantAttachment[], files: PackStore, root: string): void {
+  if (!attachments.length) return
+  try {
+    checkedPath(files.directory, root)
+    for (const a of attachments) {
+      if (a.status !== 'ready') throw unavailableAttachment()
+      for (const asset of new Set([...a.imageAssets, ...(a.thumbnail ? [a.thumbnail] : [])])) {
+        const path = storedAttachmentAssetPath(files, asset)
+        checkedPath(path, root)
+        const st = statSync(path)
+        if (!st.isFile() || !st.size || st.size > MAX_ATTACHMENT_BYTES) throw unavailableAttachment()
+      }
+      if (a.sourceID) {
+        if (!SafePath.isComponent(a.sourceID)) throw unavailableAttachment()
+        const pack = decodePack(JSON.parse(readStoredAttachmentFile(files.packPath, root, 16 * 1024 * 1024).toString('utf8')))
+        const source = pack.sources.find(s => s.id === a.sourceID)
+        if (!source) throw unavailableAttachment()
+        const chunks = JSON.parse(readStoredAttachmentFile(files.chunksPath(a.sourceID), root).toString('utf8')) as unknown
+        if (!Array.isArray(chunks) || (a.characters > 0 && !chunks.some(value => decodeSourceChunk(value)?.text.trim()))) throw unavailableAttachment()
+        if (source.filename) {
+          if (!SafePath.isComponent(source.filename)) throw unavailableAttachment()
+          const original = join(files.sourceDirectory(a.sourceID), source.filename)
+          checkedPath(original, root)
+          const st = statSync(original)
+          if (!st.isFile() || st.size > MAX_ATTACHMENT_BYTES) throw unavailableAttachment()
+        }
+      }
+      if (a.kind === 'image' && !a.imageAssets.length && !a.sourceID) throw unavailableAttachment()
+    }
+  } catch { throw unavailableAttachment() }
+}
 
 /** Lo que sabe hacer con imágenes, vídeo y audio quien monta el servicio (Electron: `nativeImage`); todo opcional. */
 export interface AttachmentMedia {

@@ -18,6 +18,7 @@ import {
 import { setInboxChatSink } from '@main/services/automations'
 import { AulaError, invalidArgs } from '@main/services/errors'
 import { importSourceIntoPack } from '@main/services/ingest'
+import { isCheckedAttachmentFiles, withAttachmentOriginals } from '@main/services/assistant/attachments'
 import { log } from '@main/services/log'
 import { MEMORY_KINDS, MemoryError, isSaved, memoryService, recordView, type MemoryKind } from '@main/services/memory'
 import { getSettings, onSettingsChange } from '@main/services/settings'
@@ -194,46 +195,48 @@ const runInfo = (courseID: string, title: string, isExtend: boolean, searchesPla
 function courseTeam(): CourseTeam | undefined {
   const g = generationService()
   if (!g) return undefined
-  const originals = (files: PackStore | undefined, ids: readonly string[]): string[] => {
-    if (!files || !ids.length) return []
-    let sources: ReturnType<PackStore['loadPack']>['sources'] = []
-    try { sources = files.loadPack().sources } catch { return [] }
-    return ids.flatMap((id) => {
-      const meta = sources.find((s) => s.id === id)
-      const p = meta ? files.originalPath(meta) : undefined
-      return p ? [p] : []
-    })
-  }
   return {
     async create(spec: AssistantCourseSpec, attachments?: PackStore) {
-      let draftId: string | undefined
-      let materialIds: string[] = []
-      const paths = originals(attachments, spec.attachmentSourceIDs)
-      if (paths.length) {
-        const r = g.drafts.addFiles(undefined, paths)
-        draftId = r.draftId
-        materialIds = r.materials.map((m) => m.id)
-        await g.drafts.idle(draftId)
-      }
-      const account = spec.searchPlatform ? getSettings().platforms.accounts[0]?.id : undefined
-      const request: Obj = {
-        title: spec.title, subject: spec.subject, depth: spec.depth, goal: spec.goal, topics: spec.topics, userNotes: spec.notes, materialIds, allowWeb: getSettings().data.webSearch,
-        ...(spec.examTitle ? { examNotes: spec.examTitle } : {}), ...(spec.examDate ? { examDate: spec.examDate } : {}), ...(spec.language ? { language: spec.language } : {}),
-        ...(account ? { gather: { accountId: account, ...(spec.platformCourse ? { courseId: spec.platformCourse } : {}), ...(spec.focus ? { focus: spec.focus } : {}) } } : {})
-      }
-      const r = await g.start(draftId, request)
-      return runInfo(r.packId, spec.title, false, !!account)
+      return withAttachmentOriginals(attachments, spec.attachmentSourceIDs, async (paths, signal) => {
+        let draftId: string | undefined
+        let materialIds: string[] = []
+        signal?.throwIfAborted()
+        if (paths.length) {
+          // Si addFiles falla después de encolar alguno, también esperamos antes de borrar las copias.
+          if (attachments && isCheckedAttachmentFiles(attachments)) draftId = g.drafts.open()
+          try {
+            const r = g.drafts.addFiles(draftId, paths)
+            draftId = r.draftId
+            materialIds = r.materials.map((m) => m.id)
+          } finally {
+            if (draftId) await g.drafts.idle(draftId)
+          }
+        }
+        signal?.throwIfAborted()
+        const account = spec.searchPlatform ? getSettings().platforms.accounts[0]?.id : undefined
+        const request: Obj = {
+          title: spec.title, subject: spec.subject, depth: spec.depth, goal: spec.goal, topics: spec.topics, userNotes: spec.notes, materialIds, allowWeb: getSettings().data.webSearch,
+          ...(spec.examTitle ? { examNotes: spec.examTitle } : {}), ...(spec.examDate ? { examDate: spec.examDate } : {}), ...(spec.language ? { language: spec.language } : {}),
+          ...(account ? { gather: { accountId: account, ...(spec.platformCourse ? { courseId: spec.platformCourse } : {}), ...(spec.focus ? { focus: spec.focus } : {}) } } : {})
+        }
+        const r = await g.start(draftId, request)
+        return runInfo(r.packId, spec.title, false, !!account)
+      })
     },
     async extend(courseID, instruction, opts) {
-      // lo que adjuntó en el chat pasa antes a los materiales del curso (la ampliación lo lee de ahí)
-      const store = getLibrary().openPack(courseID)
-      for (const p of originals(opts.attachments, opts.attachmentSourceIDs)) {
-        try { if (store) await importSourceIntoPack(store.directory, { type: 'file', path: p }, { store, trust: 'notes' }) } catch (err) { log.warn('Chat: no pude pasar un adjunto al curso', err) }
-      }
-      await g.extend(courseID, instruction, opts.skillID)
-      let title = courseID
-      try { title = store?.loadPack().title ?? courseID } catch { /* sin título */ }
-      return runInfo(courseID, title, true)
+      return withAttachmentOriginals(opts.attachments, opts.attachmentSourceIDs, async (paths, signal) => {
+        // lo que adjuntó en el chat pasa antes a los materiales del curso (la ampliación lo lee de ahí)
+        const store = getLibrary().openPack(courseID)
+        for (const p of paths) {
+          signal?.throwIfAborted()
+          try { if (store) await importSourceIntoPack(store.directory, { type: 'file', path: p }, { store, trust: 'notes', ...(signal ? { signal } : {}) }) } catch (err) { log.warn('Chat: no pude pasar un adjunto al curso', err) }
+        }
+        signal?.throwIfAborted()
+        await g.extend(courseID, instruction, opts.skillID)
+        let title = courseID
+        try { title = store?.loadPack().title ?? courseID } catch { /* sin título */ }
+        return runInfo(courseID, title, true)
+      })
     }
   }
 }
@@ -321,6 +324,11 @@ export function register(): void {
     })
   })
   handle('chat.stop', (args) => { assistantService().stop(str(obj(args), 'threadId', 100) as string) })
+  handle('chat.retry', (args) => {
+    const o = obj(args)
+    if (Object.keys(o).some(k => k !== 'threadId' && k !== 'failedMessageId')) throw invalidArgs(tr('Reintento no válido', 'Invalid retry'))
+    return assistantService().retry({ threadId: str(o, 'threadId', 80) as string, failedMessageId: str(o, 'failedMessageId', 80) as string })
+  })
   handle('chat.cancelQueued', (args) => {
     const o = obj(args)
     return { removed: assistantService().cancelQueued(str(o, 'threadId', 100) as string, str(o, 'messageId', 100) as string) }

@@ -155,7 +155,7 @@ export function decodeMessage(raw: unknown): AssistantMessage | undefined {
     id: s(raw.id) ?? IDs.short(8), role: oneOf(raw.role, ['user', 'assistant'] as const) ?? 'assistant', text: s(raw.text) ?? '', date: date(raw.date) ?? new Date().toISOString(),
     mentions: arr(raw.mentions, decodeRef), attachments: arr(raw.attachments, decodeAttachment), cards: arr(raw.cards, decodeCard), steps: arr(raw.steps, decodeStep),
     notices: arr(raw.notices, s), failed: b(raw.failed) ?? false, provider: s(raw.provider), origin: decodeOrigin(raw.origin), context: decodeContext(raw.context),
-    interrupted: b(raw.interrupted) ?? false
+    interrupted: b(raw.interrupted) ?? false, turnRootID: s(raw.turnRootID)
   })
   const cites = arr(raw.citations, decodeCitation)
   if (cites.length) m.citations = cites
@@ -223,7 +223,7 @@ export function encodeMessage(m: AssistantMessage): Obj {
     id: m.id, role: m.role, text: m.text, date: m.date, mentions: m.mentions.map(encodeRef),
     attachments: m.attachments.map((a) => prune({ ...a } as unknown as Obj)), cards: m.cards.map(encodeCard), steps: m.steps.map((x) => prune({ id: x.id, tool: x.tool, label: x.label, ok: x.ok, detail: x.detail, count: x.count, declined: x.declined || undefined })),
     notices: m.notices, failed: m.failed, provider: m.provider, origin: m.origin ? prune({ ...m.origin } as Obj) : undefined, context: m.context ? prune({ ...m.context } as Obj) : undefined,
-    interrupted: m.interrupted, citations: m.citations?.length ? m.citations.map((c) => prune({ ...c } as Obj)) : undefined
+    interrupted: m.interrupted, turnRootID: m.turnRootID, citations: m.citations?.length ? m.citations.map((c) => prune({ ...c } as Obj)) : undefined
   })
 }
 

@@ -11,6 +11,11 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
   drawing, independent of zoom, without controls, atom tooltips or answers hidden in an exercise prompt. Other figure
   types, student annotations and sending a marked image to the tutor remain on the [figure roadmap](https://github.com/luumlabs/aula/issues/28).
 
+### Fixed
+- **Retrying a failed question keeps its saved images and documents**, including questions containing only an image.
+  The original question, context and files stay intact, and repeated clicks do not send duplicate questions. If a saved
+  attachment is unavailable, Aula explains the problem before starting another response.
+
 ## [0.2.5] - 2026-11-14
 
 ### Added

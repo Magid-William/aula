@@ -156,6 +156,8 @@ export interface AssistantMessage {
   provider?: string
   origin?: { kind: 'routine' | 'automation' | 'followup' | 'reminder' | 'system'; title: string; automationID?: string; runID?: string; symbol?: string }
   context?: TutorContext
+  /** Pregunta raíz del mismo turno, sólo en respuestas a tarjetas creadas por el servicio. No procede de chat.send. */
+  turnRootID?: string
   interrupted: boolean
   /** Citas de materiales que hay en el texto (solo en respuestas de Aula ya terminadas). */
   citations?: AssistantCitation[]
