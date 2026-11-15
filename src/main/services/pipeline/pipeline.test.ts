@@ -643,6 +643,119 @@ describe('flujo clásico', () => {
   })
 })
 
+describe('paradas globales con compañeros activos', () => {
+  const deferred = (): { promise: Promise<void>; resolve: () => void } => {
+    let resolve!: () => void
+    const promise = new Promise<void>((done) => { resolve = done })
+    return { promise, resolve }
+  }
+
+  it.each([
+    ['cuota', () => new AIError('http', 'Insufficient Balance (402)', { status: 402 }), 'limit', 'ai_quota'],
+    ['límite temporal', () => new AIError('rateLimited', 'Too many requests', { retryAfter: 3600 }), 'limit', 'ai_rate_limit'],
+    ['presupuesto', () => new BudgetError({ type: 'reached', limit: 1, spent: 2 }), 'limit', 'ai_budget'],
+    ['credenciales', () => new AIError('missingKey', 'Falta la clave'), 'failed', 'ai_missing_key']
+  ] as const)('%s: cancela los compañeros y espera su limpieza antes de permitir reanudar', async (_label, failure, state, code) => {
+    const started = deferred(), aborted = deferred(), cleanup = deferred()
+    let active = false, finished = false
+    const roles: string[] = []
+    const agents = scriptedAgents(async (task, call) => {
+      roles.push(task.role)
+      if (task.role === 'planner') { await call('set_course_plan', Fixture.plan); return 'ok' }
+      if (task.prompt.includes('write the LESSON')) {
+        active = true
+        task.signal.addEventListener('abort', aborted.resolve, { once: true })
+        started.resolve()
+        try {
+          await cleanup.promise
+          // Una llamada que llegue después de cancelar tampoco puede escribir en el curso.
+          await expect(call('write_lesson', Fixture.lesson('suma'))).rejects.toMatchObject({ kind: 'cancelled' })
+        } finally { active = false }
+        return 'ok'
+      }
+      await started.promise
+      throw failure()
+    })
+    const pipe = new GenerationPipeline({ library: lib, request: teamRequest(2, false), agents })
+    const running = pipe.run().then((s) => { finished = true; return s })
+    try {
+      expect(await Promise.race([aborted.promise.then(() => true), running.then(() => false)])).toBe(true)
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(active).toBe(true)
+      expect(finished).toBe(false)
+    } finally { cleanup.resolve() }
+    const result = await running
+    expect(active).toBe(false)
+    expect(result.aula2).toMatchObject({ state, errorCode: code })
+    expect(result.stages.author).toBe('failed')
+    expect(result.cancelled).toBe(false)
+    expect(roles).toEqual(['planner', 'author', 'author'])
+    expect(store.hasSkill('suma') && store.loadSkill('suma').lesson.length > 0).toBe(false)
+    expect(GenerationPipeline.loadRun(store, pipe.runID)?.aula2).toMatchObject({ state, errorCode: code })
+  })
+
+  it('una cuota agotada retira la pregunta de otro agente y conserva la causa al reanudar', async () => {
+    const started = deferred()
+    const agents = scriptedAgents(async (task, call) => {
+      if (task.role === 'planner') { await call('set_course_plan', Fixture.plan); return 'ok' }
+      if (task.prompt.includes('write the LESSON')) {
+        const answer = call('ask_user', { question: '¿Qué tema quieres repasar?', options: ['Suma', 'Resta'] })
+        started.resolve()
+        await answer
+        return 'ok'
+      }
+      await started.promise
+      throw new AIError('http', 'Insufficient Balance (402)', { status: 402 })
+    })
+    const req = teamRequest(2, false)
+    const pipe = new GenerationPipeline({ library: lib, request: req, agents })
+    const stopped = await pipe.run()
+    expect(stopped.aula2).toMatchObject({ state: 'limit', errorCode: 'ai_quota' })
+    expect(stopped.stages.author).toBe('failed')
+    expect(pipe.broker.pending()).toEqual([])
+    expect(pipe.signal.aborted).toBe(true)
+    const resumed = new GenerationPipeline({ library: lib, request: req, agents: scriptedAgents(fakeTeamScript(req)), resumeRunID: pipe.runID })
+    expect(resumed.signal.aborted).toBe(false)
+    const done = await resumed.run()
+    expect(done.aula2.state, done.failure).toBe('done')
+    expect(store.loadSkill('suma').lesson.length).toBeGreaterThan(0)
+  })
+
+  it('espera también a los lectores cancelados, sin dejar el plan animándose como activo', async () => {
+    const importer = packImporter(store)
+    for (const topic of ['fracciones', 'decimales', 'porcentajes']) {
+      await importer.importText(`Apuntes de ${topic}. Ejemplos y ejercicios.\n`.repeat(1800), topic, 'official')
+    }
+    const started = deferred(), aborted = deferred(), cleanup = deferred()
+    let readers = 0, active = false, finished = false
+    const agents = scriptedAgents(async (task) => {
+      expect(task.role).toBe('reader')
+      if (++readers === 1) {
+        active = true
+        task.signal.addEventListener('abort', aborted.resolve, { once: true })
+        started.resolve()
+        try { await cleanup.promise } finally { active = false }
+        return 'ok'
+      }
+      await started.promise
+      throw new AIError('http', 'Insufficient Balance (402)', { status: 402 })
+    })
+    const pipe = new GenerationPipeline({ library: lib, request: teamRequest(2, false), agents })
+    const running = pipe.run().then((s) => { finished = true; return s })
+    try {
+      expect(await Promise.race([aborted.promise.then(() => true), running.then(() => false)])).toBe(true)
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(active).toBe(true)
+      expect(finished).toBe(false)
+    } finally { cleanup.resolve() }
+    const result = await running
+    expect(active).toBe(false)
+    expect(readers).toBe(2)
+    expect(result.aula2).toMatchObject({ state: 'limit', errorCode: 'ai_quota' })
+    expect(result.stages.plan).toBe('failed')
+  })
+})
+
 describe('equipo de agentes', () => {
   it('escribe las habilidades en paralelo, verifica pronto y enlaza la práctica', async () => {
     const busy = new Concurrency()

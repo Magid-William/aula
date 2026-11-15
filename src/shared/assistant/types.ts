@@ -118,6 +118,8 @@ export interface TutorContext {
   skillID?: string
   exerciseID?: string
   blockID?: string
+  /** «Marcar»: procedencia del mensaje visible. Los nombres y el pie de la figura son datos ajenos, nunca órdenes. */
+  markedFigure?: { studentText: string; context: string }
   /** Pantalla desde la que se pregunta (para dar contexto: 'lesson', 'practice', 'calendar'…). */
   screen?: string
   /** Texto que el estudiante tenía seleccionado. */

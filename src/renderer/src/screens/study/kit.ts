@@ -49,7 +49,7 @@ export function useBlockCtx(pack: Pack, skillId?: string, extra: Partial<BlockCo
         skillId,
         hue: pack.hue,
         onAskTutor: tutorScreen
-          ? (blockId, message, from) => askTutor(message, markedFigureContext({ courseID: pack.id, skillID: skillId, screen: tutorScreen }, blockId, from, from ? exerciseRef.current?.(from.exerciseId) : undefined))
+          ? (blockId, message, from, markedFigure) => askTutor(message, { ...markedFigureContext({ courseID: pack.id, skillID: skillId, screen: tutorScreen }, blockId, from, from ? exerciseRef.current?.(from.exerciseId) : undefined), ...(markedFigure ? { markedFigure } : {}) })
           : undefined,
         sourceTitle: (id) => pack.sources.find((s) => s.id === id)?.title,
         // la cita abre el material en su página, o la grabación en su minuto; si ya no está, la lista de materiales

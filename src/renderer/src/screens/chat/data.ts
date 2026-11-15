@@ -1,6 +1,7 @@
 // Datos del chat: lista de conversaciones y la conversación abierta (la usan el chat y el tutor del estudio), que se actualiza con
 // los eventos 'chat.message' (mensajes), 'chat.status' (si responde) y 'chat.queue' (lo que se escribió mientras respondía).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { figureContentOf } from '@engine/assistant/trust'
 import type { AssistantAttachment, AssistantMessage, AssistantRef, AssistantThread, AssistantThreadSummary, TutorContext } from '@shared/assistant/types'
 import type { AssistantThreadView } from '@shared/ipc/assistant'
 import { api } from '@renderer/lib/api'
@@ -42,6 +43,15 @@ export interface Draft {
   text: string
   files: string[]
   mentions: AssistantRef[]
+  /** Reintentar conserva la procedencia de la pregunta original. */
+  context?: TutorContext
+}
+
+/** Un reintento conserva su procedencia; una pregunta nueva del compositor sí es texto escrito por el estudiante. */
+export function draftContext(draft: Draft, current?: TutorContext): TutorContext | undefined {
+  if (draft.context) return draft.context
+  if (!current?.blockID || current.markedFigure) return current
+  return { ...current, markedFigure: { studentText: draft.text, context: '' } }
 }
 
 export interface Conversation {
@@ -125,9 +135,10 @@ export function useConversation(id: string | null): Conversation {
 
   /** Envía (o deja en cola). `false` si no se pudo: quien llama devuelve el texto a la caja (A3-P2-7: no se pierde). */
   const send = useCallback(async (threadId: string, draft: Draft, context?: TutorContext): Promise<boolean> => {
-    const optimistic = userMessage(draft)
+    context = draftContext(draft, context)
+    const optimistic = { ...userMessage(draft), ...(context ? { context } : {}) }
     // mientras Aula responde (y no espera una respuesta), el mensaje espera en cola
-    const toQueue = live.current.busy && !live.current.awaiting
+    const toQueue = live.current.busy && (!live.current.awaiting || !!figureContentOf(optimistic))
     if (toQueue) setQueued((q) => [...q, optimistic])
     else setThread((th) => (th ? { ...th, messages: [...th.messages, optimistic] } : th))
     setSending((n) => n + 1)

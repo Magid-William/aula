@@ -34,6 +34,18 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 - **Choose the language of a new course** next to its level (or let Aula pick it from your system languages); the
   default is in Settings → General.
 - **The system cursor** option is easier to find (Settings → Appearance, and from ⌘K).
+- **Stopping a course at an AI limit cancels its other agents and pending questions**, and waits for them before
+  offering resume. The recorded reason remains the original quota, budget or provider failure.
+- **Older drawings in chats and slides remain visible**, including legacy line aliases and node-based Venn diagrams.
+- **Complex figures use bounded layout work**, keeping long chart labels and large drawings responsive.
+- **Marked figure text stays course content when sent to the tutor**, including after a retry or a saved conversation
+  is reopened; it cannot authorize tools as if the student had typed it.
+- **The iOS demonstration includes the licenses for its bundled code and fonts**, including Sketchy's MIT notice.
+
+### Compatibility
+- Existing courses continue to open. Aula 0.2.4 cannot display all the new figures, and saving a course with new
+  figure fields in that older version can discard those fields. Keep courses that use the new figures in this version
+  or newer; keep a backup before opening them in an older version.
 
 ## [0.2.4] - 2026-11-13
 

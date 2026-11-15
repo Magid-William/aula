@@ -28,6 +28,19 @@ class IdMaker {
 export function normalizeDiagramForm(o: O, rawType: string): void {
   const form = parseDiagramForm(text(o.form)) ?? parseDiagramForm(text(o.kind)) ?? parseDiagramForm(rawType)
   if (!form) return
+  // Los chats antiguos guardaban `kind: "venn"` con nodos normales: se veían como flujo, con sus flechas. Solo inferir
+  // conjuntos si hay círculos o atajos; un `form`/tipo explícito sigue pasando por la validación de Venn.
+  const nodes = arr(o.nodes)
+  if (form === 'venn' && o.form === undefined && parseDiagramForm(rawType) === undefined && nodes?.length
+    && ['sets', 'circles', 'groups', 'items', 'elements', 'both', 'shared', 'common', 'intersection', 'all', 'build'].every((k) => o[k] === undefined)
+    && nodes.every((n) => {
+      const no = obj(n)
+      return text(no?.shape)?.toLowerCase() !== 'circle'
+        && ['in', 'sets', 'members', 'belongs', 'belongsTo'].every((k) => no?.[k] === undefined)
+    })) {
+    o.kind = 'flow'
+    return
+  }
   o.form = form
   switch (form) {
     case 'pyramid': case 'funnel': levels(o); break

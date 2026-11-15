@@ -20,7 +20,7 @@ import type { AskFrom, BlockContext } from '../types'
 import { barAnchor, collectTargets, findCanvas, findSurface, headSlot, keyboardTargets, unionBox } from './dom'
 import { MarkerGlyph, PenGlyph } from './glyphs'
 import {
-  clampInto, cleanText, composeMarkMessage, isPageKey, loopAround, MARK_LIMITS, MARK_STYLE, marksCenter, marksOf, nearestTarget, ringLabelTop, strokePath, summarizeMarks, whereOf,
+  clampInto, cleanText, composeMarkRequest, isPageKey, loopAround, MARK_LIMITS, MARK_STYLE, marksCenter, marksOf, nearestTarget, ringLabelTop, strokePath, summarizeMarks, whereOf,
   type AskedBlock, type Box, type Mark, type MarkTarget, type MarkTool, type Pt, type Stroke
 } from './marks'
 
@@ -527,7 +527,7 @@ function AskHost({ block, ctx, onAsk, children }: { block: Block; ctx: BlockCont
     const r = surfaceOf()?.getBoundingClientRect()
     const surfBox: Box = r ? { x: r.left, y: r.top, width: r.width, height: r.height } : UNIT
     const c = marksCenter(marks)
-    const message = composeMarkMessage({
+    const { message, markedFigure } = composeMarkRequest({
       question,
       block: blockInfo(block, ctx.inPrompt === true),
       summary,
@@ -538,7 +538,7 @@ function AskHost({ block, ctx, onAsk, children }: { block: Block; ctx: BlockCont
     })
     // una figura del enunciado de un ejercicio: el tutor sabe cuál es (y, si está sin resolver, ayuda sin resolverlo)
     const from: AskFrom | undefined = ctx.exerciseId ? { exerciseId: ctx.exerciseId, unsolved: ctx.inPrompt === true } : undefined
-    onAsk(block.id, message, from)
+    onAsk(block.id, message, from, markedFigure)
     ctx.onInteract?.(block.id, 'ask-tutor')
     setQuestion('')
     dismiss(true)

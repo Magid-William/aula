@@ -24,6 +24,8 @@ export function handPath(points: readonly Pt[], closed: boolean, seed: number, a
   const k = Math.min(1, total / 50)
   const a = amp * (0.35 + 0.65 * k)
   const step = Math.max(2.5, Math.min(6, total / 12))
+  // Decoración opcional: para un recorrido enorme se usa el SVG exacto, sin millones de muestras ni curvas.
+  if (!Number.isFinite(total) || total / step > 4094) return ''
   const pts = resample(src, step)
   if (closed && pts.length > 2) {
     const last = pts[pts.length - 1]

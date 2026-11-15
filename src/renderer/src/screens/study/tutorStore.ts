@@ -26,7 +26,14 @@ export const useTutor = create<TutorState>((set, get) => ({
   show: (context, prompt, owner) => set({ open: true, context, prompt: prompt ?? null, owner: owner ?? routeKey(useNav.getState().route) }),
   takePrompt: () => {
     const p = get().prompt
-    if (p !== null) set({ prompt: null })
+    if (p !== null) {
+      // La procedencia corresponde solo a esta pregunta. Las siguientes se escriben en el compositor.
+      const context = get().context
+      if (context?.markedFigure) {
+        const { markedFigure: _marked, ...rest } = context
+        set({ prompt: null, context: rest })
+      } else set({ prompt: null })
+    }
     return p
   },
   close: () => set({ open: false, prompt: null, owner: null })

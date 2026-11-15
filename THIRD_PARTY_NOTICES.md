@@ -116,8 +116,11 @@ Sketchy file it comes from in its header):
   `src/renderer/src/blocks/TableBlocks.tsx`, `src/renderer/src/design/paint/penInk.ts`
 - Structural formulas from SMILES: `src/engine/chem/smiles.ts`, `src/engine/chem/structure-layout.ts`,
   `src/engine/chem/structure-depict.ts`, `src/engine/pipeline/structure-guide.ts`
+- Adapted regression tests: `src/engine/chem/smiles.test.ts`, `src/engine/chem/structure-depict.test.ts`,
+  `src/renderer/src/blocks/visual/lib/diagramForms.test.ts`
 - Drawings (objects, geometry marks, labels, motion, steps, checks): `src/engine/drawing/geometry.ts`, `marks.ts`,
-  `objects.ts`, `labels.ts`, `motion.ts`, `steps.ts` and `issues.ts`, `src/engine/pipeline/drawingReference.ts`,
+  `objects.ts`, `labels.ts`, `motion.ts`, `steps.ts` and `issues.ts`, `src/engine/content/drawing-validation.ts`,
+  `src/engine/pipeline/drawingReference.ts`,
   `src/renderer/src/blocks/visual/lib/loopInk.ts`
 - Mark and ask the tutor, guided tours of labeled figures: `src/renderer/src/blocks/ask/AskLayer.tsx`,
   `src/renderer/src/blocks/ask/marks.ts`, `src/renderer/src/blocks/visual/LabeledBlock.tsx`,

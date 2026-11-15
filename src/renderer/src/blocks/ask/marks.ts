@@ -3,6 +3,7 @@
 // Adaptado de Sketchy (https://github.com/ddkbs/sketchy), MIT © 2026 ddkbs: viewer/src/annotate.ts (strokePath,
 // describeMarks, nearest, bounds y overlaps). Aquí la prueba de qué se marcó es más fina que la caja de Sketchy: un lazo
 // marca lo que tiene DENTRO y un trazo abierto lo que toca.
+import type { TutorContext } from '@shared/assistant/types'
 
 export interface Pt {
   x: number
@@ -409,11 +410,18 @@ export interface AskedBlock {
 
 export type Translate = (key: string, vars?: Record<string, string | number>) => string
 
+interface MarkMessageOptions { question: string; block: AskedBlock; summary: MarkSummary; where?: Where; whereOfPoint?: (p: Pt) => Where; t: Translate; lang: string }
+
+/** Vista legible del mensaje; al enviarlo se conserva también la procedencia de sus partes. */
+export function composeMarkMessage(opts: MarkMessageOptions): string {
+  return composeMarkRequest(opts).message
+}
+
 /**
  * El mensaje al tutor: la pregunta del estudiante (o una por defecto) y, debajo, lo que marcó en palabras: la figura, las
  * partes, las notas y dónde están las marcas. `t` lee las claves de `visual:ask.*`.
  */
-export function composeMarkMessage(opts: { question: string; block: AskedBlock; summary: MarkSummary; where?: Where; whereOfPoint?: (p: Pt) => Where; t: Translate; lang: string }): string {
+export function composeMarkRequest(opts: MarkMessageOptions): { message: string; markedFigure: NonNullable<TutorContext['markedFigure']> } {
   const { block, summary, t } = opts
   const question = cleanText(opts.question, MARK_LIMITS.question) || t('ask.defaultQuestion')
   const kinds = ['diagram', 'drawing', 'labeled', 'map', 'structure']
@@ -446,8 +454,10 @@ export function composeMarkMessage(opts: { question: string; block: AskedBlock; 
     if (w) parts.push(t('ask.msgLoose', { where: w }))
   }
   if (summary.marked.length && opts.where) parts.push(t('ask.msgWhere', { where: t(`ask.where.${opts.where}`) }))
-  const lines = [question, '', parts.join(' ')]
+  const lines = [parts.join(' ')]
   const caption = block.caption ? cleanText(block.caption, 200) : ''
   if (caption) lines.push(t('ask.msgCaption', { caption }))
-  return lines.join('\n')
+  const context = lines.join('\n')
+  const studentText = [question, ...summary.notes.map((n) => t('ask.msgNoteAlone', { text: cleanText(n.text, MARK_LIMITS.noteChars) }))].join('\n')
+  return { message: `${question}\n\n${context}`, markedFigure: { studentText, context } }
 }

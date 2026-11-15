@@ -21,6 +21,13 @@ const ID = 'exam-2-math112'
 const log = (...a) => console.log(...a)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// Los avisos viajan con el código, también sin Mac ni conexión. Si falta el build de licencias, falla antes de grabar.
+const legalFiles = ['LICENSE.md', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_LICENSES.txt'].map((name) => {
+  const data = readFileSync(resolve(name === 'THIRD_PARTY_LICENSES.txt' ? `out/${name}` : name))
+  if (!data.toString('utf8').trim()) throw new Error(`el aviso de licencia está vacío: ${name}`)
+  return ['/' + name, { type: 'text/plain; charset=utf-8', data }]
+})
+
 // ── La app con el curso de ejemplo y seis semanas de estudio simuladas, en inglés (el idioma de la revisión) ───────────
 const home = mkdtempSync(join(tmpdir(), 'aula-ios-demo-'))
 writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: 'en' } }))
@@ -50,7 +57,7 @@ const paired = await page.evaluate(async (code) => (await fetch('/pair/complete'
 if (!paired.ok) throw new Error('no se pudo vincular el dispositivo de la grabación')
 
 // ── Lo que se graba ───────────────────────────────────────────────────────────────────────────────────────────────────
-const files = new Map() // ruta → { type, data }
+const files = new Map(legalFiles) // ruta → { type, data }
 const rpc = new Map() // cuerpo → respuesta (texto)
 const fallback = {} // método → último cuerpo
 const events = {} // cuerpo → [{ after, line }]

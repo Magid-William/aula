@@ -49,11 +49,25 @@ export function densify(points: readonly Pt[], closed: boolean, step = 5): Pt[] 
   if (points.length < 2) return points.map((p) => [p[0], p[1]])
   const out: Pt[] = []
   const count = closed ? points.length : points.length - 1
+  const steps: number[] = []
+  let total = 0
   for (let i = 0; i < count; i++) {
     const a = points[i]
     const b = points[(i + 1) % points.length]
-    const steps = Math.max(1, Math.min(400, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)))
-    for (let k = 0; k < steps; k++) out.push([a[0] + ((b[0] - a[0]) * k) / steps, a[1] + ((b[1] - a[1]) * k) / steps])
+    const n = Math.max(1, Math.min(400, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)))
+    steps.push(n)
+    total += n
+  }
+  // El límite es por contorno, no por segmento: una spline puede tener miles de segmentos.
+  // Se muestrea todo el recorrido sin construir antes el contorno enorme. El SVG exacto se conserva aparte.
+  const samples = Math.min(total, 4095)
+  let segment = 0, start = 0
+  for (let k = 0; k < samples; k++) {
+    const index = Math.floor(k * total / samples)
+    while (segment < count - 1 && index >= start + steps[segment]) start += steps[segment++]
+    const a = points[segment], b = points[(segment + 1) % points.length]
+    const t = (index - start) / steps[segment]
+    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
   }
   out.push(closed ? [points[0][0], points[0][1]] : [points[points.length - 1][0], points[points.length - 1][1]])
   return out

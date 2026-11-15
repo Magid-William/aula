@@ -60,6 +60,24 @@ if let script {
 let (missing, _, _) = await get("/assets/no-existe.js")
 check(missing == 404, "lo que no está, 404")
 
+// El código de la interfaz lleva sus avisos completos dentro del mismo archivo, disponibles incluso sin red.
+for (name, marker) in [
+    ("LICENSE.md", "GNU AFFERO GENERAL PUBLIC LICENSE"),
+    ("NOTICE.md", "Aula"),
+    ("THIRD_PARTY_NOTICES.md", "Copyright (c) 2026 ddkbs"),
+    ("THIRD_PARTY_LICENSES.txt", "Aula — third-party software licenses")
+] {
+    let path = "/" + name
+    guard let file = archive.index.files[path], let packed = archive.bytes(file.offset, file.length) else {
+        check(false, "la demostración incluye \(name)")
+        continue
+    }
+    let (status, served, response) = await get(path)
+    check(status == 200 && served == packed && String(decoding: served, as: UTF8.self).contains(marker)
+          && (response?.value(forHTTPHeaderField: "content-type") ?? "").contains("text/plain"),
+          "sirve \(name) completo, sin desplazar las fechas de sus avisos")
+}
+
 // una llamada grabada tal cual (con las fechas de «hoy», 40 días después)
 if let home = archive.index.fallback["home.summary"] {
     let answer = await rpc(DemoDates.shift(home, by: 40))

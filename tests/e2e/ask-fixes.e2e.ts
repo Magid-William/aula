@@ -151,10 +151,13 @@ test('una figura del enunciado de un ejercicio: el tutor recibe qué ejercicio e
     for (const f of readdirSync(chats).filter((x) => x.endsWith('.json'))) {
       const thread = JSON.parse(readFileSync(join(chats, f), 'utf8')) as { messages?: Array<{ text?: string; context?: Record<string, unknown> }> }
       const m = thread.messages?.find((x) => x.text?.startsWith('What is this?'))
-      if (m?.context) return { block: m.context.blockID, exercise: typeof m.context.exerciseID === 'string', result: m.context.lastResult, screen: m.context.screen }
+      if (m?.context) return { block: m.context.blockID, exercise: typeof m.context.exerciseID === 'string', result: m.context.lastResult, screen: m.context.screen, markedFigure: m.context.markedFigure }
     }
     return null
-  }, { timeout: 30_000 }).toEqual({ block: 'ask-diagram', exercise: true, result: 'not solved yet', screen: 'practice' })
+  }, { timeout: 30_000 }).toEqual({
+    block: 'ask-diagram', exercise: true, result: 'not solved yet', screen: 'practice',
+    markedFigure: { studentText: 'What is this?', context: expect.stringContaining('Angle') }
+  })
   expect(errors).toEqual([])
   await app.close()
 })

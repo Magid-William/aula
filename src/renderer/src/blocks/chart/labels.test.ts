@@ -8,6 +8,15 @@ import { hbarPath } from './HBarChart'
 const fake = (s: string): number => Array.from(s).length * 6
 
 describe('nombres largos de las categorías', () => {
+  it('no vuelve a medir cada posible corte de una etiqueta ajena enorme', () => {
+    const label = Array.from({ length: 3000 }, (_, i) => `palabra${i}`).join(' ')
+    let measured = 0
+    const measure = (s: string): number => { measured += s.length; return s.length * 6 }
+    const lines = splitLabel(label, 100, measure)
+    expect(lines.join(' ')).toBe(label)
+    expect(measured).toBeLessThan(label.length * 30)
+    expect(labelLines(label, 100, measure).every((line) => measure(line) <= 100)).toBe(true)
+  })
   it('parte en dos líneas por el corte más equilibrado', () => {
     expect(splitLabel('Enfermedades cardiovasculares', 90, fake)).toEqual(['Enfermedades', 'cardiovasculares'])
     expect(splitLabel('Cáncer de pulmón y bronquios', 100, fake)).toEqual(['Cáncer de pulmón', 'y bronquios'])

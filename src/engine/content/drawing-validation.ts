@@ -1,6 +1,7 @@
 // Validación del dibujo vectorial (`drawing`): campos que necesita cada tipo, objetos que existen, ids únicos, movimiento
 // (expresiones que se entienden y recorridos válidos), pasos coherentes y, con la misma geometría que pinta la interfaz,
-// textos que se pisan y formas que se salen del lienzo (adaptado de drawIssues de Sketchy, ver engine/drawing/issues.ts).
+// textos que se pisan y formas que se salen del lienzo (ver engine/drawing/issues.ts).
+// Adaptado de drawIssues de Sketchy (https://github.com/ddkbs/sketchy), MIT © 2026 ddkbs.
 // Los mensajes son en español: los lee la IA que escribe el dibujo para corregirlo.
 import type { ContentIssue, DrawingBlock, DrawItem, IssueSeverity } from '@shared/schema'
 import { freeVariables } from '@engine/math/core/expr'

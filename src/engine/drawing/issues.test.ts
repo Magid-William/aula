@@ -30,6 +30,23 @@ describe('avisos del dibujo', () => {
 })
 
 describe('normalizador del dibujo', () => {
+  it('los alias guardados solo con extremos conservan la línea que dibujaban antes', () => {
+    const ends = { x1: 40, y1: 260, x2: 380, y2: 260, label: 'suelo' }
+    for (const kind of ['axis', 'axes', 'grid', 'ground', 'wall', 'shape', 'triangle', 'path', 'point', 'label']) {
+      const raw = { kind, ...ends }
+      expect(normalizeDrawItem(raw), kind).toEqual({ kind: 'line', ...ends })
+      expect(raw.kind).toBe(kind)
+    }
+    // Con geometría propia se conserva la forma nueva, aunque también haya extremos.
+    expect(normalizeDrawItem({ kind: 'axis', ...ends, x: 40, y: 260, w: 300, h: 200 })).toMatchObject({ kind: 'axes' })
+    expect(normalizeDrawItem({ kind: 'ground', ...ends, x: 200, y: 260, w: 340 })).toMatchObject({ kind: 'object', object: 'ground' })
+    expect(normalizeDrawItem({ kind: 'shape', ...ends, points: [[0, 0], [10, 0], [0, 10]] })).toMatchObject({ kind: 'polygon' })
+    // No ocultar errores de tipos explícitos ni de extremos incompletos.
+    expect(normalizeDrawItem({ kind: 'polygon', ...ends })).toMatchObject({ kind: 'polygon' })
+    expect(normalizeDrawItem({ kind: 'object', object: 'car', ...ends })).toMatchObject({ kind: 'object' })
+    expect(normalizeDrawItem({ kind: 'axis', x1: 40, y1: 260, x2: 380 })).toMatchObject({ kind: 'axes' })
+  })
+
   it('blob y shape pasan a polygon (blob suave)', () => {
     expect(normalizeDrawItem({ kind: 'blob', points: [] })).toMatchObject({ kind: 'polygon', smooth: true })
     expect(normalizeDrawItem({ kind: 'shape', points: [] })).toMatchObject({ kind: 'polygon' })

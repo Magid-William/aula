@@ -85,6 +85,11 @@ function context(v: unknown): TutorContext | undefined {
   const c: TutorContext = {}
   for (const k of ['courseID', 'skillID', 'exerciseID', 'blockID', 'screen'] as const) { const s = str(o, k, 300, false); if (s) c[k] = s }
   for (const k of ['selection', 'lastInput', 'lastResult'] as const) { const s = str(o, k, 8000, false); if (s) c[k] = s }
+  if (o.markedFigure !== undefined) {
+    const figure = obj(o.markedFigure)
+    if (typeof figure.studentText !== 'string' || typeof figure.context !== 'string') throw invalidArgs(tr('«markedFigure» no es válido', '“markedFigure” isn’t valid'))
+    c.markedFigure = { studentText: str(figure, 'studentText', MAX_MESSAGE_CHARS, false)!, context: str(figure, 'context', MAX_MESSAGE_CHARS, false)! }
+  }
   const step = o.lessonBlock
   if (step !== undefined && step !== null) {
     if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > 10_000) throw invalidArgs(tr('«lessonBlock» no es válido', '“lessonBlock” isn’t valid'))

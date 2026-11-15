@@ -62,7 +62,15 @@ export function placeAutoLabels(shapes: readonly DrawShape[], W: number, H: numb
   if (!shapes.some((s) => s.auto)) return shapes.slice()
   const taken: Box[] = []
   for (const s of shapes) for (const l of s.labels) taken.push(labelBox(l, ctx))
-  const outline: Pt[] = shapes.flatMap((s) => s.outline)
+  // Cada etiqueta prueba varios sitios contra el dibujo entero: acotar también el total, no solo cada forma.
+  const total = shapes.reduce((n, s) => n + s.outline.length, 0)
+  const stride = Math.max(1, Math.ceil(total / 8192))
+  const outline: Pt[] = []
+  let offset = 0
+  for (const s of shapes) {
+    for (let i = (stride - offset % stride) % stride; i < s.outline.length; i += stride) outline.push(s.outline[i])
+    offset += s.outline.length
+  }
   const k = ctx.unitsPerPx
   const gaps: [number, number] = [6 * k + 2, 28 * k + 4]
   return shapes.map((s) => {

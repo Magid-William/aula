@@ -17,6 +17,16 @@ const KIND_ALIASES: Readonly<Record<string, string>> = {
   dimension: 'measure', cota: 'measure', ruler: 'measure', axis: 'axes', ejes: 'axes', rejilla: 'grid'
 }
 
+/** Los chats guardan JSON sin normalizar: estos nombres con solo extremos se dibujaban como líneas. */
+function legacyEndpointLine(kind: string, o: O): boolean {
+  const alias = Object.hasOwn(KIND_ALIASES, kind) ? KIND_ALIASES[kind] : undefined
+  const needsGeometry = kind === 'axes' || kind === 'grid' || kind === 'smooth' || isObjectName(kind)
+    || (alias !== undefined && ['polygon', 'polyline', 'dot', 'text', 'axes', 'grid'].includes(alias))
+  return needsGeometry
+    && ['x1', 'y1', 'x2', 'y2'].every((k) => typeof o[k] === 'number' && Number.isFinite(o[k]))
+    && ['x', 'y', 'cx', 'cy', 'w', 'h', 'r', 'rx', 'ry', 'points', 'object'].every((k) => o[k] === undefined)
+}
+
 function moveKey(o: O, from: readonly string[], to: string): void {
   if (o[to] !== undefined) return
   for (const f of from) if (o[f] !== undefined) { o[to] = o[f]; delete o[f]; return }
@@ -32,7 +42,8 @@ export function normalizeDrawItem(v: JSONValue): JSONValue {
   if (raw !== undefined) {
     const k = raw.toLowerCase()
     const pts = arr(o.points)
-    if (k === 'blob' || k === 'smooth') { o.kind = 'polygon'; if (o.smooth === undefined) o.smooth = true }
+    if (legacyEndpointLine(k, o)) o.kind = 'line'
+    else if (k === 'blob' || k === 'smooth') { o.kind = 'polygon'; if (o.smooth === undefined) o.smooth = true }
     else if (k === 'curve' && pts && pts.length > 3) { o.kind = 'polyline'; if (o.smooth === undefined) o.smooth = true }
     else if (k !== 'object' && isObjectName(k) && o.object === undefined) { o.kind = 'object'; o.object = k }
     else if (Object.hasOwn(KIND_ALIASES, k)) o.kind = KIND_ALIASES[k]

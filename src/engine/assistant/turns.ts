@@ -49,21 +49,24 @@ export class AssistantTurns {
 
   /** Lo que esperaba, en UN mensaje (como lo leería una persona: varios mensajes seguidos son una sola idea). */
   takeMerged(): AssistantMessage | undefined {
-    const first = this._queued[0]
+    // Una figura conserva su contexto (p. ej. ejercicio sin resolver); no se mezcla con preguntas de otra pantalla.
+    const marked = this._queued.findIndex((m) => !!m.context?.markedFigure || !!m.context?.blockID)
+    if (marked === 0) return this._queued.shift()
+    const queued = this._queued.splice(0, marked < 0 ? this._queued.length : marked)
+    const first = queued[0]
     if (!first) return undefined
     const merged: AssistantMessage = { ...first }
-    if (this._queued.length > 1) {
-      merged.text = this._queued.map((m) => m.text).filter((t) => t).join('\n\n')
+    if (queued.length > 1) {
+      merged.text = queued.map((m) => m.text).filter((t) => t).join('\n\n')
       const seen = new Set<string>()
-      merged.mentions = this._queued.flatMap((m) => m.mentions).filter((r) => {
+      merged.mentions = queued.flatMap((m) => m.mentions).filter((r) => {
         const k = refID(r)
         if (seen.has(k)) return false
         seen.add(k)
         return true
       })
-      merged.attachments = this._queued.flatMap((m) => m.attachments)
+      merged.attachments = queued.flatMap((m) => m.attachments)
     }
-    this._queued = []
     return merged
   }
 }

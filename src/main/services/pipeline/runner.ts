@@ -94,6 +94,13 @@ function isFatal(err: unknown): boolean {
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err))
 
+/** Una etapa no termina mientras sus compañeros puedan seguir escribiendo, aunque uno haya fallado. */
+async function waitForAll(work: Promise<void>[]): Promise<void> {
+  const results = await Promise.allSettled(work)
+  const failed = results.find((r) => r.status === 'rejected')
+  if (failed?.status === 'rejected') throw failed.reason
+}
+
 export class GenerationPipeline {
   readonly runID: string
   readonly store: PackStore
@@ -218,7 +225,10 @@ export class GenerationPipeline {
   }
 
   private setFatal(e: Error): void {
-    if (!this.fatal) this.fatal = e
+    if (this.fatal) return
+    // Guardar la causa antes de cancelar: los compañeros pueden responder con «cancelado» al mismo tiempo.
+    this.fatal = e
+    this.controller.abort()
   }
 
   private checkCancelled(): void {
@@ -305,8 +315,14 @@ export class GenerationPipeline {
   }
 
   private finishWithError(err: unknown): void {
+    err = this.fatal ?? err
+    if (this.fatal) {
+      for (const stage of Object.keys(this.state.stages) as GenerationStage[]) {
+        if (this.state.stages[stage] === 'running') this.state.stages[stage] = 'failed'
+      }
+    }
     const at = this.now().toISOString()
-    if (isCancelled(err, this.controller.signal) && !(err instanceof LimitStop) && !(err instanceof BudgetError)) {
+    if (!this.fatal && isCancelled(err, this.controller.signal) && !(err instanceof LimitStop) && !(err instanceof BudgetError)) {
       // «Detener»: una creación queda en pausa (se reanuda o se queda con lo que hay); una ampliación, detenida
       this.mutate((s) => { s.cancelled = true; s.finishedAt = at; s.aula2.state = isExtend(s.request) ? 'cancelled' : 'paused' })
       return
@@ -488,7 +504,7 @@ export class GenerationPipeline {
     if (!(groups.length >= 2 || (groups.length > 0 && have.size > 0))) return
     this.stage('plan', 'running', tr(`${groups.length} lectores leen tus materiales a la vez`, `${groups.length} readers read your materials at the same time`))
     const course = this.promptCourse(pack)
-    await Promise.all(groups.map(async (ids) => {
+    await waitForAll(groups.map(async (ids) => {
       const titles = pack.sources.filter((s) => ids.includes(s.id)).map((s) => s.title)
       const lane = titles.length === 1 ? tr(`Lector · ${titles[0]}`, `Reader · ${titles[0]}`) : tr(`Lector · ${titles.length} materiales`, `Reader · ${titles.length} materials`)
       try {
@@ -505,8 +521,8 @@ export class GenerationPipeline {
     if (!todo.length) { this.stage('author', 'done', tr('Todas las habilidades ya estaban listas', 'All skills were already ready')); return }
     this.stage('author', 'running', tr(`${todo.length} habilidad(es) por escribir`, `${todo.length} skill(s) to write`))
     await forEachLimited(todo.map((s) => s.id), this.state.request.maxParallel, (id) => this.authorSkill(id))
-    this.checkCancelled()
     if (this.fatal) { this.stage('author', 'failed', this.fatal.message); throw this.fatal }
+    this.checkCancelled()
     const e = this.finishAuthorStage()
     if (e) throw e
   }
@@ -577,7 +593,7 @@ export class GenerationPipeline {
 
   /** Equipo: la lección y la práctica de una habilidad las escriben dos agentes a la vez. */
   private async writeSkillAsTeam(id: string, title: string, pack: Pack): Promise<void> {
-    await Promise.all((['lesson', 'practice'] as SkillPart[]).map((part) => this.writePart(part, id, title, pack)))
+    await waitForAll((['lesson', 'practice'] as SkillPart[]).map((part) => this.writePart(part, id, title, pack)))
   }
 
   private async writePart(part: SkillPart, id: string, title: string, pack: Pack): Promise<void> {
@@ -727,8 +743,8 @@ export class GenerationPipeline {
     if (!ids.length) { this.stage('verify', 'skipped', tr('Nada que verificar', 'Nothing to verify')); return }
     this.stage('verify', 'running', tr('Un solucionador independiente resuelve los ejercicios sin ver las claves', 'An independent solver works the exercises without seeing the keys'))
     await forEachLimited(ids, this.state.request.maxParallel, (id) => this.verifySkill(id, 'normal'))
-    this.checkCancelled()
     if (this.fatal) { this.stage('verify', 'failed', this.fatal.message); throw this.fatal }
+    this.checkCancelled()
     this.stage('verify', 'done', this.verifySummary())
   }
 
@@ -793,11 +809,11 @@ export class GenerationPipeline {
       try { await this.crossCuttingStage(true) } catch (err) { if (!isCancelled(err, this.controller.signal) && err instanceof Error) this.setFatal(err) }
     })())
     await Promise.all(work)
-    this.checkCancelled()
     if (this.fatal) {
       for (const g of ['author', 'crossCutting', 'verify'] as GenerationStage[]) if (this.state.stages[g] === 'running') this.stage(g, 'failed', this.fatal.message)
       throw this.fatal
     }
+    this.checkCancelled()
     if (!verify) this.stage('verify', 'skipped', tr('Desactivada', 'Turned off'))
     else if (!this.verifyStarted) { if (!verifyWasDone) this.stage('verify', 'skipped', tr('Nada que verificar', 'Nothing to verify')) }
     else this.stage('verify', 'done', this.verifySummary())
@@ -991,8 +1007,8 @@ export class GenerationPipeline {
         lane.status = 'failed'; lane.finishedAt = this.now().toISOString()
         lane.current = isCancelled(err, this.controller.signal) ? tr('Detenido', 'Stopped') : errorText(err)
         this.laneChanged()
-        // el tope de gasto vale para TODA la ejecución (los demás agentes no empiezan); queda para reanudar
-        if (err instanceof BudgetError || err instanceof LimitStop) this.setFatal(err)
+        // Una parada global cancela también los compañeros y sus preguntas pendientes.
+        if (err instanceof Error && isFatal(err)) this.setFatal(err)
         throw err
       } finally {
         this.runningAgents -= 1

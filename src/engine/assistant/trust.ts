@@ -4,6 +4,21 @@
 //   - `memory_remember`, `memory_forget` y `goal_set` piden confirmación si la IA ya leyó contenido ajeno en el turno;
 //   - `run_automation_now` se lanza como mucho una vez por turno.
 import { foldPlain } from './fold'
+import type { AssistantMessage } from '@shared/assistant/types'
+
+/** En «Marcar», el texto visible mezcla la pregunta con nombres del curso. Solo la pregunta y las notas son del estudiante. */
+export const studentTextOf = (message: Pick<AssistantMessage, 'text' | 'context'>): string => message.context?.markedFigure?.studentText ?? (message.context?.blockID ? '' : message.text)
+
+/** Los mensajes antiguos con blockID mezclaban texto propio y ajeno sin procedencia: no se puede adivinar por el idioma. */
+export const figureContentOf = (message: Pick<AssistantMessage, 'text' | 'context'>): string | undefined =>
+  (message.context?.markedFigure ? message.context.markedFigure.context : message.context?.blockID ? message.text : undefined) || undefined
+
+/** Incluye la procedencia en turnos nuevos y en las figuras que se vuelven a leer del historial. */
+export function messageTrust(history: readonly AssistantMessage[], message: AssistantMessage): AssistantTurnTrust {
+  const previous = history.filter((m) => m.role === 'user' && m.id !== message.id && !m.origin)
+  return new AssistantTurnTrust([...previous.map(studentTextOf), studentTextOf(message)],
+    !!figureContentOf(message) || previous.some((m) => !!figureContentOf(m)) || message.attachments.length > 0 || message.mentions.some((r) => r.kind === 'material' || r.kind === 'event'))
+}
 
 /** Nombre base de una herramienta: sin el prefijo de los agentes CLI (`mcp__aula__list_courses` → `list_courses`). */
 export function toolBaseName(name: string): string {

@@ -231,14 +231,22 @@ export function splitLabel(label: string, width: number, measure: TextWidth): st
   if (measure(label) <= width || words.length < 2) return [label]
   let best: [string, string] = [label, '']
   let bestW = Infinity
-  for (let i = 1; i < words.length; i++) {
+  let bestIndex = Infinity
+  let lo = 1, hi = words.length - 1
+  // El ancho de la primera línea crece y el de la segunda decrece. Buscar el cruce evita medir O(n²) texto.
+  while (lo <= hi) {
+    const i = Math.floor((lo + hi) / 2)
     const a = words.slice(0, i).join(' ')
     const b = words.slice(i).join(' ')
-    const w = Math.max(measure(a), measure(b))
-    if (w < bestW) {
+    const aw = measure(a), bw = measure(b)
+    const w = Math.max(aw, bw)
+    if (w < bestW || (w === bestW && i < bestIndex)) {
       bestW = w
+      bestIndex = i
       best = [a, b]
     }
+    if (aw < bw) lo = i + 1
+    else hi = i - 1
   }
   return best
 }
