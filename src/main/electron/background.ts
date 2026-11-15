@@ -127,7 +127,9 @@ function guardWindow(win: BrowserWindow): void {
   })
 }
 
-function applyLoginItem(openAtLogin: boolean): void {
+export function applyLoginItem(openAtLogin: boolean): void {
+  // Ensayos del paquete: no registrar ni retirar elementos de inicio de sesión del ordenador.
+  if (process.env.AULA_NO_LOGIN_ITEM === '1') return
   if (!app.isPackaged || process.platform === 'linux') return
   try { app.setLoginItemSettings({ openAtLogin, args: ['--hidden'] }) } catch (err) { log.warn('Abrir al iniciar sesión', err) }
 }

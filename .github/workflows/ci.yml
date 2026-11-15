@@ -36,7 +36,7 @@ jobs:
       - name: Unit tests
         run: npm test
       - name: Release metadata and publication tests
-        if: runner.os == 'Linux'
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
         run: node --test scripts/release-tests/*.test.mjs
       - name: Build
         id: build

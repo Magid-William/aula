@@ -133,7 +133,16 @@ describe('la .deb de Linux y el código de cada versión (A6-P1-3, A6-P2-14)', (
     const p = read('docs/PUBLISHING.md')
     expect(p).not.toMatch(/so you can add the `\.deb` later/)
     expect(p).toMatch(/### Adding a `\.deb` to a published release/)
-    expect(p).toMatch(/shopt -s nullglob/)
+    const section = p.split('### Adding a `.deb` to a published release')[1]?.split('\n## ')[0] ?? ''
+    // La receta usa el código etiquetado y crea solo la .deb, sin publicar lo que genere el builder.
+    expect(section).toMatch(/git worktree add \S+ v\d+\.\d+\.\d+/)
+    expect(section).toMatch(/npx electron-builder --linux deb[^\n]*--publish never/)
+    // Un archivo explícito: ni globs, ni AppImages, ni feeds que sustituyan la actualización publicada.
+    const uploads = section.split('\n').filter((line) => line.startsWith('gh release upload ')).map((line) => line.split('#')[0].trim())
+    expect(uploads).toHaveLength(1)
+    expect(uploads[0]).toMatch(/^gh release upload v\d+\.\d+\.\d+ [^\s*?{}]+\.deb -R [^\s]+$/)
+    expect(section).toMatch(/Never upload the\s+`latest-linux\.yml`/)
+    expect(section).toMatch(/Don't use\s+`scripts\/release-local\.sh --only linux`/)
   })
 
   it('las notas de la versión dicen dónde está su código fuente, en las dos lenguas', () => {

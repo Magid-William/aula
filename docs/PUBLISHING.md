@@ -470,6 +470,13 @@ The installed app refuses `--remote-debugging-port` (see [What's hardened](#what
 packaged build with CDP (`scripts/dev/security-check.mjs`, measurements), build it with `AULA_AUDIT_BUILD=1 npm run build`
 (`release-local.sh` refuses that).
 
+For a short **startup smoke of 0.2.5 or later**, copy the verified final app to a temporary directory and use a newly
+created, empty `AULA_HOME`, `AULA_NO_UPDATES=1`, `AULA_NO_LOGIN_ITEM=1`, `AULA_FAKE_AI=1`, `AULA_HIDDEN=1` and
+`--use-mock-keychain`. Keep it at the welcome screen without opening providers or connecting accounts. The login-item
+flag prevents startup and settings changes from registering or removing a login item during the test. Neither that
+flag nor a mock keychain proves the update flow: this smoke only checks startup, with updates disabled. Older binaries
+do not recognize the login-item flag and still require a separate test account.
+
 ## Signing
 
 | System | Without certificates (now) | With certificates |
