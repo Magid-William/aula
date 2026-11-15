@@ -135,7 +135,6 @@ export default function ChatScreen() {
           <Conversation
             conv={conv}
             language={i18n.language}
-            onSend={(d) => void send(d)}
             onCancelQueued={(id) => void cancel(id)}
             empty={emptyView}
             contentClassName="mx-auto max-w-[760px] px-2 pt-4 pb-6"

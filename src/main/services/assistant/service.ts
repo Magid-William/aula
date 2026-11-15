@@ -5,9 +5,10 @@
 // Cada turno corre en nombre de un actor del historial («chat-<hilo>-<mensaje>» o «tutor-…»): lo que Aula cambie en los cursos, el
 // calendario o la memoria queda en «Cambios de Aula» como un grupo y se puede deshacer entero.
 import { existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { IDs } from '@engine/base/ids'
-import { AssistantTurns, bestCitationMatch, buildCatalog, extractCitations, figureContentOf, oneLine, readable, redactSecrets, titleFrom, type AssistantCatalog } from '@engine/assistant'
+import { AssistantTurns, bestCitationMatch, buildCatalog, extractCitations, figureContentOf, oneLine, readable, redactSecrets, refID, studentTextOf, titleFrom, type AssistantCatalog } from '@engine/assistant'
 import type { AssistantCalendar } from '@engine/calendar'
 import { ContentValidator } from '@engine/content/validator'
 import { aiLocale, tr } from '@shared/ai/i18n'
@@ -30,7 +31,7 @@ import { LiveWebAccess, type WebAccess } from '../tools'
 import { ChangeContext } from '../store/history/context'
 import type { Library } from '../store/library'
 import type { PackStore } from '../store/packStore'
-import { MAX_ATTACHMENTS, pendingAttachment, processAttachment, type AttachmentMedia } from './attachments'
+import { checkRetryAttachments, MAX_ATTACHMENTS, pendingAttachment, processAttachment, type AttachmentMedia } from './attachments'
 import { Answer, AssistantBroker, type AssistantAnswer } from './broker'
 import { cutOffNotice, explainError } from './errors'
 import { isFakeModel, streamingFake } from './fake'
@@ -117,10 +118,61 @@ interface Run {
   emitTimer?: ReturnType<typeof setTimeout>
   partialTimer?: ReturnType<typeof setTimeout>
   done?: Promise<void>
+  /** Identidad estable de la respuesta a un reintento explícito; no autoriza archivos ni contenido nuevo. */
+  retryReplyId?: string
 }
 
 const SAFE_ID = /^[\p{L}\p{N}_.:-]{1,80}$/u
 const safeID = (raw: unknown): string | undefined => (typeof raw === 'string' && SAFE_ID.test(raw) ? raw : undefined)
+
+function isCardReply(messages: readonly AssistantMessage[], index: number): boolean {
+  const user = messages[index], before = messages[index - 1]
+  return !!user && user.role === 'user' && !user.origin && !!before && before.role === 'assistant' && !before.origin && before.cards.some(c =>
+    c.answer === user.text && ((c.kind === 'question' && c.state === 'answered') || (c.kind === 'approval' && c.state === 'denied')))
+}
+
+/** Detecta sólo el protocolo antiguo de tarjetas; sirve para rechazar, nunca para conceder acceso a adjuntos. */
+function legacyAttachmentContinuation(messages: readonly AssistantMessage[], current: AssistantMessage): boolean {
+  let index = messages.indexOf(current)
+  for (let depth = 0; depth < 64; depth++) {
+    if (!isCardReply(messages, index)) return false
+    let previous = index - 2
+    while (previous >= 0 && messages[previous].role !== 'user') previous--
+    const parent = messages[previous]
+    if (!parent || parent.origin) return false
+    if (parent.attachments.length) return true
+    index = previous
+  }
+  return true // No continuar una cadena que no pudimos comprobar completa.
+}
+
+/** Vista temporal: una aclaración conserva la imagen y el contexto de SU turno, nunca de una pregunta independiente. */
+function retryTurnMessage(messages: readonly AssistantMessage[], current: AssistantMessage): AssistantMessage {
+  if (current.turnRootID === undefined) {
+    if (!current.attachments.length && legacyAttachmentContinuation(messages, current)) throw invalidArgs(tr(
+      'No puedo recuperar los adjuntos de esta respuesta antigua. Vuelve a adjuntarlos para enviar la pregunta.',
+      'I cannot recover the attachments for this older reply. Attach them again to send the question.'))
+    return current
+  }
+  const rootID = safeID(current.turnRootID)
+  const rootIndex = messages.findIndex(m => m.id === rootID), currentIndex = messages.indexOf(current)
+  const root = messages[rootIndex]
+  if (!rootID || !root || rootIndex >= currentIndex || root.role !== 'user' || root.origin || root.turnRootID !== undefined ||
+    messages.filter(m => m.id === rootID).length !== 1 || messages.slice(rootIndex + 1, currentIndex + 1).some((m, i) =>
+      m.role === 'user' && (m.origin || m.turnRootID !== rootID || m.attachments.length > 0 || !isCardReply(messages, rootIndex + 1 + i)))) {
+    throw invalidArgs(tr('No puedo recuperar el contexto de esa aclaración. Vuelve a enviar la pregunta con sus adjuntos.', 'I cannot recover the context of that clarification. Send the question with its attachments again.'))
+  }
+  const context = root.context ? { ...root.context } : undefined
+  if (context && (context.markedFigure || context.blockID)) context.markedFigure = { studentText: studentTextOf(current), context: figureContentOf(root) ?? '' }
+  const seen = new Set<string>()
+  const mentions = [...current.mentions, ...root.mentions].filter(ref => {
+    const id = refID(ref)
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  }).slice(0, 12)
+  return { ...current, attachments: root.attachments, context, mentions }
+}
 
 /** ¿Tiene algo que enseñar? */
 export const hasContent = (m: AssistantMessage): boolean => m.text !== '' || m.cards.length > 0 || m.notices.length > 0
@@ -402,6 +454,41 @@ export class AssistantService {
 
   // MARK: Enviar
 
+  /** El usuario y sus adjuntos permanecen intactos; sólo se añade otra respuesta a esa misma pregunta. */
+  retry(args: { threadId: string; failedMessageId: string }): { messageId: string; replyId: string; queued: false } {
+    if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(k => k !== 'threadId' && k !== 'failedMessageId')) throw invalidArgs(tr('Reintento no válido', 'Invalid retry'))
+    const id = safeID(args.threadId), failedID = safeID(args.failedMessageId)
+    if (!id || !failedID) throw invalidArgs(tr('Reintento no válido', 'Invalid retry'))
+    const found = this.find(id)
+    // safe() sanea nombres: un alias que produzca el mismo archivo no es el mismo hilo.
+    if (!found || found.draft || found.thread.id !== id) throw new AulaError('not_found', tr('No encuentro esa conversación.', "I can't find that conversation."))
+    const messages = found.thread.messages
+    const failureIndex = messages.findIndex(m => m.id === failedID)
+    const failed = messages[failureIndex]
+    if (!failed || messages.filter(m => m.id === failedID).length !== 1 || failed.role !== 'assistant' || !failed.failed || failed.interrupted || failed.origin) throw invalidArgs(tr('Esa respuesta no se puede reintentar.', 'That reply cannot be retried.'))
+    const original = messages.slice(0, failureIndex).reverse().find(m => m.role === 'user')
+    if (!original || original.origin || messages.filter(m => m.id === original.id).length !== 1 || (!original.text && !original.mentions.length && !original.attachments.length)) throw invalidArgs(tr('No encuentro la pregunta original.', "I can't find the original question."))
+    const replyId = 'retry-' + createHash('sha256').update(JSON.stringify([id, failedID])).digest('hex')
+    const receipt = { messageId: original.id, replyId, queued: false as const }
+    const liveRun = this.runs.get(id)
+    if (liveRun?.busy && liveRun.retryReplyId === replyId) return receipt
+    const previousIndex = messages.findIndex(m => m.id === replyId)
+    if (previousIndex >= 0) {
+      const previous = messages[previousIndex]
+      if (messages.filter(m => m.id === replyId).length !== 1 || previousIndex <= failureIndex || previous.role !== 'assistant' || previous.origin || messages.slice(failureIndex + 1, previousIndex).some(m => m.role === 'user')) throw invalidArgs(tr('Reintento no válido', 'Invalid retry'))
+      return receipt // El ACK pudo perderse; también después de volver a abrir el hilo.
+    }
+    if (liveRun?.busy || liveRun?.turns.queued.length) throw new AulaError('busy', tr('Espera a que termine la respuesta en curso.', 'Wait for the current reply to finish.'))
+    if (failureIndex !== messages.length - 1) throw invalidArgs(tr('Sólo se puede reintentar el último fallo.', 'Only the latest failed reply can be retried.'))
+    const message = retryTurnMessage(messages, original)
+    checkRetryAttachments(message.attachments, found.store.filesHandle(id), this.assistantRoot)
+    // La comprobación es síncrona: otro envío no puede adelantarse entre validar y tomar el turno.
+    const run = this.runFor(id)
+    this.touched.add(id)
+    this.begin(run, message, false, replyId, replyId)
+    return receipt
+  }
+
   /** Un mensaje del estudiante. Si Aula está respondiendo: contesta a la tarjeta que espera (si la hay) o espera en cola
    * (`queued`; se envía solo cuando termina la respuesta y se puede quitar con `cancelQueued`). */
   send(args: { threadId: string; text: string; mentions?: unknown[]; attachments?: string[]; context?: unknown; messageId?: string }): { messageId: string; queued: boolean } {
@@ -488,9 +575,10 @@ export class AssistantService {
   }
 
   /** `liveId`: al reintentar solo, la respuesta en vivo sigue siendo la misma burbuja (antes salía una vacía por intento). */
-  private begin(run: Run, message: AssistantMessage, autoRetried = false, liveId?: string): void {
+  private begin(run: Run, message: AssistantMessage, autoRetried = false, liveId?: string, retryReplyId?: string): void {
     const turn = run.turns.begin()
     run.busy = true
+    run.retryReplyId = retryReplyId
     run.live = newMessage('assistant', '', { notices: run.notices.splice(0), ...(liveId ? { id: liveId } : {}) })
     run.controller = new AbortController()
     run.broker = new AssistantBroker()
@@ -538,7 +626,7 @@ export class AssistantService {
       const snapshot: AssistantThread = { ...run.thread, messages: [...run.thread.messages] }
       const deps = this.deps(run, model)
       const last = await ChangeContext.run(actor, () => withAIUse({ purpose: run.thread.courseID ? 'tutor' : 'chat', ...(run.thread.courseID ? { courseID: run.thread.courseID } : {}), label: actor.label },
-        () => runTurn({ thread: snapshot, message, broker: run.broker, signal }, deps, this.events(run, turn, message.id))))
+        () => runTurn({ thread: snapshot, message, broker: run.broker, signal }, deps, this.events(run, turn, message.turnRootID ?? message.id))))
       if (!current()) return
       const final = this.settle(run, last, true)
       observeTurn(this.memory, run.thread, final, this.courseOf(run.thread))
@@ -554,7 +642,7 @@ export class AssistantService {
         await delay(this.opts.retryDelayMs ?? 2000)
         if (!current()) return
         run.busy = false
-        this.begin(run, message, true, liveId)
+        this.begin(run, message, true, liveId, run.retryReplyId)
         return
       }
       log.info('Chat: el turno falló', explained.code, explained.message)
@@ -568,9 +656,12 @@ export class AssistantService {
       } else {
         const provider = run.live?.provider
         // si no llegó nada, el error ocupa la misma burbuja: no queda una «Aula» vacía encima (J2-10)
-        const reuse = empty && run.live ? { id: run.live.id } : {}
+        const liveID = run.live?.id
         // lo que ya había llegado (un error que no es de red, p. ej. la clave o el límite) también queda como interrumpido
         this.keepLive(run, true)
+        // Incluso un intento que sólo produjo pasos necesita conservar su identidad para no repetirse por un ACK perdido.
+        const retryID = run.retryReplyId && !run.thread.messages.some(m => m.id === run.retryReplyId) ? run.retryReplyId : undefined
+        const reuse = empty && liveID ? { id: liveID } : retryID ? { id: retryID } : {}
         const failed = newMessage('assistant', explained.message, { failed: true, ...reuse, ...(provider ? { provider } : {}) })
         run.thread.messages.push(failed)
         this.persist(run)
@@ -586,6 +677,7 @@ export class AssistantService {
     return {
       library: this.library, store: run.store, model, validator: this.validator, appLanguage: s.appLanguage, dailyMinutes: s.dailyMinutes, allowWeb: s.allowWeb,
       interactive: this.opts.interactive ?? true,
+      strictAttachments: !!run.retryReplyId,
       ...(this.opts.visionHelpers ? { visionHelpers: this.opts.visionHelpers } : {}),
       ...(this.opts.calendar?.() ? { calendar: this.opts.calendar()! } : {}),
       control: this.opts.control?.() ?? this.defaultControl(model),
@@ -619,7 +711,7 @@ export class AssistantService {
 
   // MARK: Lo que va llegando
 
-  private events(run: Run, turn: number, userMessageID: string): TurnEvents {
+  private events(run: Run, turn: number, rootMessageID: string): TurnEvents {
     const live = (): AssistantMessage | undefined => (run.turns.isCurrent(turn) ? run.live : undefined)
     return {
       status: (label) => { if (run.turns.isCurrent(turn)) this.setStatus(run, label) },
@@ -653,7 +745,7 @@ export class AssistantService {
       provider: (p) => { const l = live(); if (l) l.provider = p },
       attachments: (list) => {
         if (!run.turns.isCurrent(turn)) return
-        const m = run.thread.messages.find((x) => x.id === userMessageID)
+        const m = run.thread.messages.find((x) => x.id === rootMessageID)
         if (m) this.replaceMessage(run, { ...m, attachments: list })
       },
       segmentBreak: (closed, reply, fromComposer) => {
@@ -671,6 +763,7 @@ export class AssistantService {
           emitReply = run.composerReply.emit
           run.composerReply = undefined
         }
+        reply.turnRootID = rootMessageID
         run.thread.messages.push(reply)
         if (emitReply) this.sink?.message(run.thread.id, reply)
         run.live = newMessage('assistant', '', { ...(l.provider ? { provider: l.provider } : {}) })

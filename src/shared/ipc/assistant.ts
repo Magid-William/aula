@@ -21,6 +21,8 @@ declare module './contract' {
      * sustituyen. Sin él, el mensaje del estudiante no se emite (la interfaz ya lo enseña). `queued`: Aula estaba respondiendo y el
      * mensaje espera en cola (se envía solo al terminar; 'chat.queue' avisa). */
     'chat.send': { args: { threadId: string; text: string; mentions?: AssistantRef[]; attachments?: string[]; context?: TutorContext; messageId?: string }; result: { messageId: string; queued: boolean } }
+    /** Reintenta el último fallo manual con el mensaje y adjuntos ya guardados del mismo hilo. Nunca acepta rutas ni contenido nuevo. */
+    'chat.retry': { args: { threadId: string; failedMessageId: string }; result: { messageId: string; replyId: string; queued: false } }
     /** Detiene SOLO la respuesta en curso: lo que esperaba en cola se envía a continuación. */
     'chat.stop': { args: { threadId: string }; result: void }
     /** Quita un mensaje de la cola (el «×» de la burbuja que espera). `removed` = false si ya se había enviado. */

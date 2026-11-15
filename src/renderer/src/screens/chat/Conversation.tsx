@@ -6,15 +6,13 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Icon, cx, spring } from '@renderer/design'
 import type { AssistantMessage } from '@shared/assistant/types'
-import type { Conversation as Conv, Draft } from './data'
+import type { Conversation as Conv } from './data'
 import { Message, PendingReply, QueuedMessage } from './Message'
 import { useStickToBottom } from './scroll'
 
 export interface ConversationProps {
   conv: Conv
   language: string
-  /** Enviar un mensaje (para «Reintentar»). */
-  onSend: (draft: Draft) => void
   onCancelQueued: (id: string) => void
   /** Lo que se enseña sin mensajes. */
   empty: ReactNode
@@ -24,7 +22,7 @@ export interface ConversationProps {
   gapClassName?: string
 }
 
-export function Conversation({ conv, language, onSend, onCancelQueued, empty, className, contentClassName, gapClassName = 'gap-7' }: ConversationProps) {
+export function Conversation({ conv, language, onCancelQueued, empty, className, contentClassName, gapClassName = 'gap-7' }: ConversationProps) {
   const { t } = useTranslation('chat')
   const { thread, busy, queued, liveId, pendingSince } = conv
   const scroller = useRef<HTMLDivElement>(null)
@@ -42,13 +40,6 @@ export function Conversation({ conv, language, onSend, onCancelQueued, empty, cl
     if ((lastUser && lastUser !== before.user && lastUser.startsWith('local-')) || queued.length > before.queued) toBottom()
   }, [lastUser, queued.length, toBottom])
 
-  const retryFor = (m: AssistantMessage, i: number): (() => void) | undefined => {
-    if (!m.failed || i !== messages.length - 1 || busy.busy) return undefined
-    const asked = [...messages.slice(0, i)].reverse().find((x) => x.role === 'user' && !x.origin)
-    if (!asked || (!asked.text && !asked.mentions.length)) return undefined
-    return () => onSend({ text: asked.text, files: [], mentions: asked.mentions, context: asked.context })
-  }
-
   return (
     <div className={cx('relative flex min-h-0 flex-1 flex-col', className)}>
       <div ref={scroller} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" style={{ overflowAnchor: 'none' }}>
@@ -60,9 +51,10 @@ export function Conversation({ conv, language, onSend, onCancelQueued, empty, cl
               </motion.div>
             ) : (
               <motion.div key={thread?.id ?? 'thread'} className={cx('flex flex-col', gapClassName)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-                {messages.map((m, i) =>
+                {messages.map((m) =>
                   m.id !== liveId && isBlankReply(m) ? null : (
-                    <Message key={m.id} m={m} threadId={thread!.id} streaming={m.id === liveId} label={busy.label} language={language} onRetry={retryFor(m, i)} />
+                    <Message key={m.id} m={m} threadId={thread!.id} streaming={m.id === liveId} label={busy.label} language={language}
+                      onRetry={m.id === conv.retryableId ? () => void conv.retry(thread!.id, m.id) : undefined} />
                   )
                 )}
                 <AnimatePresence initial={false}>

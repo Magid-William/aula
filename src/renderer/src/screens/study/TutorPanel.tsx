@@ -89,7 +89,6 @@ export function TutorPanel({ screenKey }: { screenKey: string }) {
           <Conversation
             conv={conv}
             language={i18n.language}
-            onSend={send}
             onCancelQueued={(id) => void cancel(id)}
             empty={emptyView}
             contentClassName="px-5 py-2"
