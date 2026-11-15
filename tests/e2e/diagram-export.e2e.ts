@@ -3,12 +3,12 @@ import { test, expect, type ElectronApplication, type Locator, type Page, type T
 import { _electron as electron } from 'playwright'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
 import type { DiagramPrimitive, DiagramRenderSceneV1 } from '../../src/shared/figuresDiagram'
 import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { DIAGRAM_FIXTURES, EMPTY_DIAGRAM } from './diagram-fixtures'
 import { compareDiagramPixels, type LiveDiagramGeometry } from './diagram-pixels'
 import { go, homeWithDemoCourse } from './helpers'
+import { captureDiagramReference, initializeDiagramReference, evaluateLiveElement, liveGeometry } from './diagram-reference'
 
 const PACK = 'exam-2-math112', SKILLS = ['reference-angles', 'degree-radian-conversion', 'arc-length-sector-area']
 interface Audit { id: number; shown: number; destroyed: boolean; defaultSession: boolean; calls: Array<{ method: string; input?: unknown; result?: unknown; error?: string }>; isolation?: unknown }
@@ -105,7 +105,9 @@ async function start(home: string, dark: boolean): Promise<{ app: ElectronApplic
       }, { phase, sourceId, dom })
     }
     await recordSourceViewport('before-setViewportSize')
+    const nativeDpr = await page.evaluate<number>('devicePixelRatio')
     await page.setViewportSize({ width: 1440, height: 1100 })
+    await initializeDiagramReference(page, nativeDpr)
     await recordSourceViewport('after-setViewportSize')
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
     return { app, page, errors }
@@ -138,6 +140,7 @@ async function save(app: ElectronApplication, page: Page, figure: Locator, path:
   else await png.click()
   await expect.poll(() => existsSync(path), { timeout: 30_000 }).toBe(true)
   await expect(figure.locator('[data-figure-export]')).toHaveAttribute('aria-busy', 'false')
+  await expect(page.getByRole('menuitem', { includeHidden: true })).toHaveCount(0)
 }
 async function inspect(page: Page, file: string, info: TestInfo, name: string): Promise<{ width: number; height: number }> {
   const png = readFileSync(file), width = png.readUInt32BE(16), height = png.readUInt32BE(20), chunks: string[] = []
@@ -169,79 +172,6 @@ async function settle(page: Page, figure: Locator): Promise<void> {
   await page.evaluate('document.fonts.ready')
 }
 
-/** Referencia DOM independiente: no consulta escenas, datos IPC, bounds ni helpers del exportador. */
-async function evaluateLiveElement<R>(target: Locator, expression: string): Promise<R> {
-  const key = `__aulaDiagramOracle_${randomUUID()}`
-  // Una callback real entrega el elemento; evaluate(string) no invoca por sí mismo una arrow function.
-  await target.evaluate((element, key) => { (globalThis as unknown as Record<string, unknown>)[key] = element }, key)
-  try { return await target.page().evaluate<R>(`(${expression})(globalThis[${JSON.stringify(key)}])`) }
-  finally { await target.page().evaluate(key => { delete (globalThis as unknown as Record<string, unknown>)[key] }, key) }
-}
-async function liveGeometry(figure: Locator, expectedEmpty = false): Promise<LiveDiagramGeometry> {
-  const geometry = await evaluateLiveElement<LiveDiagramGeometry>(figure.locator('.viz-dots'), `viewport => {
-    const box = viewport.getBoundingClientRect(), canvas = viewport.querySelector('[data-diagram-canvas]');
-    if (!canvas) throw new Error('The live Diagram canvas is unavailable');
-    const canvasBox = canvas.getBoundingClientRect(), canvasStyle = getComputedStyle(canvas);
-    const naturalWidth = parseFloat(canvasStyle.width), naturalHeight = parseFloat(canvasStyle.height);
-    const scale = canvasBox.width / naturalWidth;
-    if (!Number.isFinite(scale) || scale <= 0 || Math.abs(canvasBox.height / naturalHeight - scale) > 0.001) throw new Error('The live canvas does not have one uniform scale');
-    const visible = element => {
-      for (let parent = element; parent; parent = parent.parentElement) {
-        const css = getComputedStyle(parent);
-        if (css.display === 'none' || css.visibility === 'hidden' || css.visibility === 'collapse' || Number(css.opacity) === 0 || parent.classList.contains('katex-mathml')) return false;
-      }
-      return true;
-    };
-    const clipped = (element, raw) => {
-      if (!visible(element)) return undefined;
-      let left = Math.max(box.left, raw.left), top = Math.max(box.top, raw.top), right = Math.min(box.right, raw.right), bottom = Math.min(box.bottom, raw.bottom);
-      for (let parent = element; parent; parent = parent.parentElement) {
-        const css = getComputedStyle(parent), rect = parent.getBoundingClientRect();
-        if (['hidden', 'clip', 'auto', 'scroll'].includes(css.overflowX)) { left = Math.max(left, rect.left); right = Math.min(right, rect.right); }
-        if (['hidden', 'clip', 'auto', 'scroll'].includes(css.overflowY)) { top = Math.max(top, rect.top); bottom = Math.min(bottom, rect.bottom); }
-      }
-      return right > left && bottom > top ? { x: left - box.left, y: top - box.top, width: right - left, height: bottom - top } : undefined;
-    };
-    const labels = [];
-    for (const element of canvas.querySelectorAll('.aula-rich-inline, .katex-html')) {
-      if (!visible(element)) continue;
-      const kind = element.classList.contains('katex-html') ? 'math' : 'text', text = (element.textContent || '').trim().slice(0, 400);
-      if (!text) continue;
-      const rects = Array.from(element.getClientRects()).map(raw => clipped(element, raw)).filter(Boolean);
-      if (kind === 'math') {
-        // Cada fórmula conserva su ROI propio, separado del párrafo que la contiene.
-        for (const rect of rects) labels.push({ ...rect, text, kind });
-      } else if (rects.length) {
-        // Un mismo span puede emitir fragmentos por línea, negrita o el punto final. Su texto
-        // visible es una sola etiqueta: unir tras recortar conserva wrap/clamp sin exigir tinta
-        // suficiente a un fragmento arbitrario. No se agrupan elementos aunque repitan el texto.
-        const left = Math.min(...rects.map(rect => rect.x)), top = Math.min(...rects.map(rect => rect.y));
-        const right = Math.max(...rects.map(rect => rect.x + rect.width)), bottom = Math.max(...rects.map(rect => rect.y + rect.height));
-        labels.push({ x: left, y: top, width: right - left, height: bottom - top, text, kind });
-      }
-    }
-    const exclusions = [];
-    for (const button of document.querySelectorAll('button, [role="button"]')) {
-      const rect = clipped(button, button.getBoundingClientRect());
-      if (rect) exclusions.push({ ...rect, kind: 'button', label: button.getAttribute('aria-label') || button.textContent || button.className });
-    }
-    // El aviso de pan es UI real del viewport, hermano del lienzo; nunca excluye contenido del lienzo.
-    for (const child of viewport.children) {
-      if (child === canvas || child.contains(canvas) || child.matches('button, [role="button"]') || child.querySelector('button, [role="button"]')) continue;
-      if (!child.classList.contains('pointer-events-none') || !(child.textContent || '').trim()) continue;
-      const rect = clipped(child, child.getBoundingClientRect());
-      if (rect) exclusions.push({ ...rect, kind: 'hint', label: (child.textContent || '').trim() });
-    }
-    const probe = document.createElement('canvas'); probe.width = probe.height = 1;
-    const context = probe.getContext('2d', { colorSpace: 'srgb', willReadFrequently: true });
-    if (!context) throw new Error('The live background probe is unavailable');
-    context.fillStyle = getComputedStyle(viewport).backgroundColor; context.fillRect(0, 0, 1, 1);
-    const rgba = Array.from(context.getImageData(0, 0, 1, 1).data); probe.width = probe.height = 0;
-    if (rgba[3] !== 255) throw new Error('The live viewport background must be opaque');
-    return { width: box.width, height: box.height, canvas: { x: canvasBox.x - box.x, y: canvasBox.y - box.y, width: canvasBox.width, height: canvasBox.height, naturalWidth, naturalHeight, scale }, background: rgba.slice(0, 3), exclusions, labels };
-  }`)
-  return { ...geometry, expectedEmpty }
-}
 
 interface PausedFlowPhase { phase: number; currentTime: number | null; wasRunning: boolean; playState: string }
 /** Sólo el fixture de paridad pausa Animation objects en su fase real; no cambia CSS ni Playing. */
@@ -299,16 +229,10 @@ async function captureWithLiveComparison(app: ElectronApplication, page: Page, f
     const phases = await pauseVizFlowAtCurrentPhase(figure)
     expect(phases.every(p => Number.isFinite(p.phase) && p.playState === 'paused')).toBe(true)
     if (phases.some(p => p.wasRunning)) expect(phases.some(p => p.wasRunning && Math.abs(p.phase) > 0.00001)).toBe(true)
-    const geometry = await liveGeometry(figure, options.expectedEmpty)
-    const fractions = await evaluateLiveElement<unknown>(figure, `figure => [...figure.querySelectorAll('.katex .frac-line')].map(n => { const c=getComputedStyle(n),b=n.getBoundingClientRect();return {border:c.borderBottomWidth,minHeight:c.minHeight,fontSize:c.fontSize,width:b.width,height:b.height,dpr:devicePixelRatio} })`)
-    const reference = info.outputPath(`${name}-live.png`), metadata = info.outputPath(`${name}-live-dom.json`)
-    const live = await figure.locator('.viz-dots').screenshot({ path: reference, scale: 'css' })
-    writeFileSync(metadata, JSON.stringify({ geometry, phases, fractions }, null, 2))
-    await info.attach(`${name}-live.png`, { path: reference, contentType: 'image/png' })
-    await info.attach(`${name}-live-dom.json`, { path: metadata, contentType: 'application/json' })
+    const { png: live, geometry } = await captureDiagramReference(page, figure, info, name, { expectedEmpty: options.expectedEmpty, phases })
     await save(app, page, figure, file, { keyboard: options.keyboard })
     const dimensions = await inspect(page, file, info, name)
-    const comparison = await compareDiagramPixels(page, live, readFileSync(file), geometry, info, name)
+    const comparison = await compareDiagramPixels(page, live, readFileSync(file), geometry, info, name, 'dense')
     if (options.requireMath) expect(comparison.labels.filter(label => label.kind === 'math' && !label.skipped).length, 'The independent oracle must inspect a separately clipped formula area').toBeGreaterThan(0)
     return { dimensions, natural: { width: geometry.canvas.naturalWidth, height: geometry.canvas.naturalHeight } }
   } finally { try { await resumePixelFixtureFlows(figure) } finally { await restoreDiagramPixelReference(figure) } }

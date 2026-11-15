@@ -5,7 +5,7 @@ import type { Page, TestInfo } from 'playwright/test'
 
 export interface PixelRect { x: number; y: number; width: number; height: number }
 export interface LiveDiagramGeometry {
-  /** Captura del viewport con screenshot({ scale: 'css' }), sin redondear estas medidas DOM. */
+  /** Viewport vivo en píxeles CSS, sin redondear estas medidas DOM. */
   width: number
   height: number
   /** Caja viva relativa al viewport; naturalWidth/Height salen de offsetWidth/Height o CSS width/height. */
@@ -217,22 +217,23 @@ export function assertDiagramPixelComparison(result: DiagramPixelComparison, geo
 }
 
 /** PNG decodificado por Image/Canvas del navegador; el cálculo usa sólo sus píxeles finales. */
-export async function compareDiagramPixels(page: Page, live: Buffer, saved: Buffer, geometry: LiveDiagramGeometry, info: TestInfo, name: string): Promise<DiagramPixelComparison> {
-  const input = { before: live.toString('base64'), after: saved.toString('base64'), geometry }
+export async function compareDiagramPixels(page: Page, live: Buffer, saved: Buffer, geometry: LiveDiagramGeometry, info: TestInfo, name: string, sourceRaster: 'css' | 'dense' = 'css'): Promise<DiagramPixelComparison> {
+  const input = { before: live.toString('base64'), after: saved.toString('base64'), geometry, sourceRaster }
   // Se inserta nuestra función pura, nunca contenido ejecutable suministrado por el documento.
   const script = `(async () => {
     const input = ${JSON.stringify(input).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')};
     const resample = ${resampleDiagramPixels.toString()};
-    async function decode(base64, factor) {
+    async function decode(base64, factor, cssSize) {
       const image = new Image(); image.src = 'data:image/png;base64,' + base64; await image.decode();
       const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
       const context = canvas.getContext('2d', { colorSpace: 'srgb', willReadFrequently: true }); if (!context) throw new Error('Oracle canvas is unavailable');
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const raster = { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data };
-      canvas.width = canvas.height = 0; return resample(raster, Math.round(raster.width * factor), Math.round(raster.height * factor));
+      canvas.width = canvas.height = 0; return resample(raster, cssSize ? Math.round(cssSize.width) : Math.round(raster.width * factor), cssSize ? Math.round(cssSize.height) : Math.round(raster.height * factor));
     }
     const compare = ${diagramPixelOracle.toString()};
-    return compare(await decode(input.before, 1), await decode(input.after, input.geometry.canvas.scale / 2), input.geometry);
+    // La fuente densa vuelve al viewport DOM exacto: la calibración CDP puede redondear un píxel.
+    return compare(await decode(input.before, 1, input.sourceRaster === 'dense' ? input.geometry : undefined), await decode(input.after, input.geometry.canvas.scale / 2), input.geometry);
   })()`
   const result = await page.evaluate<DiagramPixelComparison>(script)
   const path = info.outputPath(`${name}-live-comparison.json`)

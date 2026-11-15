@@ -23,6 +23,8 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
   appear complete in the image while the live chart continues normally.
 
 ### Fixed
+- **Importing scanned PDFs no longer stops because the OCR worker is missing a required file.** Desktop installers
+  retain all supported OCR core variants and check their packaged contents before building the installer.
 - **Retrying a failed question keeps its saved images and documents**, including questions containing only an image.
   The original question, context and files stay intact, and repeated clicks do not send duplicate questions. If a saved
   attachment is unavailable, Aula explains the problem before starting another response.
