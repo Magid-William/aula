@@ -13,6 +13,14 @@
     "stepByStep": "Step by step",
     "watch": "Watch it step by step"
   },
+  "figureExport": {
+    "label": "Export figure",
+    "svg": "Save SVG…",
+    "png": "Save PNG…",
+    "saving": "Saving drawing…",
+    "saved": "Chemical drawing saved",
+    "failed": "Couldn’t save the chemical drawing"
+  },
   "diagram": {
     "label": "Diagram",
     "process": "Step-by-step process",

@@ -13,6 +13,14 @@
     "stepByStep": "Paso a paso",
     "watch": "Verlo paso a paso"
   },
+  "figureExport": {
+    "label": "Exportar figura",
+    "svg": "Guardar SVG…",
+    "png": "Guardar PNG…",
+    "saving": "Guardando dibujo…",
+    "saved": "Dibujo químico guardado",
+    "failed": "No se pudo guardar el dibujo químico"
+  },
   "diagram": {
     "label": "Diagrama",
     "process": "Proceso paso a paso",

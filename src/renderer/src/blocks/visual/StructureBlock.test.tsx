@@ -10,9 +10,9 @@ import { formulaCe, shownGroups, stepAtoms, structureView, type ShownGroup } fro
 const block = (o: object): BlockOf<'structure'> => decodeBlock({ type: 'structure', ...o }) as BlockOf<'structure'>
 
 /** El dibujo de una SMILES como lo pinta el bloque (sin medidas de ventana). */
-function drawing(smiles: string, opts: { animate?: boolean; active?: number[]; groups?: object[]; autoGroups?: boolean } = {}): string {
-  const b = block({ smiles, groups: opts.groups ?? [], autoGroups: opts.autoGroups ?? false })
-  const view = structureView(b, 'skeletal', estimateMeasure)
+function drawing(smiles: string, opts: { animate?: boolean; portable?: boolean; hover?: number; active?: number[]; groups?: object[]; autoGroups?: boolean; style?: 'skeletal' | 'condensed'; conditions?: string; reversible?: boolean; notes?: object[] } = {}): string {
+  const b = block({ smiles, groups: opts.groups ?? [], autoGroups: opts.autoGroups ?? false, conditions: opts.conditions, reversible: opts.reversible, notes: opts.notes })
+  const view = structureView(b, opts.style ?? 'skeletal', estimateMeasure)
   if (!view.ok) throw new Error('no se dibujó')
   const groups = shownGroups(b, view.mol, false)
   return renderToStaticMarkup(
@@ -27,9 +27,10 @@ function drawing(smiles: string, opts: { animate?: boolean; active?: number[]; g
       groupLabel={(g) => g.label ?? g.kind ?? ''}
       active={opts.active ?? null}
       activeSet={opts.active ? new Set(opts.active) : null}
-      hover={null}
+      hover={opts.hover ?? null}
       setHover={() => undefined}
       animate={opts.animate ?? false}
+      portable={opts.portable}
       run
       seed="t"
       atomAsk={(i) => `átomo ${i + 1}`}
@@ -87,6 +88,36 @@ describe('bloque structure en pantalla', () => {
     expect(html.search(/Fórmula estructural|Structural formula/)).toBeLessThan(canvasAt)
     expect(html.lastIndexOf('aria-pressed')).toBeGreaterThan(canvasAt)
     expect(html.slice(canvasAt).match(/data-ask-part="group-/g) ?? []).toHaveLength(0)
+  })
+})
+
+describe('dibujo portable de STRUCTURE', () => {
+  it('termina los trazos sin hover, zonas transparentes ni metadatos del tutor, conservando la selección', () => {
+    const html = drawing('CC(=O)OCC', { portable: true, animate: true, hover: 0, active: [1, 2, 3], groups: [{ atoms: [2, 3, 4], label: 'respuesta secreta', md: 'explicación secreta' }] })
+    expect(html).not.toMatch(/stroke-dasharray|stroke-dashoffset|pathLength|opacity:0|data-ask-|transparent|accent-wash|respuesta secreta|explicación secreta/)
+    expect(html).toContain('stroke="var(--pigment-brick')
+    expect(html).toContain('opacity="0.3"')
+    expect(inkPaths(html)).toHaveLength(inkPaths(drawing('CC(=O)OCC')).length)
+    expect(html).toContain('viewBox="0 0 400 300"')
+  })
+  it('conserva isótopos, cargas y subíndices en sus posiciones, y las notas visibles', () => {
+    const html = drawing('[13CH3][NH3+].[Cl-]', { portable: true, style: 'condensed', notes: [{ atom: 1, text: 'α' }] })
+    for (const text of ['13', 'C', 'H', '3', 'N', '+', 'Cl', '−']) expect(html).toContain(`>${text}</tspan>`)
+    expect(html).toContain('α</text>')
+    expect(html).toMatch(/<tspan[^>]+x="[^"]+" y="[^"]+" font-size="/)
+  })
+  it('conserva la reacción reversible, sus condiciones y todos sus enlaces', () => {
+    const html = drawing('CCO.CC(=O)O>>CC(=O)OCC.O', { portable: true, animate: true, reversible: true, conditions: 'H₂SO₄ · Δ' })
+    expect(html).toContain('H₂SO₄ · Δ</text>')
+    expect(html).not.toMatch(/stroke-dasharray|stroke-dashoffset|data-ask-/)
+    expect(inkPaths(html).length).toBeGreaterThan(6)
+    expect(html.match(/stroke-width="1.5"/g)).toHaveLength(4)
+  })
+  it('no ofrece exportar un dibujo inexistente ni al imprimir', () => {
+    const render = (smiles: string, mode: 'lesson' | 'print') => renderToStaticMarkup(<StructureBlock block={block({ smiles })} ctx={makeBlockContext(null, 'es', { mode })} />)
+    expect(render('C1CC', 'lesson')).not.toContain('data-figure-export')
+    expect(render('CCO', 'print')).not.toContain('data-figure-export')
+    expect(render('CCO', 'lesson')).toContain('data-figure-export="structure"')
   })
 })
 

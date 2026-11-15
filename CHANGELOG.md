@@ -5,6 +5,12 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 
 ## [Unreleased]
 
+### Added
+- **Save a chemical drawing as SVG or PNG** from its export menu in the desktop app. Molecules and reactions keep
+  their drawing style, group or guided-step highlighting, and light or dark paper background. Files contain the full
+  drawing, independent of zoom, without controls, atom tooltips or answers hidden in an exercise prompt. Other figure
+  types, student annotations and sending a marked image to the tutor remain on the [figure roadmap](https://github.com/luumlabs/aula/issues/28).
+
 ## [0.2.5] - 2026-11-14
 
 ### Added

@@ -17,6 +17,8 @@ import { smilesErrorMessage } from '@engine/chem/smiles-messages'
 import type { SmilesMolecule } from '@engine/chem/smiles'
 import type { Depiction, DepictLabel } from '@engine/chem/structure-depict'
 import { RichText } from '@renderer/lib/RichText'
+import { captureFigure } from '@renderer/lib/figureExport/snapshot'
+import { FigureExportAction } from '@renderer/lib/figureExport/FigureExportAction'
 import type { BlockProps } from '../types'
 import { StepScrubber } from './DiagramBlock'
 import { arrowPaths, clusters, formulaCe, handStroke, ringPath, shownGroups, stepAtoms, structureView, type ShownGroup } from './lib/structureView'
@@ -141,14 +143,29 @@ export default function StructureBlock({ block, ctx }: BlockProps<BlockOf<'struc
       <StructureHeader
         eyebrow={isReaction ? t('structure.reactionEyebrow') : t('structure.eyebrow')}
         title={title}
-        actions={showStyles ? (
+        actions={!printing ? <>
+          {showStyles && (
           <SegmentedTabs
             size="sm"
             value={view.style}
             items={view.styles.map((st) => ({ id: st, label: t(`structure.styles.${st}`) }))}
             onChange={(st) => { setStyle(st); ctx.onInteract?.(block.id, 'structure-style') }}
-          />
-        ) : undefined}
+          />)}
+          <FigureExportAction kind="structure" capture={(signal) => {
+            const context = viewRef.current
+            if (!context) return Promise.reject(new Error('Structure drawing is unavailable'))
+            return captureFigure((portableMeasure) => {
+              // Se mide después de fonts.ready, con el estado elegido al pulsar Guardar; el original no se toca.
+              const current = structureView(block, view.style, portableMeasure)
+              if (!current.ok) throw new Error('Structure drawing is unavailable')
+              return <StructureDrawing d={current.depiction} mol={current.mol}
+                width={Math.ceil(current.depiction.bounds.w + PAD * 2)} height={Math.ceil(current.depiction.bounds.h + PAD * 2)}
+                dark={dark} groups={groups} groupColor={groupColor} groupLabel={groupLabel}
+                active={active} activeSet={activeSet} hover={null} setHover={() => undefined}
+                animate={false} run seed={block.id} atomAsk={() => ''} portable />
+            }, context, signal)
+          }} />
+        </> : undefined}
       />
       <div ref={box} className="w-full">
         {/* el lienzo y lo que se mueve y se amplía: ahí se marca para preguntar al tutor (los botones de grupo quedan fuera) */}
@@ -282,6 +299,8 @@ export interface DrawingProps {
   groupLabel: (g: ShownGroup) => string
   /** Los grupos se pueden marcar con su nombre (no en un enunciado sin resolver: el nombre sería la respuesta). */
   askGroups?: boolean
+  /** Dibujo final sin animaciones, hover, zonas de interacción ni metadatos para el tutor. */
+  portable?: boolean
   active: number[] | null
   activeSet: Set<number> | null
   hover: number | null
@@ -292,7 +311,9 @@ export interface DrawingProps {
   atomAsk: (i: number) => string
 }
 
-export function StructureDrawing({ d, mol, width, height, dark, groups, groupColor, groupLabel, askGroups = true, active, activeSet, hover, setHover, animate, run, seed, atomAsk }: DrawingProps) {
+export function StructureDrawing({ d, mol, width, height, dark, groups, groupColor, groupLabel, askGroups = true, portable = false, active, activeSet, hover, setHover, animate: animation, run: playing, seed, atomAsk }: DrawingProps) {
+  const animate = !portable && animation
+  const run = portable || playing
   const ox = PAD - d.bounds.x
   const oy = PAD - d.bounds.y
   const order = d.drawOrder
@@ -322,8 +343,8 @@ export function StructureDrawing({ d, mol, width, height, dark, groups, groupCol
           return (
             <motion.g
               key={g.key}
-              data-ask-part={askGroups ? `group-${g.key}` : undefined}
-              data-ask-label={askGroups ? groupLabel(g) : undefined}
+              data-ask-part={askGroups && !portable ? `group-${g.key}` : undefined}
+              data-ask-label={askGroups && !portable ? groupLabel(g) : undefined}
               initial={animate ? { opacity: 0 } : false}
               animate={run ? { opacity: 1 } : undefined}
               transition={{ duration: 0.5, delay: animate ? end + 0.1 + gi * 0.06 : 0 }}
@@ -339,7 +360,7 @@ export function StructureDrawing({ d, mol, width, height, dark, groups, groupCol
             </motion.g>
           )
         })}
-        {hover !== null && !d.atoms[hover]?.hidden && <circle cx={d.atoms[hover].x} cy={d.atoms[hover].y} r={d.fontPx * 0.95} fill="var(--accent-wash)" />}
+        {!portable && hover !== null && !d.atoms[hover]?.hidden && <circle cx={d.atoms[hover].x} cy={d.atoms[hover].y} r={d.fontPx * 0.95} fill="var(--accent-wash)" />}
         {/* enlaces: tinta que se traza en el orden de la mano */}
         {d.bonds.map((b) => {
           const on = !activeSet || (activeSet.has(b.a) && activeSet.has(b.b))
@@ -403,14 +424,16 @@ export function StructureDrawing({ d, mol, width, height, dark, groups, groupCol
         ))}
         {/* el rodeado a mano del grupo elegido, en ladrillo */}
         <AnimatePresence>
-          {rings.map((p, k) => (
+          {rings.map((p, k) => portable ? (
+            <path key={p} d={p} fill="none" stroke="var(--pigment-brick, var(--accent))" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+          ) : (
             <motion.path key={p} d={p} fill="none" stroke="var(--pigment-brick, var(--accent))" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
               initial={animate ? { pathLength: 0, opacity: 1 } : false} animate={{ pathLength: 1, opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: animate ? 0.5 : 0, delay: animate ? k * 0.12 : 0, ease: [0.4, 0, 0.2, 1] }} />
           ))}
         </AnimatePresence>
         {/* zonas para pasar el ratón (y el contrato «marca y pregunta al tutor») */}
-        {d.atoms.map((a, i) => {
+        {!portable && d.atoms.map((a, i) => {
           if (a.hidden) return null
           const l = d.labels.find((x) => x.atom === i)
           return (
