@@ -10,7 +10,8 @@ import { join } from 'node:path'
 
 const require = createRequire(import.meta.url)
 const root = join(__dirname, '../../../..')
-const { GitHubProvider } = require('electron-updater/out/providers/GitHubProvider') as { GitHubProvider: new (...a: unknown[]) => { getLatestVersion(): Promise<{ version: string; tag: string; releaseNotes?: unknown }> } }
+type FeedInfo = { version: string; tag: string; releaseNotes?: unknown; path?: string }
+const { GitHubProvider } = require('electron-updater/out/providers/GitHubProvider') as { GitHubProvider: new (...a: unknown[]) => { getLatestVersion(): Promise<FeedInfo>; resolveFiles(info: FeedInfo): Array<{ url: URL }> } }
 const { NodeHttpExecutor } = require('builder-util/out/nodeHttpExecutor') as { NodeHttpExecutor: new () => unknown }
 const semver = require('semver') as { parse(v: string): unknown }
 const yaml = require('js-yaml') as { load(s: string): unknown }
@@ -34,11 +35,11 @@ function publish(releases: Rel[]): void {
   }
 }
 
-function latest(platform: 'darwin' | 'win32' | 'linux', current = '2.0.0', allowPrerelease = false) {
-  const updater = { allowPrerelease, channel: null, currentVersion: semver.parse(current), fullChangelog: false }
-  const p = new GitHubProvider({ provider: 'github', owner: 'luumlabs', repo: 'aula', host: `127.0.0.1:${PORT}`, protocol: 'http' }, updater, { isUseMultipleRangeRequest: false, platform, executor: new NodeHttpExecutor() })
-  return p.getLatestVersion()
+function provider(platform: 'darwin' | 'win32' | 'linux', current = '2.0.0', allowPrerelease = false, channel: string | null = null) {
+  const updater = { allowPrerelease, channel, currentVersion: semver.parse(current), fullChangelog: false }
+  return new GitHubProvider({ provider: 'github', owner: 'luumlabs', repo: 'aula', host: `127.0.0.1:${PORT}`, protocol: 'http' }, updater, { isUseMultipleRangeRequest: false, platform, executor: new NodeHttpExecutor() })
 }
+const latest = (platform: 'darwin' | 'win32' | 'linux', current = '2.0.0', allowPrerelease = false) => provider(platform, current, allowPrerelease).getLatestVersion()
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'aula-feed-'))
@@ -79,6 +80,45 @@ describe('qué versión se ofrece', () => {
     publish([{ tag: 'v2.0.1' }])
     rmSync(join(dir, 'v2.0.1', 'latest-mac.yml'))
     await expect(latest('darwin')).rejects.toMatchObject({ code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' })
+  })
+})
+
+describe('el puente de firma Mac no se puede omitir', () => {
+  function publishWithBridge(version: string): string {
+    publish([{ tag: `v${version}` }, { tag: 'v0.2.4' }])
+    const d = join(dir, `v${version}`)
+    const currentYml = readFileSync(join(d, 'latest-mac.yml'), 'utf8')
+    writeFileSync(join(d, 'developer-id-mac.yml'), currentYml)
+    writeFileSync(join(d, 'latest-mac.yml'), currentYml.replaceAll(version, '0.2.5'))
+    writeFileSync(join(d, 'Aula-0.2.5-mac.zip'), 'original bridge')
+    return d
+  }
+
+  it.each(['0.2.5', '0.2.6', '0.3.0'])('latest v%s: el cliente antiguo recibe 0.2.5 y el puente lee el canal nuevo', async (version) => {
+    publishWithBridge(version)
+    const old = provider('darwin', '0.2.4')
+    const info = await old.getLatestVersion()
+    expect(info).toMatchObject({ tag: `v${version}`, version: '0.2.5' })
+    const url = old.resolveFiles(info)[0].url
+    expect(url.pathname).toBe(`/luumlabs/aula/releases/download/v${version}/Aula-0.2.5-mac.zip`)
+    expect(await (await fetch(url)).text()).toBe('original bridge')
+    expect(await provider('darwin', '0.2.5', false, 'developer-id').getLatestVersion()).toMatchObject({ tag: `v${version}`, version })
+    expect((await latest('win32', '0.2.4')).version).toBe(version)
+    expect((await latest('linux', '0.2.4')).version).toBe(version)
+  })
+
+  it('el canal nuevo ausente da error; no recae en latest-mac ni ofrece el puente como downgrade', async () => {
+    const d = publishWithBridge('0.2.6')
+    rmSync(join(d, 'developer-id-mac.yml'))
+    await expect(provider('darwin', '0.2.5', false, 'developer-id').getLatestVersion()).rejects.toMatchObject({ code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' })
+  })
+
+  it('el puente debe acompañar a cada tag latest: no se descarga automáticamente desde su tag original', async () => {
+    const d = publishWithBridge('0.2.6')
+    rmSync(join(d, 'Aula-0.2.5-mac.zip'))
+    const p = provider('darwin', '0.2.4')
+    const url = p.resolveFiles(await p.getLatestVersion())[0].url
+    expect((await fetch(url)).status).toBe(404)
   })
 })
 

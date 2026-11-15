@@ -1,6 +1,7 @@
 # Empaquetado de Aula (electron-builder). `npm run dist:mac|win|linux`.
-# Firma: en macOS, si hay certificado (CSC_LINK/CSC_KEY_PASSWORD o uno «Developer ID» en el llavero) se firma con él y,
-# con APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID, se notariza; si no, firma ad hoc. Ver docs/PUBLISHING.md.
+# Firma: la 0.2.5 conserva el certificado local para que las copias existentes puedan instalar el puente.
+# La posterior transición a Developer ID requiere cambiar esta configuración y verificar la notarización del ZIP;
+# no basta con que exista un certificado en el llavero. Ver docs/PUBLISHING.md → The macOS signing bridge.
 appId: com.luumlabs.aula
 productName: Aula
 copyright: Copyright © 2026 Luum Labs
@@ -132,5 +133,5 @@ publish:
   releaseType: draft
 # título y notas de la versión (inglés y español); al publicar otra versión, apuntar a sus notas
 releaseInfo:
-  releaseName: Aula 0.2.4
-  releaseNotesFile: docs/release-notes/0.2.4.md
+  releaseName: Aula 0.2.5
+  releaseNotesFile: docs/release-notes/0.2.5.md

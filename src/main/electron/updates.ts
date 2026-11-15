@@ -152,6 +152,9 @@ function getUpdater(): AppUpdater {
   u.autoDownload = false
   u.autoInstallOnAppQuit = true
   u.allowPrerelease = false
+  // latest-mac.yml conserva el puente local para las copias anteriores a 0.2.5. El canal nuevo sigue Developer ID.
+  if (process.platform === 'darwin') u.channel = 'developer-id'
+  // Asignar channel activa allowDowngrade en electron-updater: se desactiva DESPUÉS.
   u.allowDowngrade = false
   // Windows: Aula publica el instalador NSIS completo, nunca el «web installer» (sin esto, cada búsqueda deja un aviso)
   u.disableWebInstaller = true

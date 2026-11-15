@@ -9,6 +9,8 @@
 #                                            en cuanto está: si falla uno, los anteriores no se pierden (sigue con --only)
 #   scripts/release-local.sh --only mac      solo un sistema (mac | win | linux | android; se puede repetir). Recompila
 #                                            SOLO ese sistema: los archivos ya compilados de los otros se quedan como están
+#   scripts/release-local.sh --only mac --bridge-dir /ruta/originales-v0.2.5
+#                                            desde 0.2.6: exige el manifiesto público y repite los originales exactos
 #   scripts/release-local.sh --skip-checks   sin typecheck ni pruebas (si ya las pasaste)
 #   scripts/release-local.sh --upload --repo luumlabs/aula [--partial]
 #                                            sube lo ya compilado y comprobado a un borrador de ese repositorio (necesita
@@ -40,12 +42,16 @@ CHECKS=1
 UPLOAD=0
 PARTIAL=0
 REPO=""
+BRIDGE_DIR=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --only)
       [ $# -ge 2 ] || die "--only necesita un sistema: mac, win, linux o android"
       case "$2" in mac|win|linux|android) ONLY+=("$2") ;; *) die "Sistema desconocido: «$2» (mac, win, linux o android)" ;; esac
       shift 2 ;;
+    --bridge-dir)
+      [ $# -ge 2 ] || die "--bridge-dir necesita la carpeta con los originales públicos de v0.2.5"
+      BRIDGE_DIR="$2"; shift 2 ;;
     --skip-checks) CHECKS=0; shift ;;
     --upload) UPLOAD=1; shift ;;
     --partial) PARTIAL=1; shift ;;
@@ -73,7 +79,14 @@ for p in "${ONLY[@]}"; do
   [ "$p" = android ] || DESKTOP=1
 done
 
+# electron-builder pierde dependencias transitivas al empaquetar node_modules enlazado desde otro worktree.
+# Antes de leer claves, compilar o borrar salidas; subir artefactos y compilar solo Android no lo necesitan.
+if [ "$UPLOAD" -eq 0 ] && [ "$DESKTOP" -eq 1 ] && [ -L node_modules ]; then
+  die "node_modules es un enlace simbólico: quita solo el enlace con unlink node_modules; después ejecuta npm ci en este worktree antes de compilar escritorio. No borres su destino."
+fi
+
 VERSION=$(node -p "require('./package.json').version")
+MAC_MODE=$(node --input-type=module -e 'import {macMode} from "./scripts/release-common.mjs"; console.log(macMode(process.argv[1]))' "$VERSION")
 OUT="release/$VERSION"
 TAG="v$VERSION"
 NOTES="docs/release-notes/$VERSION.md"
@@ -228,6 +241,7 @@ same_as_draft() {
 
 # ── Subir (solo si se pide) ────────────────────────────────────────────────────────────────────────────────────────
 if [ $UPLOAD -eq 1 ]; then
+  [ "${AULA_MAC_ADHOC:-}" != 1 ] || die "AULA_MAC_ADHOC=1 solo sirve para probar; nunca permite --upload."
   [ -n "$REPO" ] || die "Di a qué repositorio se sube: --upload --repo $PUB_OWNER/$PUB_REPO (no se deduce de origin)."
   [ "$REPO" = "$PUB_OWNER/$PUB_REPO" ] \
     || die "--repo $REPO no es el de electron-builder.yml → publish ($PUB_OWNER/$PUB_REPO): las copias instaladas no lo verían."
@@ -240,6 +254,11 @@ if [ $UPLOAD -eq 1 ]; then
   YMLS=("$OUT"/latest*.yml)
   APKS=("$OUT"/*.apk)
   FILES=("$OUT"/latest*.yml "$OUT"/*.dmg "$OUT"/*.zip "$OUT"/*.exe "$OUT"/*.AppImage "$OUT"/*.deb "$OUT"/*.blockmap "$OUT"/*.apk)
+  MAC_FILES=("$OUT"/*.zip "$OUT"/*.dmg "$OUT"/*.zip.blockmap "$OUT"/*.dmg.blockmap)
+  if [ -f "$OUT/developer-id-mac.yml" ]; then
+    YMLS+=("$OUT/developer-id-mac.yml")
+    FILES+=("$OUT/developer-id-mac.yml")
+  fi
   shopt -u nullglob
   [ ${#FILES[@]} -gt 0 ] || die "No hay nada que subir en $OUT."
   if [ ${#YMLS[@]} -gt 0 ]; then
@@ -248,7 +267,9 @@ if [ $UPLOAD -eq 1 ]; then
     node scripts/release-sign.mjs --verify "$OUT" || die "Los latest*.yml de $OUT no llevan la firma de Aula: vuelve a compilar."
     # el título de cada latest*.yml es el de electron-builder.yml (releaseInfo.releaseName)
     for y in "${YMLS[@]}"; do
-      [ "$(sed -n 's/^releaseName: *//p' "$y" | head -1)" = "$TITLE" ] || die "$(basename "$y") no dice «releaseName: $TITLE»: vuelve a compilar ese sistema."
+      # El título histórico pertenece a los bytes firmados e inmutables del puente.
+      if [ "$MAC_MODE" = developer-id ] && [ "${y##*/}" = latest-mac.yml ]; then continue; fi
+      [ "$(sed -n 's/^releaseName: *//p' "$y" | head -1)" = "$TITLE" ] || die "$(basename "$y") no dice «releaseName: ${TITLE}»: vuelve a compilar ese sistema."
     done
   fi
   # Android: solo el APK de publicación de esta versión (nunca el de --debug ni el de otra versión)
@@ -256,10 +277,9 @@ if [ $UPLOAD -eq 1 ]; then
     for a in "${APKS[@]}"; do [ "${a##*/}" = "$APK" ] || die "$a no es $APK: quítalo de $OUT (solo se sube el APK de publicación de esta versión)."; done
     android_check_apk "$OUT/$APK"
   fi
-  # macOS: firmado con el certificado propio (si no, las copias firmadas con él la rechazarían)
-  if [ -d "$OUT/mac-universal/Aula.app" ] && [ "${AULA_MAC_ADHOC:-}" != 1 ]; then
-    codesign -d -r- "$OUT/mac-universal/Aula.app" 2>&1 | grep -q 'certificate root = H"' \
-      || die "La app de macOS de $OUT no está firmada con «Aula Local Signing»: vuelve a compilar mac en este Mac (docs/PUBLISHING.md → Signing)."
+  # Comprueba exactamente el ZIP que se subirá, aunque no quede una .app descomprimida. Sin bypass ad hoc.
+  if [ ${#MAC_FILES[@]} -gt 0 ] || [ -f "$OUT/latest-mac.yml" ] || [ -f "$OUT/developer-id-mac.yml" ]; then
+    node scripts/release-mac-verify.mjs "$OUT" "$VERSION" || die "El ZIP final de macOS no cumple la identidad y firma exigidas."
   fi
   HEAD_SHA=$(git rev-parse HEAD)
   HEAD_TREE=$(git rev-parse 'HEAD^{tree}')
@@ -289,7 +309,7 @@ if [ $UPLOAD -eq 1 ]; then
     TARGET=$(gh release view "$TAG" -R "$REPO" --json targetCommitish -q .targetCommitish)
     TARGET_TREE=$(gh api "repos/$REPO/commits/$TARGET" --jq .commit.tree.sha 2>/dev/null || true)
     [ "$TARGET_TREE" = "$HEAD_TREE" ] \
-      || die "El borrador $TAG apunta a «$TARGET», con otro contenido que HEAD: añadirle esto mezclaría dos compilaciones. Sube desde ese commit, o borra el borrador en GitHub."
+      || die "El borrador $TAG apunta a «${TARGET}», con otro contenido que HEAD: añadirle esto mezclaría dos compilaciones. Sube desde ese commit, o borra el borrador en GitHub."
     # lo que ya tiene, con el SHA-256 que GitHub calcula de cada archivo subido («sha256:…»; vacío en los antiguos)
     DRAFT_ASSETS=$(gh release view "$TAG" -R "$REPO" --json assets -q '.assets[] | [.name, (.digest // "")] | @tsv')
     ON_DRAFT=$(printf '%s\n' "$DRAFT_ASSETS" | cut -f1)
@@ -321,6 +341,7 @@ if [ $UPLOAD -eq 1 ]; then
   # APK (docs/SERVER.md y native/android/README.md mandan a la release a buscarlo)
   MISSING=()
   for f in latest-mac.yml latest.yml latest-linux.yml latest-linux-arm64.yml "$APK"; do on_release "$f" || MISSING+=("$f"); done
+  if [ "$MAC_MODE" != legacy ]; then on_release developer-id-mac.yml || MISSING+=(developer-id-mac.yml); fi
   if [ ${#MISSING[@]} -gt 0 ] && [ $PARTIAL -eq 0 ]; then
     die "Faltan ${MISSING[*]} (ni en $OUT ni en el borrador): publicada así, esos sistemas dejarían de ver versiones (y sin el APK, Android no tendría qué instalar). Compílalos (--only) o usa --partial a sabiendas."
   fi
@@ -366,6 +387,22 @@ grep -q "## \[$VERSION\]" CHANGELOG.md || die "CHANGELOG.md no tiene la entrada 
 grep -q "releaseNotesFile: $NOTES" electron-builder.yml || die "electron-builder.yml → releaseInfo.releaseNotesFile debe ser $NOTES."
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then die "La etiqueta $TAG ya existe: esa versión ya salió. Sube \"version\"."; fi
 
+# Una versión posterior nunca reconstruye el puente ni inventa sus hashes. Se comprueba antes de leer claves.
+if [ "$MAC_MODE" = developer-id ]; then
+  for p in "${ONLY[@]}"; do
+    if [ "$p" = mac ]; then
+      [ -n "$BRIDGE_DIR" ] || die "Desde 0.2.6 hace falta --bridge-dir con los originales públicos de v0.2.5."
+      node scripts/release-mac-bridge.mjs check-baseline "$BRIDGE_DIR" || die "El puente no coincide con su manifiesto inmutable."
+      node --input-type=module -e '
+        import {readFileSync} from "node:fs"; import {yaml} from "./scripts/release-common.mjs";
+        const m = yaml.load(readFileSync("electron-builder.yml", "utf8")).mac;
+        if (m.hardenedRuntime !== true || m.identity === "-" || m.sign || m.notarize === false) {
+          console.error("Configura Developer ID, hardenedRuntime y notarización; el firmador local de 0.2.5 no sirve."); process.exit(1)
+        }' || die "La configuración de Mac aún no es Developer ID."
+    fi
+  done
+fi
+
 # las claves, antes de los minutos de compilación (si falta alguna o no es la de la app, mejor saberlo ya)
 if [ $DESKTOP -eq 1 ]; then
   node scripts/release-sign.mjs --check-key || die "Sin la clave de firma de las actualizaciones no se puede publicar (docs/PUBLISHING.md)."
@@ -379,6 +416,7 @@ for p in "${ONLY[@]}"; do
     mac)
       # macOS: el certificado estable «Aula Local Signing» (scripts/build/mac-sign.cjs; A1-P1-5)
       [ "${AULA_MAC_ADHOC:-}" = 1 ] && { printf '\n! AULA_MAC_ADHOC=1: macOS se firma ad hoc (solo para probar; --upload lo rechaza).\n'; continue; }
+      [ "$MAC_MODE" != developer-id ] || continue
       [ -f "$HOME/.aula-signing/aula-signing.keychain-db" ] && [ -f "$HOME/.aula-signing/keychain.pass" ] \
         || die "Falta el llavero de «Aula Local Signing» (~/.aula-signing/aula-signing.keychain-db + keychain.pass): sin él, las copias de macOS rechazarían esta versión (docs/PUBLISHING.md → Signing)." ;;
     android)
@@ -392,6 +430,7 @@ if [ $CHECKS -eq 1 ]; then
   say "Comprobaciones"
   npm run typecheck
   npm test
+  node --test scripts/release-tests/*.test.mjs
 fi
 
 say "Compilando $VERSION (${ONLY[*]})"
@@ -405,7 +444,7 @@ else
   mkdir -p "$OUT"
   for p in "${ONLY[@]}"; do
     case "$p" in
-      mac)     rm -rf "$OUT"/Aula-*-mac.* "$OUT"/latest-mac.yml "$OUT"/mac* "$OUT"/BUILD_INFO.mac ;;
+      mac)     rm -rf "$OUT"/Aula-*-mac.* "$OUT"/latest-mac.yml "$OUT"/developer-id-mac.yml "$OUT"/mac* "$OUT"/BUILD_INFO.mac ;;
       win)     rm -rf "$OUT"/Aula-Setup-* "$OUT"/Aula-*-win-* "$OUT"/latest.yml "$OUT"/win-* "$OUT"/BUILD_INFO.win ;;
       linux)   rm -rf "$OUT"/*.AppImage "$OUT"/*.deb "$OUT"/latest-linux*.yml "$OUT"/linux-* "$OUT"/BUILD_INFO.linux ;;
       android) rm -rf "$OUT"/*.apk "$OUT"/BUILD_INFO.android ;;
@@ -427,11 +466,21 @@ trap built_so_far EXIT
 system_done() {
   local p="$1" dirty="$BUILD_DIRTY"
   if [ "$p" != android ]; then
-    # firma de Aula en cada latest*.yml con la clave privada de ~/.aula-signing/update-ed25519.key (o
-    # $AULA_UPDATE_SIGNING_KEY); las copias instaladas no instalan nada sin ella (docs/PUBLISHING.md → «Update
-    # signatures»). Firma también los de los sistemas ya compilados: la firma es la misma (Ed25519 es determinista)
-    say "Firmando las actualizaciones"
-    node scripts/release-sign.mjs "$OUT" || die "No se pudieron firmar las actualizaciones (¿falta ~/.aula-signing/update-ed25519.key?)."
+    # Solo firma lo recién compilado; el YAML histórico del puente nunca se vuelve a serializar.
+    say "Firmando las actualizaciones de $p"
+    case "$p" in
+      mac) node scripts/release-sign.mjs "$OUT" --only latest-mac.yml ;;
+      win) node scripts/release-sign.mjs "$OUT" --only latest.yml ;;
+      linux) node scripts/release-sign.mjs "$OUT" --only latest-linux.yml --only latest-linux-arm64.yml ;;
+    esac
+    if [ "$p" = mac ] && [ "$MAC_MODE" != legacy ]; then
+      local bridge_args=()
+      [ -z "$BRIDGE_DIR" ] || bridge_args=(--bridge-dir "$BRIDGE_DIR")
+      node scripts/release-mac-bridge.mjs prepare "$OUT" "$VERSION" ${bridge_args[@]+"${bridge_args[@]}"}
+    fi
+    if [ "$p" = mac ] && [ "${AULA_MAC_ADHOC:-}" != 1 ]; then
+      node scripts/release-mac-verify.mjs "$OUT" "$VERSION"
+    fi
   fi
   # de qué commit sale (--upload se niega si no es HEAD o si había cambios sin commit); si cambió algo mientras
   # compilaba, no cuenta como limpio (ni este sistema ni los que vengan detrás)
@@ -503,4 +552,4 @@ say "Comprobando $OUT"
 if ls "$OUT"/latest*.yml >/dev/null 2>&1; then node scripts/release-verify.mjs "$OUT" "$VERSION"; fi
 ls -lh "$OUT" | grep -E '\.(dmg|zip|exe|AppImage|deb|apk|yml)$' || true
 [ "$BUILD_DIRTY" = 0 ] || printf '\n! Compilado con cambios sin commit: sirve para probar, pero --upload no lo subirá.\n'
-say "Siguiente paso: prueba los instaladores de $OUT (y el APK en un teléfono) y luego «scripts/release-local.sh --upload --repo $PUB_OWNER/$PUB_REPO» (sube un borrador, o añade a uno que ya haya)."
+say "Siguiente paso: prueba los instaladores de $OUT (y el APK en un teléfono) y luego «scripts/release-local.sh --upload --repo ${PUB_OWNER}/${PUB_REPO}» (sube un borrador, o añade a uno que ya haya)."

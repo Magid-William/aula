@@ -35,6 +35,9 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
+      - name: Release metadata and publication tests
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: node --test scripts/release-tests/*.test.mjs
       - name: Build
         id: build
         if: ${{ !cancelled() }}
