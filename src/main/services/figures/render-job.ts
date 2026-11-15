@@ -16,8 +16,8 @@ export interface FigureRenderJob {
   abort(error?: Error): void
 }
 const cancelled = () => new AulaError('cancelled', tr('Cancelado', 'Cancelled'))
-const timedOut = () => new AulaError('render_timeout', tr('El dibujo tardó demasiado en prepararse.', 'The drawing took too long to prepare.'))
-export function drawingJobId(value: unknown): string {
+const timedOut = () => new AulaError('render_timeout', tr('La figura tardó demasiado en prepararse.', 'The figure took too long to prepare.'))
+export function figureJobId(value: unknown): string {
   if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(value)) {
     throw new AulaError('invalid_args', tr('Identificador de exportación no válido.', 'Invalid export identifier.'))
   }
@@ -63,7 +63,7 @@ export class FigureRenderJobs {
     }
     try {
       if (owner.isDestroyed()) abort()
-      check(); current.id = drawingJobId(identify()); check()
+      check(); current.id = figureJobId(identify()); check()
       return await job.wait(task(job))
     } finally {
       clearTimeout(timer); owner.removeListener('destroyed', destroyed); close()
@@ -72,7 +72,7 @@ export class FigureRenderJobs {
   }
 
   cancel(owner: FigureRenderOwner, value: unknown): void {
-    const id = drawingJobId(value)
+    const id = figureJobId(value)
     if (this.current?.owner === owner && this.current.id === id) this.current.abort()
   }
 }

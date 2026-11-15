@@ -6,7 +6,7 @@
 // diagramas grandes se amplían y se mueven (Ctrl + rueda o pellizco, arrastrar).
 // El rodeo de cada paso y las flechas a tinta están adaptados de Sketchy (https://github.com/ddkbs/sketchy), MIT © 2026
 // ddkbs: viewer/src/steps.ts drawHighlights() y viewer/src/render.ts drawEdge().
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button, Icon, IconButton, cx, useTheme, type IconName } from '@renderer/design'
@@ -15,11 +15,15 @@ import { edgeInk } from '@renderer/design/paint/penInk'
 import { revealedAt } from '@engine/content/diagram-forms'
 import type { BlockOf, DiagramBlock as DiagramData } from '@shared/schema/blocks'
 import { RichText } from '@renderer/lib/RichText'
+import { contentLang } from '@renderer/lib/contentLanguage'
+import { FigureExportAction } from '@renderer/lib/figureExport/FigureExportAction'
+import { captureDiagramPng } from '@renderer/lib/figureExport/diagram'
+import { freezeDiagramExportState, type DiagramCommittedState } from '@renderer/lib/figureExport/diagramState'
 import type { BlockProps } from '../types'
 import { cappedDiagram, layoutDiagram, stepHighlight, type EdgeRoute, type NodeBox } from './lib/diagramLayout'
 import { layoutForm, type FormLayout } from './lib/diagramForms'
 import { DIM, MindmapView, PenRing, PyramidView, VennView } from './diagram/FormViews'
-import { vizColor, wash } from './shared/colors'
+import { MAX_INK_EDGES, diagramNodePresentation } from './diagram/presentation'
 import { canvasMeasure, useFontsReady } from './shared/measure'
 import { usePanZoom } from './shared/usePanZoom'
 import { BlockHeader, Caption, ZoomControls, canvasWell, useInView, useInk, useSize } from './shared/ui'
@@ -27,15 +31,13 @@ import { BlockHeader, Caption, ZoomControls, canvasWell, useInView, useInk, useS
 const KIND_ICON: Record<DiagramData['kind'], IconName> = { flow: 'flow', concept: 'share', tree: 'flow', cycle: 'repeat', layers: 'layers' }
 const FORM_ICON: Record<NonNullable<DiagramData['form']>, IconName> = { pyramid: 'pyramid', funnel: 'funnel', venn: 'venn', mindmap: 'mindmap' }
 const STEP_MS = 2800
-/** Con más flechas, se trazan como vectores (las máscaras de la tinta costarían demasiado). */
-const MAX_INK_EDGES = 40
 /** Por debajo de este ancho, las explicaciones de una pirámide van dentro de cada fila. */
 const DETAILS_BESIDE_MIN = 560
 
 export default function DiagramBlock({ block, ctx }: BlockProps<BlockOf<'diagram'>>) {
-  const { t } = useTranslation('visual')
+  const { t, i18n } = useTranslation('visual')
   const ink = useInk(ctx.hue)
-  const { reducedMotion } = useTheme()
+  const { reducedMotion, dark } = useTheme()
   const b = useMemo(() => cappedDiagram(block), [block])
   const fonts = useFontsReady()
   const printing = ctx.mode === 'print'
@@ -61,10 +63,26 @@ export default function DiagramBlock({ block, ctx }: BlockProps<BlockOf<'diagram
   const fitted = useMemo(() => ({ width: cw * fit, height: ch * fit }), [cw, ch, fit])
   const viewport = useMemo(() => ({ width: avail, height: Math.min(ch * fit, printing ? ch * fit : maxH) }), [avail, ch, fit, maxH, printing])
   const view = useRef<HTMLDivElement>(null)
+  const exportCanvas = useRef<HTMLDivElement>(null)
+  const committed = useRef<DiagramCommittedState | null>(null)
   const pz = usePanZoom(view, fitted, viewport, { enabled: !printing, maxScale: 4 })
   const seen = useInView(box, true, '-60px')
   const animate = !printing && !reducedMotion
   const run = !animate || seen
+
+  // El handle apunta al commit visible: un render concurrente todavía no pintado nunca entra en la captura.
+  useLayoutEffect(() => {
+    committed.current = { b, blockId: block.id, layout, form, hl, revealed, step, hover, dark, outsideText: t('diagram.outside'), ofStepsText: t('diagram.ofSteps', { count: b.steps.length }) }
+    return () => { committed.current = null }
+  })
+  const capturePng = useCallback((signal: AbortSignal): Promise<Uint8Array> => {
+    const state = committed.current, element = exportCanvas.current
+    if (!state || !element) return Promise.reject(new Error('Diagram is unavailable'))
+    const language = contentLang(ctx.language || i18n.language)
+    // Entradas/revelación completas; el flujo conserva la fase de sus trazos sin pausar la reproducción.
+    const scene = freezeDiagramExportState(state, element, language.lang || 'es', language.dir || 'ltr')
+    return captureDiagramPng(scene, signal)
+  }, [ctx.language, i18n.language])
 
   // reproducir el proceso: un paso cada 2,8 s hasta el último
   useEffect(() => {
@@ -114,7 +132,10 @@ export default function DiagramBlock({ block, ctx }: BlockProps<BlockOf<'diagram
   const formProps = { b, blockId: block.id, hl, revealed, step, animate, run, printing }
   return (
     <section className="flex flex-col gap-3" style={ink} aria-label={b.title ?? t('diagram.label')} onKeyDown={onKey} aria-keyshortcuts={b.steps.length ? 'ArrowLeft ArrowRight Escape' : undefined}>
-      <BlockHeader icon={icon} eyebrow={eyebrow} title={b.title} />
+      <div className="flex items-start justify-between gap-3">
+        <BlockHeader icon={icon} eyebrow={eyebrow} title={b.title} />
+        {!printing && <FigureExportAction kind="diagram" capturePng={capturePng} />}
+      </div>
       <div ref={box} className="w-full">
         <div
           ref={view}
@@ -126,6 +147,8 @@ export default function DiagramBlock({ block, ctx }: BlockProps<BlockOf<'diagram
         >
           {size.width > 0 && (
             <div
+              ref={exportCanvas}
+              data-diagram-canvas
               className="absolute left-0 top-0 origin-top-left"
               style={{ width: cw, height: ch, transform: `translate(${pz.t.x}px, ${pz.t.y}px) scale(${s})`, transition: pz.smooth && !pz.dragging ? 'transform 260ms cubic-bezier(.2,.7,.2,1)' : undefined }}
             >
@@ -197,7 +220,7 @@ function GraphCanvas({ layout, b, blockId, hl, revealed, step, hover, onHover, a
       {inked && hl && (
         // la flecha encendida «corre» en su sentido, encima de la tinta
         <svg width={layout.width} height={layout.height} className="absolute inset-0 overflow-visible pointer-events-none" aria-hidden>
-          {layout.edges.map((e) => (lit(e) && !e.dashed && edgeShown(e) ? <path key={e.key} d={e.d} fill="none" stroke="var(--surface)" strokeWidth={1.2} strokeLinecap="round" className="viz-flow" opacity={0.85} /> : null))}
+          {layout.edges.map((e) => (lit(e) && !e.dashed && edgeShown(e) ? <path key={e.key} data-diagram-flow={e.key} d={e.d} fill="none" stroke="var(--surface)" strokeWidth={1.2} strokeLinecap="round" className="viz-flow" opacity={0.85} /> : null))}
         </svg>
       )}
       {layout.cycle && (
@@ -278,7 +301,7 @@ function Edge({ e, on, dim, near, animate, run, delay }: { e: EdgeRoute; on: boo
       ) : (
         <motion.path d={e.d} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeDasharray={e.dashed ? '5 4' : undefined} style={style} initial={animate ? { opacity: 0 } : false} animate={run ? { opacity: 1 } : undefined} transition={{ duration: 0.4, delay }} />
       )}
-      {on && <path d={e.d} fill="none" stroke="var(--surface)" strokeWidth={1.4} strokeLinecap="round" className="viz-flow" opacity={0.9} />}
+      {on && <path data-diagram-flow={e.key} d={e.d} fill="none" stroke="var(--surface)" strokeWidth={1.4} strokeLinecap="round" className="viz-flow" opacity={0.9} />}
       {e.head && (
         <motion.path d={e.head} fill={color} style={style} initial={animate ? { opacity: 0 } : false} animate={run ? { opacity: 1 } : undefined} transition={{ duration: 0.2, delay: animate ? delay + 0.5 : 0 }} />
       )}
@@ -291,13 +314,7 @@ function Edge({ e, on, dim, near, animate, run, delay }: { e: EdgeRoute; on: boo
  * no se puede señalar ni nombrar (sin `data-ask-*` y oculto para los lectores de pantalla).
  */
 export function Node({ n, on, dim, hidden, hovered, layers, animate, run, delay, onHover }: { n: NodeBox; on: boolean; dim: boolean; hidden: boolean; hovered: boolean; layers: boolean; animate: boolean; run: boolean; delay: number; onHover: (h: boolean) => void }) {
-  const tint = n.node.color ? vizColor(n.node.color) : undefined
-  // lo encendido conserva su velo; la luz es el rodeo a pluma, así que el borde vuelve a ser fino
-  const ring = tint ? wash(tint, 55) : 'var(--line-strong)'
-  const bg = on ? wash(tint ?? 'var(--accent)', 14) : tint ? wash(tint, 9) : n.node.shape === 'note' ? wash('var(--sun)', 12) : 'var(--surface)'
-  const diamond = n.node.shape === 'diamond'
-  const radius = n.node.shape === 'round' ? 999 : n.node.shape === 'circle' ? '50%' : n.node.shape === 'note' ? '4px 14px 4px 4px' : 12
-  const detail = n.node.detail?.trim()
+  const { ring, background: bg, diamond, radius, detail } = diagramNodePresentation(n.node, on)
   // al ocultarse, la visibilidad espera al fundido de 300 ms
   return (
     <motion.div

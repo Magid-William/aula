@@ -2,8 +2,9 @@ import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pngChunk, pngFixture } from '@main/services/figures/testing'
 import type { DrawingRenderSceneV1 } from '@shared/figuresDrawing'
+import { diagramSceneFixture } from '@engine/figures/testing'
 
-const state = vi.hoisted(() => ({ windows: [] as unknown[], sessions: [] as unknown[], normalized: 'good', displayScale: 2, calibrationFailures: 0, calls: [] as string[], cleanup: vi.fn(async () => undefined) }))
+const state = vi.hoisted(() => ({ windows: [] as unknown[], sessions: [] as unknown[], normalized: 'good', displayScale: 2, calibrationFailures: 0, calls: [] as string[], renderInputs: [] as unknown[], layoutWidth: 100, layoutHeight: 80, renderGate: undefined as Promise<void> | undefined, cleanup: vi.fn(async () => undefined) }))
 vi.mock('@main/services/figures/render-assets', async original => ({ ...await original<object>(), loadFigureAssets: async () => new Map([['figure-render.html', { file: '/fixture/figure-render.html', mime: 'text/html' }], ['assets/scene.js', { file: '/fixture/assets/scene.js', mime: 'text/javascript' }]]) }))
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
@@ -34,7 +35,7 @@ vi.mock('electron', async () => {
         if (script.startsWith('new Promise')) { state.calls.push('paint'); return undefined }
         const match = /^window\.aulaFigureRender\.(\w+)\(([\s\S]*)\)$/.exec(script)!
         const args = JSON.parse(match[2]) as Record<string, unknown>; state.calls.push(match[1])
-        if (match[1] === 'render') return { bounds: { x: -2, y: -2, width: 100, height: 80 }, layoutWidth: 100, layoutHeight: 80 }
+        if (match[1] === 'render') { state.renderInputs.push(args); await state.renderGate; return { bounds: { x: -2, y: -2, width: 100, height: 80 }, layoutWidth: state.layoutWidth, layoutHeight: state.layoutHeight } }
         if (match[1] === 'resize') return { width: args.width, height: args.height }
         const native = Buffer.from(args.data as string, 'base64')
         expect(native.includes(Buffer.from('iCCP'))).toBe(true)
@@ -61,9 +62,9 @@ vi.mock('electron', async () => {
 })
 class Owner extends EventEmitter { isDestroyed(): boolean { return false } }
 const scene = (): DrawingRenderSceneV1 => ({ version: 1, canvas: { width: 100, height: 80 }, metrics: { pixelWidth: 100, layoutWidth: 100, textK: 1, unitsPerPx: 1, rootFontPx: 16, bodyFont: 'sans', bodyItalic: false, cssZoom: 1 }, appearance: { theme: 'light', language: 'es', direction: 'ltr', palette: { paper: '#ffffff', text: '#000000', text2: '#111111', text3: '#222222', brick: '#aa2211', accent: '#aa2211', link: '#aa2211' } }, items: [], output: { scale: 2 } })
-beforeEach(() => { vi.resetModules(); vi.stubEnv('ELECTRON_RENDERER_URL', ''); state.windows = []; state.sessions = []; state.calls = []; state.normalized = 'good'; state.displayScale = 2; state.calibrationFailures = 0; state.cleanup.mockClear() })
+beforeEach(() => { vi.resetModules(); vi.stubEnv('ELECTRON_RENDERER_URL', ''); state.windows = []; state.sessions = []; state.calls = []; state.renderInputs = []; state.layoutWidth = 100; state.layoutHeight = 80; state.renderGate = undefined; state.normalized = 'good'; state.displayScale = 2; state.calibrationFailures = 0; state.cleanup.mockClear() })
 
-describe('pipeline aislado de Drawing', () => {
+describe('pipeline aislado de figuras', () => {
   it('contrasta el layout aislado con el ancho CSS, conservando la medida original de preparación', async () => {
     const { renderDrawingPng } = await import('./figure-render')
     const nested = scene(); nested.metrics.pixelWidth = 200; nested.metrics.unitsPerPx = .5
@@ -84,6 +85,45 @@ describe('pipeline aislado de Drawing', () => {
     expect(state.cleanup).toHaveBeenCalledTimes(1)
     await renderDrawingPng({ jobId: 'two', scene: scene() }, new Owner())
     expect(state.sessions).toHaveLength(1); expect(state.cleanup).toHaveBeenCalledTimes(2)
+    expect(state.renderInputs[0]).toEqual({ kind: 'drawing', scene: scene() })
+  })
+  it('Diagram comparte sesión aislada, calibración, normalización y validación estricta con Drawing', async () => {
+    const { renderDrawingPng, renderDiagramPng } = await import('./figure-render')
+    const diagram = diagramSceneFixture()
+    await expect(renderDiagramPng({ jobId: 'diagram', scene: diagram }, new Owner())).resolves.toMatchObject({ width: 200, height: 160 })
+    expect(state.renderInputs[0]).toEqual({ kind: 'diagram', scene: diagram })
+    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'capture', 'normalize'])
+    await renderDrawingPng({ jobId: 'drawing', scene: scene() }, new Owner())
+    expect(state.sessions).toHaveLength(1); expect(state.cleanup).toHaveBeenCalledTimes(2)
+    expect(state.windows.every(win => (win as { destroyed: boolean }).destroyed)).toBe(true)
+  })
+  it('rechaza DTO de otra clase y layout Diagram incoherente antes de ampliar superficies', async () => {
+    const { renderDrawingPng, renderDiagramPng } = await import('./figure-render')
+    await expect(renderDiagramPng({ jobId: 'drawing-as-diagram', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'invalid_args' })
+    await expect(renderDrawingPng({ jobId: 'diagram-as-drawing', scene: diagramSceneFixture() }, new Owner())).rejects.toMatchObject({ code: 'invalid_args' })
+    const inherited = Object.assign(Object.create({}), { jobId: 'prototype', scene: diagramSceneFixture() })
+    await expect(renderDiagramPng(inherited, new Owner())).rejects.toMatchObject({ code: 'invalid_args' })
+    expect(state.windows).toHaveLength(0)
+    state.layoutHeight = 81
+    await expect(renderDiagramPng({ jobId: 'layout', scene: diagramSceneFixture() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+    expect(state.calls).not.toContain('resizeWindow')
+    expect((state.windows[0] as { destroyed: boolean }).destroyed).toBe(true)
+  })
+  it('el único slot y la cancelación por dueño se comparten entre Diagram y Drawing', async () => {
+    const { renderDrawingPng, renderDiagramPng, cancelFigureRender } = await import('./figure-render')
+    let release!: () => void
+    state.renderGate = new Promise<void>(resolve => { release = resolve })
+    const owner = new Owner(), other = new Owner()
+    const pending = renderDiagramPng({ jobId: 'shared', scene: diagramSceneFixture() }, owner)
+    const rejected = expect(pending).rejects.toMatchObject({ code: 'cancelled' })
+    await vi.waitFor(() => expect(state.calls).toContain('render'))
+    await expect(renderDrawingPng({ jobId: 'other', scene: scene() }, other)).rejects.toMatchObject({ code: 'busy' })
+    cancelFigureRender({ jobId: 'shared' }, other)
+    expect((state.windows[0] as { destroyed: boolean }).destroyed).toBe(false)
+    cancelFigureRender({ jobId: 'shared' }, owner)
+    await rejected
+    release(); state.renderGate = undefined
+    await expect(renderDrawingPng({ jobId: 'next', scene: scene() }, other)).resolves.toMatchObject({ width: 200, height: 160 })
   })
   it('reintenta una sola calibración UnknownVizError tras dos frames, sin asumir DPR', async () => {
     const { renderDrawingPng } = await import('./figure-render')

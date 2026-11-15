@@ -68,6 +68,7 @@ describe('IPC de figuras y diálogo nativo', () => {
     const denied = async (ctx: RpcContext) => {
       await expect(call('figures.save', args, ctx)).rejects.toMatchObject({ code: 'forbidden' })
       await expect(call('figures.renderDrawingPng', { jobId: 'one', scene: {} }, ctx)).rejects.toMatchObject({ code: 'forbidden' })
+      await expect(call('figures.renderDiagramPng', { jobId: 'one', scene: {} }, ctx)).rejects.toMatchObject({ code: 'forbidden' })
       await expect(call('figures.cancelRender', { jobId: 'one' }, ctx)).rejects.toMatchObject({ code: 'forbidden' })
       await expect(call('figures.revealSaved', { path: '/no.svg' }, ctx)).rejects.toMatchObject({ code: 'forbidden' })
     }

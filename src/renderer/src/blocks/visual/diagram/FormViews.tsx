@@ -13,8 +13,9 @@ import { circleLoopInk, circleLoopPad, encircleInk, encirclePad, outlineInk, ova
 import type { DiagramBlock } from '@shared/schema/blocks'
 import { RichText } from '@renderer/lib/RichText'
 import type { Box, MindmapLayout, PyramidLayout, VennLayout } from '../lib/diagramForms'
-import type { Pt, StepLight } from '../lib/diagramLayout'
+import type { StepLight } from '../lib/diagramLayout'
 import { INK, vizColor, wash } from '../shared/colors'
+import { DIAGRAM_DIM, VENN_COLORS, diagramCurvePath, pyramidFill } from './presentation'
 
 export interface FormViewProps {
   b: DiagramBlock
@@ -29,7 +30,7 @@ export interface FormViewProps {
 }
 
 /** Cuánto se apaga lo que el paso no señala. */
-export const DIM = 0.24
+export const DIM = DIAGRAM_DIM
 const BRICK = 'var(--pigment-brick)'
 // la visibilidad cambia al final al ocultarse (deja ver el fundido) y al principio al aparecer
 const fade = { transition: 'opacity 300ms, visibility 300ms' }
@@ -67,7 +68,7 @@ function StepRings({ boxes, p }: { boxes: Array<{ id: string; box: Box }>; p: Fo
   if (!p.hl || p.step === null) return null
   return (
     <>
-      {boxes.filter((x) => p.hl!.focus.has(x.id)).slice(0, 4).map((x, i) => (
+      {boxes.filter((x) => !unrevealed(x.id, p) && p.hl!.focus.has(x.id)).slice(0, 4).map((x, i) => (
         <PenRing key={`${p.step}:${x.id}`} box={x.box} seed={`${p.blockId}:${x.id}`} delay={i * 180} printing={p.printing} />
       ))}
     </>
@@ -90,11 +91,6 @@ function Label({ box, children, className, look, part }: { box: Box; children: R
 export function PyramidView({ layout: l, ...p }: FormViewProps & { layout: PyramidLayout }) {
   const n = l.rows.length
   const outline = useMemo(() => outlineInk(l.outline.map(([x, y]) => ({ x, y })), l.width, l.height, `${p.blockId}:silueta`), [l, p.blockId])
-  const fill = (i: number, color: string | undefined): string => {
-    if (color?.trim().toLowerCase() === 'accent') return wash(INK, 32)
-    const tint = color ? vizColor(color) : INK
-    return wash(tint, 9 + (n > 1 ? (i / (n - 1)) * 15 : 8))
-  }
   // la pirámide sube desde la base; el embudo cae desde la boca
   const delay = (i: number): number => (l.form === 'pyramid' ? n - 1 - i : i) * 0.08
   return (
@@ -104,7 +100,7 @@ export function PyramidView({ layout: l, ...p }: FormViewProps & { layout: Pyram
           <g key={r.id} style={partStyle(r.id, p)}>
             <motion.polygon
               points={r.points.map((q) => q.join(',')).join(' ')}
-              fill={fill(r.index, r.node.color)}
+              fill={pyramidFill(r.index, n, r.node.color)}
               stroke="var(--line-strong)"
               strokeWidth={0.75}
               strokeLinejoin="round"
@@ -149,13 +145,12 @@ export function PyramidView({ layout: l, ...p }: FormViewProps & { layout: Pyram
 // MARK: Venn
 
 /** Colores de los conjuntos sin color propio: azul, ámbar y verde azulado (al cruzarse no dan nunca violeta). */
-const SET_COLORS = ['var(--viz-blue)', 'var(--viz-amber)', 'var(--viz-teal)']
 
 export function VennView({ layout: l, hover, onHover, ...p }: FormViewProps & { layout: VennLayout; hover: string | null; onHover: (key: string | null) => void }) {
   const { t } = useTranslation('visual')
   const { dark } = useTheme()
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
-  const colors = l.circles.map((c) => (c.node.color ? vizColor(c.node.color) : SET_COLORS[c.index % 3]))
+  const colors = l.circles.map((c) => (c.node.color ? vizColor(c.node.color) : VENN_COLORS[c.index % 3]))
   const names = new Map(l.circles.map((c) => [c.id, c.node.label]))
   const regionName = (sets: string[]): string => {
     const n = sets.map((s) => names.get(s) ?? s)
@@ -183,7 +178,7 @@ export function VennView({ layout: l, hover, onHover, ...p }: FormViewProps & { 
           {shaded && !shaded.whole && (
             <mask id={`${uid}-m`} maskUnits="userSpaceOnUse" x={0} y={0} width={l.width} height={l.height}>
               <rect width={l.width} height={l.height} fill="#fff" />
-              {l.circles.filter((c) => !shaded.members.includes(c.id)).map((c) => <circle key={c.id} cx={c.cx} cy={c.cy} r={c.r} fill="#000" />)}
+              {l.circles.filter((c) => !unrevealed(c.id, p) && !shaded.members.includes(c.id)).map((c) => <circle key={c.id} cx={c.cx} cy={c.cy} r={c.r} fill="#000" />)}
             </mask>
           )}
         </defs>
@@ -267,7 +262,7 @@ export function VennView({ layout: l, hover, onHover, ...p }: FormViewProps & { 
           ))}
         </>
       )}
-      {p.hl && p.step !== null && l.circles.filter((c) => p.hl!.focus.has(c.id)).slice(0, 3).map((c, i) => {
+      {p.hl && p.step !== null && l.circles.filter((c) => !unrevealed(c.id, p) && p.hl!.focus.has(c.id)).slice(0, 3).map((c, i) => {
         const ring = circleLoopInk(c.r + 9, `${p.blockId}:rodeo:${c.id}`, 2.2, 1.1)
         const pad = circleLoopPad(2.2)
         return <Ink key={`${p.step}:${c.id}`} drawing={ring} color={BRICK} delay={i * 180} draw={!p.printing} className="ink-fixed" style={{ left: c.cx - c.r - 9 - pad, top: c.cy - c.r - 9 - pad, width: ring.w, height: ring.h, zIndex: 3 }} />
@@ -284,7 +279,7 @@ function nestClips(indexes: number[], uid: string, inner: ReactNode): ReactNode 
 
 // MARK: Mapa mental
 
-const curvePath = (pts: Pt[]): string => pts.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')
+
 
 export function MindmapView({ layout: l, ...p }: FormViewProps & { layout: MindmapLayout }) {
   const root = l.root
@@ -299,8 +294,8 @@ export function MindmapView({ layout: l, ...p }: FormViewProps & { layout: Mindm
           const w = x.depth === 1 ? 3 : 2
           return (
             <g key={x.id} style={partStyle(x.id, p)} {...ask(x.id, x.node.label, p)}>
-              <motion.path d={curvePath(x.curve)} fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" initial={p.animate ? { pathLength: 0 } : false} animate={p.run ? { pathLength: 1 } : undefined} transition={{ duration: 0.45, delay: p.animate ? x.order : 0, ease: [0.4, 0, 0.2, 1] }} />
-              <motion.path d={curvePath(x.underline)} fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" initial={p.animate ? { pathLength: 0 } : false} animate={p.run ? { pathLength: 1 } : undefined} transition={{ duration: 0.35, delay: p.animate ? x.order + 0.4 : 0, ease: [0.4, 0, 0.2, 1] }} />
+              <motion.path d={diagramCurvePath(x.curve)} fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" initial={p.animate ? { pathLength: 0 } : false} animate={p.run ? { pathLength: 1 } : undefined} transition={{ duration: 0.45, delay: p.animate ? x.order : 0, ease: [0.4, 0, 0.2, 1] }} />
+              <motion.path d={diagramCurvePath(x.underline)} fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" initial={p.animate ? { pathLength: 0 } : false} animate={p.run ? { pathLength: 1 } : undefined} transition={{ duration: 0.35, delay: p.animate ? x.order + 0.4 : 0, ease: [0.4, 0, 0.2, 1] }} />
             </g>
           )
         })}

@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { BlockOf } from '../../src/shared/schema/blocks'
 import type { DrawingRenderSceneV1 } from '../../src/shared/figuresDrawing'
+import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { go, homeWithDemoCourse } from './helpers'
 import { compareDrawingPixels, type LiveDrawingGeometry } from './drawing-pixels'
 
@@ -261,7 +262,10 @@ async function holdCapture(app: ElectronApplication, hold: boolean): Promise<voi
 }
 async function rendered(app: ElectronApplication, index: number): Promise<DrawingRenderSceneV1> {
   await expect.poll(() => app.evaluate((_electron, index) => !!(globalThis as unknown as { drawingQa: RenderAudit[] }).drawingQa[index]?.calls.find(c => c.method === 'render')?.result, index)).toBe(true)
-  return app.evaluate((_electron, index) => (globalThis as unknown as { drawingQa: RenderAudit[] }).drawingQa[index].calls.find(c => c.method === 'render')!.args as DrawingRenderSceneV1, index)
+  const input = await app.evaluate((_electron, index) => (globalThis as unknown as { drawingQa: RenderAudit[] }).drawingQa[index].calls.find(c => c.method === 'render')!.args as FigureRenderInput, index)
+  expect(input.kind).toBe('drawing')
+  if (input.kind !== 'drawing') throw new Error('Expected the Drawing renderer')
+  return input.scene
 }
 async function choosePng(page: Page, figure: Locator): Promise<void> {
   await action(figure).click()

@@ -1,6 +1,6 @@
 // Presentación cerrada del dibujo visible: no contiene el bloque, expresiones ni nombres ocultos.
 import type { FigureTypography } from './figuresTypography'
-export interface DrawingRenderBounds { x: number; y: number; width: number; height: number }
+export type { FigureRenderBounds as DrawingRenderBounds } from './figuresRender'
 export interface DrawingRenderTransform { dx: number; dy: number; deg: number; px: number; py: number }
 export type DrawingRenderFill = { kind: 'none' } | { kind: 'solid' | 'hatch'; color: string }
 export interface PreparedDrawingPath {
@@ -55,11 +55,4 @@ export interface DrawingRenderSceneV1 {
   }
   items: PreparedVisibleItem[]
   output: { scale: 1 | 2 }
-}
-/** Contrato privado main→renderer; no forma parte del puente de la aplicación. */
-export interface DrawingRenderApi {
-  render(scene: DrawingRenderSceneV1): Promise<{ bounds: DrawingRenderBounds; layoutWidth: number; layoutHeight: number }>
-  resize(view: { width: number; height: number; scale: number; offsetX: number; offsetY: number }): Promise<{ width: number; height: number }>
-  normalize(input: { data: string; width: number; height: number }): Promise<{ data: string; width: number; height: number }>
-  cancel(): void
 }

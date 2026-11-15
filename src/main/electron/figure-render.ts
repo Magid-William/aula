@@ -4,28 +4,28 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { FIGURE_LIMITS, FigureValidationError } from '@shared/figures'
-import type { DrawingRenderApi, DrawingRenderBounds } from '@shared/figuresDrawing'
+import type { FigureRenderApi, FigureRenderBounds, FigureRenderInput } from '@shared/figuresRender'
 import { tr } from '@shared/ai/i18n'
-import { validateDrawingRenderScene } from '@engine/figures/drawing'
+import { figureRenderLayout, validateFigureRenderInput } from '@engine/figures/render'
 import { AulaError } from '@main/services/errors'
 import { canonicalizeFigurePng } from '@main/services/figures/png'
 import { FigureRenderJobs, type FigureRenderJob, type FigureRenderOwner } from '@main/services/figures/render-job'
 import { FIGURE_RENDER_URL, FIGURE_RENDER_CSP, figureAssetName, loadFigureAssets } from '@main/services/figures/render-assets'
-import { checkRenderSize, drawingCaptureSize, privatePngSize } from '@main/services/figures/render-size'
+import { checkRenderSize, figureCaptureSize, privatePngSize } from '@main/services/figures/render-size'
 
 const jobs = new FigureRenderJobs(20_000, () => performance.now(), 1000), partition = `aula-figure-${randomUUID()}`
 let isolated: Promise<Session> | undefined, sessionPoisoned = false
-const invalid = () => new AulaError('invalid_args', tr('No se puede exportar ese dibujo.', 'This drawing cannot be exported.'))
-const failed = () => new AulaError('render_failed', tr('No se pudo preparar el dibujo.', 'The drawing could not be prepared.'))
+const invalid = () => new AulaError('invalid_args', tr('No se puede exportar esa figura.', 'This figure cannot be exported.'))
+const failed = () => new AulaError('render_failed', tr('No se pudo preparar la figura.', 'The figure could not be prepared.'))
 function object(value: unknown, keys: string[]): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Reflect.ownKeys(value).length !== keys.length || Reflect.ownKeys(value).some(k => typeof k !== 'string' || !keys.includes(k))) throw invalid()
+  if (!value || typeof value !== 'object' || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value)) || Reflect.ownKeys(value).length !== keys.length || Reflect.ownKeys(value).some(k => typeof k !== 'string' || !keys.includes(k))) throw invalid()
   const out: Record<string, unknown> = {}
-  for (const key of keys) { const d = Object.getOwnPropertyDescriptor(value, key); if (!d || !('value' in d)) throw invalid(); out[key] = d.value }
+  for (const key of keys) { const d = Object.getOwnPropertyDescriptor(value, key); if (!d || !('value' in d) || !d.enumerable) throw invalid(); out[key] = d.value }
   return out
 }
 async function isolatedSession(): Promise<Session> {
   if (sessionPoisoned) throw failed()
-  if (process.env.ELECTRON_RENDERER_URL) throw new AulaError('render_build_required', tr('Compila Aula para exportar dibujos; la vista de desarrollo no se usa para capturas.', 'Build Aula to export drawings; the development page is not used for captures.'))
+  if (process.env.ELECTRON_RENDERER_URL) throw new AulaError('render_build_required', tr('Compila Aula para exportar figuras; la vista de desarrollo no se usa para capturas.', 'Build Aula to export figures; the development page is not used for captures.'))
   isolated ??= (async () => {
     const assets = await loadFigureAssets(join(__dirname, '../renderer'))
     const s = session.fromPartition(partition, { cache: false })
@@ -75,25 +75,26 @@ function captureSize(image: NativeImage): { width: number; height: number } {
   checkRenderSize(size.width, size.height)
   return size
 }
-async function invoke<K extends keyof Omit<DrawingRenderApi, 'cancel'>>(win: BrowserWindow, job: FigureRenderJob, method: K, args: Parameters<DrawingRenderApi[K]>[0]): Promise<unknown> {
+async function invoke<K extends keyof Omit<FigureRenderApi, 'cancel'>>(win: BrowserWindow, job: FigureRenderJob, method: K, args: Parameters<FigureRenderApi[K]>[0]): Promise<unknown> {
   job.check()
   // El nombre es una unión interna; el argumento es JSON copiado/validado, jamás código del emisor.
   const json = JSON.stringify(args).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
   return job.wait(win.webContents.executeJavaScript(`window.aulaFigureRender.${method}(${json})`, false))
 }
-function measured(value: unknown): { bounds: DrawingRenderBounds; layoutWidth: number; layoutHeight: number } {
+function measured(value: unknown): { bounds: FigureRenderBounds; layoutWidth: number; layoutHeight: number } {
   const v = object(value, ['bounds', 'layoutWidth', 'layoutHeight']), b = object(v.bounds, ['x', 'y', 'width', 'height'])
   const numbers = [...Object.values(b), v.layoutWidth, v.layoutHeight]
   if (numbers.some(n => typeof n !== 'number' || !Number.isFinite(n))) throw failed()
-  const bounds = b as unknown as DrawingRenderBounds
+  const bounds = b as unknown as FigureRenderBounds
   if (bounds.width <= 0 || bounds.height <= 0 || (v.layoutWidth as number) <= 0 || (v.layoutHeight as number) <= 0) throw failed()
   return { bounds, layoutWidth: v.layoutWidth as number, layoutHeight: v.layoutHeight as number }
 }
 
-export async function renderDrawingPng(value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> {
+async function renderFigurePng(kind: FigureRenderInput['kind'], value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> {
   return jobs.run(owner, () => object(value, ['jobId', 'scene']).jobId as string, async job => {
     try {
-      const args = object(value, ['jobId', 'scene']), scene = validateDrawingRenderScene(args.scene)
+      const args = object(value, ['jobId', 'scene']), input = validateFigureRenderInput({ kind, scene: args.scene }), scene = input.scene
+      const layout = figureRenderLayout(input)
       job.check()
       const knownDisplays = screen.getAllDisplays()
       if (!knownDisplays.length || knownDisplays.some(display => !Number.isFinite(display.scaleFactor) || display.scaleFactor < .5 || display.scaleFactor > 8)) throw failed()
@@ -121,7 +122,7 @@ export async function renderDrawingPng(value: unknown, owner: FigureRenderOwner)
       const ready = await job.wait(wc.executeJavaScript('Boolean(window.aulaFigureRender)', false))
       if (ready !== true) throw failed()
       // La escena permanece recortada a 128 DIP mientras espera fuentes y dos frames estables.
-      const result = measured(await invoke(win, job, 'render', scene))
+      const result = measured(await invoke(win, job, 'render', input))
       await job.wait(firstPaint)
       const calibrate = () => job.wait(wc.capturePage({ x: 0, y: 0, width: 128, height: 128 }, { stayHidden: true, stayAwake: false }))
       let small: NativeImage
@@ -135,8 +136,8 @@ export async function renderDrawingPng(value: unknown, owner: FigureRenderOwner)
       if (actual.width !== tiny.width || actual.height !== tiny.height || actual.width !== actual.height) throw failed()
       const physicalScale = Math.max(actual.width / 128, initialDisplay.scaleFactor, ...screen.getAllDisplays().map(d => d.scaleFactor))
       if (displays() !== displayState) throw failed()
-      const size = drawingCaptureSize(result.bounds, scene.output.scale, physicalScale)
-      if (Math.abs(result.layoutWidth - scene.metrics.layoutWidth) > .1 || Math.abs(result.layoutHeight - scene.canvas.height * scene.metrics.layoutWidth / scene.canvas.width) > .1) throw failed()
+      const size = figureCaptureSize(result.bounds, scene.output.scale, physicalScale)
+      if (Math.abs(result.layoutWidth - layout.width) > .1 || Math.abs(result.layoutHeight - layout.height) > .1) throw failed()
       job.check()
       if (displays() !== displayState) throw failed()
       win.setContentSize(size.width, size.height)
@@ -157,10 +158,13 @@ export async function renderDrawingPng(value: unknown, owner: FigureRenderOwner)
       return { data: new Uint8Array(data), width: outputSize.width, height: outputSize.height }
     } catch (error) {
       if (error instanceof AulaError) throw error
-      if (error instanceof FigureValidationError) throw error.reason === 'too_large' ? new AulaError('too_large', tr('El dibujo es demasiado grande para exportarlo.', 'The drawing is too large to export.')) : invalid()
+      if (error instanceof FigureValidationError) throw error.reason === 'too_large' ? new AulaError('too_large', tr('La figura es demasiado grande para exportarla.', 'The figure is too large to export.')) : invalid()
       throw failed()
     }
   })
 }
-export function cancelDrawingRender(value: unknown, owner: FigureRenderOwner): void { jobs.cancel(owner, object(value, ['jobId']).jobId) }
+export function renderDrawingPng(value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> { return renderFigurePng('drawing', value, owner) }
+export function renderDiagramPng(value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> { return renderFigurePng('diagram', value, owner) }
+export function cancelFigureRender(value: unknown, owner: FigureRenderOwner): void { jobs.cancel(owner, object(value, ['jobId']).jobId) }
+export const cancelDrawingRender = cancelFigureRender
 // Cada trabajo destruye su ventana; la sesión única es efímera y no conserva cookies ni datos de la aplicación.
