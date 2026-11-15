@@ -63,6 +63,29 @@ test('oráculo Diagram: correlaciona fase fraccionaria sin ampliar el radio ni t
   expect(result.all.recall.ratio).toBeGreaterThan(.98); expect(result.all.precision.ratio).toBeGreaterThan(.98)
 })
 
+test('oráculo Diagram: distingue la traslación real entre barras periódicas', () => {
+  const source = blank(196, 266), exported = blank(184, 254)
+  // Barras separadas cinco píxeles: el barrido impar de dos en dos omitía (-6, -6)
+  // y elegía otra barra en (-1, -6). Las dos imágenes se pintan analíticamente.
+  const pair = (rect: Rect): void => {
+    paint(source, rect)
+    paint(exported, { ...rect, x: rect.x - 6, y: rect.y - 6 })
+  }
+  for (let i = 0; i < 24; i++) {
+    const height = (i % 7 + 2) * 26
+    pair({ x: 56 + i * 5, y: 232 - height, width: 3, height, color: i === 1 ? [56, 93, 138] : [187, 199, 214] })
+  }
+  for (let i = 0; i < 5; i++) pair({ x: 41, y: 226 - i * 52, width: 2, height: 7, color: [108, 104, 98] })
+  const live: LiveDiagramGeometry = {
+    width: 196, height: 266,
+    canvas: { x: 8, y: 8, width: 180, height: 250, naturalWidth: 180, naturalHeight: 250, scale: 1 },
+    background: PAPER, exclusions: [], labels: []
+  }
+  const result = verify(source, exported, live)
+  expect(result.alignment).toMatchObject({ dx: -6, dy: -6, averageColorError: 0 })
+  expect(result.all.recall.ratio).toBe(1); expect(result.all.precision.ratio).toBe(1)
+})
+
 test('oráculo Diagram: rechaza fórmula, barra y glifo omitidos', () => {
   const source = fixture(), padded = fixture(4, 6, WIDTH + 8, HEIGHT + 12)
   const missingFormula = changed(padded, { x: 30, y: 39, width: 170, height: 32, color: PANEL })

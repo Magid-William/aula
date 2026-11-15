@@ -1,6 +1,7 @@
 import type { FigureRenderInput } from '@shared/figuresRender'
 import { validateDrawingRenderScene } from './drawing'
 import { validateDiagramRenderScene } from './diagram'
+import { validateChartRenderScene } from './chart'
 import { FigureSceneReader, failFigure } from './render-reader'
 
 /** La discriminación se valida antes de leer la escena o construir nodos. */
@@ -10,6 +11,7 @@ export function validateFigureRenderInput(value: unknown): FigureRenderInput {
   switch (input.kind) {
     case 'drawing': return { kind: 'drawing', scene: validateDrawingRenderScene(input.scene) }
     case 'diagram': return { kind: 'diagram', scene: validateDiagramRenderScene(input.scene) }
+    case 'chart': return { kind: 'chart', scene: validateChartRenderScene(input.scene) }
     default: return failFigure()
   }
 }
@@ -18,6 +20,7 @@ export function figureRenderLayout(input: FigureRenderInput): { width: number; h
   switch (input.kind) {
     case 'drawing': return { width: input.scene.metrics.layoutWidth, height: input.scene.canvas.height * input.scene.metrics.layoutWidth / input.scene.canvas.width }
     case 'diagram': return { width: input.scene.canvas.width, height: input.scene.canvas.height }
+    case 'chart': return { width: input.scene.canvas.width, height: input.scene.canvas.height }
     default: { const exhaustive: never = input; return exhaustive }
   }
 }

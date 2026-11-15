@@ -165,6 +165,7 @@ async function renderFigurePng(kind: FigureRenderInput['kind'], value: unknown, 
 }
 export function renderDrawingPng(value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> { return renderFigurePng('drawing', value, owner) }
 export function renderDiagramPng(value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> { return renderFigurePng('diagram', value, owner) }
+export function renderChartPng(value: unknown, owner: FigureRenderOwner): Promise<{ data: Uint8Array; width: number; height: number }> { return renderFigurePng('chart', value, owner) }
 export function cancelFigureRender(value: unknown, owner: FigureRenderOwner): void { jobs.cancel(owner, object(value, ['jobId']).jobId) }
 export const cancelDrawingRender = cancelFigureRender
 // Cada trabajo destruye su ventana; la sesión única es efímera y no conserva cookies ni datos de la aplicación.

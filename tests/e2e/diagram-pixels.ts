@@ -70,6 +70,8 @@ export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, g
       // Interpolación bilineal sólo al consultar la otra imagen en una coordenada subpíxel.
       // Los píxeles contados como tinta de cada dirección permanecen en su cuadrícula original.
       const x0 = Math.floor(x), y0 = Math.floor(y), u = x - x0, v = y - y0
+      // Coordenadas enteras: resultado idéntico sin cuatro vecinos bilineales.
+      if (u === 0 && v === 0) { const i = (y0 * r.width + x0) * 4; return [r.data[i], r.data[i + 1], r.data[i + 2]] }
       const result = [0, 0, 0]
       for (const [xx, wx] of [[x0, 1 - u], [Math.min(r.width - 1, x0 + 1), u]]) for (const [yy, wy] of [[y0, 1 - v], [Math.min(r.height - 1, y0 + 1), v]]) {
         for (let c = 0; c < 3; c++) result[c] += r.data[(yy * r.width + xx) * 4 + c] * wx * wy
@@ -116,12 +118,17 @@ export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, g
     const tryOffset = (x: number, y: number): void => {
       if (!samples.length) return
       let cost = 0
-      for (const sample of samples) cost += Math.min(70, localError(exported, sample.x + x, sample.y + y, sample.color, 0))
+      for (const sample of samples) {
+        cost += Math.min(70, localError(exported, sample.x + x, sample.y + y, sample.color, 0))
+        // Los costes son no negativos: esta traslación ya no puede mejorar el mínimo.
+        if (cost / samples.length >= bestCost) return
+      }
       cost /= samples.length
       if (cost < bestCost) { bestCost = cost; dx = x; dy = y }
     }
     if (samples.length) {
-      for (let y = minY; y <= maxY; y += 2) for (let x = minX; x <= maxX; x += 2) tryOffset(x, y)
+      // Un salto de dos píxeles puede omitir el mínimo entre barras periódicas.
+      for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) tryOffset(x, y)
       const coarseX = dx, coarseY = dy
       for (let y = coarseY - 2; y <= coarseY + 2; y++) for (let x = coarseX - 2; x <= coarseX + 2; x++) if (x >= minX && x <= maxX && y >= minY && y <= maxY) tryOffset(x, y)
       // La captura CSS y el PNG pueden comenzar en distintas fases fraccionarias del píxel.

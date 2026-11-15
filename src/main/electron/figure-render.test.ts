@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pngChunk, pngFixture } from '@main/services/figures/testing'
 import type { DrawingRenderSceneV1 } from '@shared/figuresDrawing'
-import { diagramSceneFixture } from '@engine/figures/testing'
+import { chartSceneFixture, diagramSceneFixture } from '@engine/figures/testing'
 
 const state = vi.hoisted(() => ({ windows: [] as unknown[], sessions: [] as unknown[], normalized: 'good', displayScale: 2, calibrationFailures: 0, calls: [] as string[], renderInputs: [] as unknown[], layoutWidth: 100, layoutHeight: 80, renderGate: undefined as Promise<void> | undefined, cleanup: vi.fn(async () => undefined) }))
 vi.mock('@main/services/figures/render-assets', async original => ({ ...await original<object>(), loadFigureAssets: async () => new Map([['figure-render.html', { file: '/fixture/figure-render.html', mime: 'text/html' }], ['assets/scene.js', { file: '/fixture/assets/scene.js', mime: 'text/javascript' }]]) }))
@@ -96,6 +96,48 @@ describe('pipeline aislado de figuras', () => {
     await renderDrawingPng({ jobId: 'drawing', scene: scene() }, new Owner())
     expect(state.sessions).toHaveLength(1); expect(state.cleanup).toHaveBeenCalledTimes(2)
     expect(state.windows.every(win => (win as { destroyed: boolean }).destroyed)).toBe(true)
+  })
+  it('Chart conserva su DTO de presentación y comparte la única sesión con Drawing/Diagram', async () => {
+    const { renderDrawingPng, renderDiagramPng, renderChartPng } = await import('./figure-render')
+    const chart = chartSceneFixture()
+    await expect(renderChartPng({ jobId: 'chart', scene: chart }, new Owner())).resolves.toMatchObject({ width: 200, height: 160 })
+    expect(state.renderInputs[0]).toEqual({ kind: 'chart', scene: chart })
+    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'capture', 'normalize'])
+    await renderDiagramPng({ jobId: 'diagram', scene: diagramSceneFixture() }, new Owner())
+    await renderDrawingPng({ jobId: 'drawing', scene: scene() }, new Owner())
+    expect(state.sessions).toHaveLength(1); expect(state.cleanup).toHaveBeenCalledTimes(3)
+    expect(state.windows.every(win => (win as { destroyed: boolean }).destroyed)).toBe(true)
+    const options = (state.windows[0] as { options: { webPreferences: Record<string, unknown> } }).options
+    expect(options.webPreferences).toMatchObject({ sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, devTools: false })
+    expect(options.webPreferences).not.toHaveProperty('preload')
+  })
+  it('Chart rechaza metadata y otras familias antes de crear ventana; un layout alterado nunca se captura', async () => {
+    const { renderChartPng, renderDiagramPng } = await import('./figure-render')
+    await expect(renderChartPng({ jobId: 'diagram-as-chart', scene: diagramSceneFixture() }, new Owner())).rejects.toMatchObject({ code: 'invalid_args' })
+    await expect(renderDiagramPng({ jobId: 'chart-as-diagram', scene: chartSceneFixture() }, new Owner())).rejects.toMatchObject({ code: 'invalid_args' })
+    await expect(renderChartPng({ jobId: 'source', scene: { ...chartSceneFixture(), series: [] } }, new Owner())).rejects.toMatchObject({ code: 'invalid_args' })
+    const large = chartSceneFixture(); large.canvas.height = 16_385
+    await expect(renderChartPng({ jobId: 'large', scene: large }, new Owner())).rejects.toMatchObject({ code: 'too_large' })
+    expect(state.windows).toHaveLength(0)
+    state.layoutHeight = 81
+    await expect(renderChartPng({ jobId: 'layout', scene: chartSceneFixture() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+    expect(state.calls).not.toContain('resizeWindow')
+    expect((state.windows[0] as { destroyed: boolean }).destroyed).toBe(true)
+  })
+  it('Chart no crea otra cola y conserva cancelación por dueño y reintento', async () => {
+    const { renderChartPng, renderDiagramPng, cancelFigureRender } = await import('./figure-render')
+    let release!: () => void
+    state.renderGate = new Promise<void>(resolve => { release = resolve })
+    const owner = new Owner(), other = new Owner(), pending = renderChartPng({ jobId: 'chart', scene: chartSceneFixture() }, owner)
+    const rejected = expect(pending).rejects.toMatchObject({ code: 'cancelled' })
+    await vi.waitFor(() => expect(state.calls).toContain('render'))
+    await expect(renderDiagramPng({ jobId: 'other', scene: diagramSceneFixture() }, other)).rejects.toMatchObject({ code: 'busy' })
+    cancelFigureRender({ jobId: 'chart' }, other)
+    expect((state.windows[0] as { destroyed: boolean }).destroyed).toBe(false)
+    cancelFigureRender({ jobId: 'chart' }, owner)
+    await rejected
+    release(); state.renderGate = undefined
+    await expect(renderChartPng({ jobId: 'retry', scene: chartSceneFixture() }, owner)).resolves.toMatchObject({ width: 200, height: 160 })
   })
   it('rechaza DTO de otra clase y layout Diagram incoherente antes de ampliar superficies', async () => {
     const { renderDrawingPng, renderDiagramPng } = await import('./figure-render')

@@ -95,6 +95,8 @@ export function Menu({ trigger, items, align = 'end' }: { trigger: (open: () => 
               aria-label={returnFocus.current?.getAttribute('aria-label') ?? undefined}
               onKeyDown={(event) => {
                 if (event.key === 'Tab') { closeMenu(true); return }
+                // El portal conserva el bubbling de React; el contenedor no debe consumir la activación nativa.
+                if (event.key === 'Enter' || event.key === ' ') { event.stopPropagation(); return }
                 if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
                 event.preventDefault()
                 event.stopPropagation()

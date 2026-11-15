@@ -18,12 +18,16 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 - **Save a complete diagram as PNG**, including flowcharts, concept maps, trees, cycles, layers, pyramids, funnels,
   Venn diagrams and mind maps. The image keeps the current layout, visible construction step, labels, formulas and
   emphasis, and includes the full canvas independently of pan and zoom.
+- **Save a chart as PNG** from its desktop export menu. Bar, line, area, pie, scatter and histogram charts keep
+  their current layout, axes, values, legends and hover readout, including painted overflow. Entrance animations
+  appear complete in the image while the live chart continues normally.
 
 ### Fixed
 - **Retrying a failed question keeps its saved images and documents**, including questions containing only an image.
   The original question, context and files stay intact, and repeated clicks do not send duplicate questions. If a saved
   attachment is unavailable, Aula explains the problem before starting another response.
 - **Diagram construction steps keep future shapes hidden**, including their emphasis rings and Venn cutouts.
+- **Saving a figure with Enter or Space from its menu keeps the current slide open.**
 
 ## [0.2.5] - 2026-11-14
 
