@@ -11,6 +11,7 @@ import { createHash, createPublicKey, verify } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { BRIDGE_VERSION, macMode } from '../release-common.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const [repo, expected] = process.argv.slice(2)
@@ -31,9 +32,19 @@ const valid = (msg, sig) => typeof sig === 'string' && keys.some((k) => { try { 
 
 const [owner, name] = repo.split('/')
 let bad = 0
-for (const [platform, arch] of [['darwin', 'arm64'], ['darwin', 'x64'], ['win32', 'x64'], ['linux', 'x64'], ['linux', 'arm64']]) {
+// Sin versión explícita, se valida el contrato vigente del repositorio local.
+const target = expected || JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
+const bridge = macMode(target) !== 'legacy'
+const targets = [
+  ...['arm64', 'x64'].flatMap(arch => [
+    ['darwin', arch, null, bridge ? BRIDGE_VERSION : target],
+    ...(bridge ? [['darwin', arch, 'developer-id', target]] : [])
+  ]),
+  ['win32', 'x64', null, target], ['linux', 'x64', null, target], ['linux', 'arm64', null, target]
+]
+for (const [platform, arch, channel, wanted] of targets) {
   process.env.TEST_UPDATER_ARCH = arch
-  const updater = { allowPrerelease: false, channel: null, currentVersion: semver.parse('0.0.1'), fullChangelog: false }
+  const updater = { allowPrerelease: false, channel, currentVersion: semver.parse('0.0.1'), fullChangelog: false }
   const p = new GitHubProvider({ provider: 'github', owner, repo: name }, updater, { isUseMultipleRangeRequest: false, platform, executor: new NodeHttpExecutor() })
   try {
     const info = await p.getLatestVersion()
@@ -44,12 +55,12 @@ for (const [platform, arch] of [['darwin', 'arm64'], ['darwin', 'x64'], ['win32'
         ? 'firmadas'
         : 'sin firma (la app 0.1.1+ no las enseña)'
       : 'ninguna'
-    const ok = (!expected || info.version === expected) && sigs.every(Boolean)
+    const ok = info.version === wanted && sigs.length > 0 && sigs.every(Boolean) && notes === 'firmadas'
     if (!ok) bad++
-    console.log(`${ok ? '✓' : '✗'} ${platform}/${arch}: ${info.tag} v${info.version} → ${files.map((f) => f.url.pathname.split('/').pop()).join(', ')} · firma de Aula: ${sigs.map((s) => (s ? 'ok' : 'NO')).join(',')} · notas: ${notes}`)
+    console.log(`${ok ? '✓' : '✗'} ${platform}/${arch}/${channel || 'latest'}: ${info.tag} v${info.version} → ${files.map((f) => f.url.pathname.split('/').pop()).join(', ')} · firma de Aula: ${sigs.map((s) => (s ? 'ok' : 'NO')).join(',')} · notas: ${notes}`)
   } catch (e) {
     bad++
-    console.log(`✗ ${platform}/${arch}: ${e.code || ''} ${String(e.message).split('\n')[0].slice(0, 160)}`)
+    console.log(`✗ ${platform}/${arch}/${channel || 'latest'}: ${e.code || ''} ${String(e.message).split('\n')[0].slice(0, 160)}`)
   }
 }
 process.exit(bad ? 1 : 0)

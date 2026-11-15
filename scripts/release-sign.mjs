@@ -15,11 +15,12 @@
 // La clave PRIVADA nunca va en el repositorio. Si se pierden la principal Y la de reserva, las copias instaladas no aceptarán
 // más actualizaciones: habría que publicar una versión con otras claves e instalarla a mano (docs/PUBLISHING.md).
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto'
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { BRIDGE_VERSION, DEVELOPER_FEED, LEGACY_FEED, metadataFiles, readMetadata } from './release-common.mjs'
 
 const require = createRequire(import.meta.url)
 const yaml = require('js-yaml')
@@ -34,7 +35,8 @@ const valueOf = (flag) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : 
 const keyArg = valueOf('--key')
 // solo para las pruebas del propio guion (con una clave de usar y tirar): la app SIEMPRE usa la de signature.ts
 const publicArg = valueOf('--public')
-const dir = resolve(args.find((a, i) => !a.startsWith('--') && !['--key', '--public'].includes(args[i - 1])) || 'release')
+const only = args.flatMap((arg, i) => arg === '--only' ? [args[i + 1]] : [])
+const dir = resolve(args.find((a, i) => !a.startsWith('--') && !['--key', '--public', '--only'].includes(args[i - 1])) || 'release')
 
 /** Las claves públicas que lleva la app (src/main/services/updates/signature.ts → UPDATE_PUBLIC_KEYS). */
 function embeddedPublicKeys(root = join(here, '..')) {
@@ -82,12 +84,17 @@ async function main() {
       return
     }
   }
-  const ymls = readdirSync(dir).filter((f) => /^latest.*\.yml$/.test(f))
-  if (!ymls.length) throw new Error(`No hay ningún latest*.yml en ${dir}`)
+  const available = metadataFiles(dir)
+  for (const name of only) if (!available.includes(name)) throw new Error(`Falta el feed solicitado: ${name}`)
+  const ymls = only.length ? [...new Set(only)] : available
+  if (!ymls.length) throw new Error(`No hay ningún feed de actualización en ${dir}`)
+  const splitChannels = available.includes(DEVELOPER_FEED) && readMetadata(dir, DEVELOPER_FEED).version !== BRIDGE_VERSION
   let bad = 0
   for (const y of ymls) {
     const path = join(dir, y)
-    const info = yaml.load(readFileSync(path, 'utf8'))
+    const info = readMetadata(dir, y)
+    // El feed legado forma parte de los bytes públicos del puente. Ni una nueva firma ni yaml.dump lo pueden tocar.
+    const frozen = y === LEGACY_FEED && info.version === BRIDGE_VERSION && splitChannels
     for (const f of info.files || []) {
       const name = nameOf(f.url)
       const file = join(dir, name)
@@ -103,7 +110,7 @@ async function main() {
         continue
       }
       const msg = message(name, String(info.version), got)
-      if (priv) f[FIELD] = sign(null, msg, priv).toString('base64')
+      if (priv && !frozen) f[FIELD] = sign(null, msg, priv).toString('base64')
       if (!validFor(msg, f[FIELD], pubs)) {
         console.error(`✗ ${y}: ${name} sin firma válida de Aula`)
         bad++
@@ -112,13 +119,13 @@ async function main() {
     // las notas que la app enseña (sin firma, no las enseña)
     if (typeof info.releaseNotes === 'string') {
       const msg = notesMessage(String(info.version), info.releaseNotes)
-      if (priv) info[NOTES_FIELD] = sign(null, msg, priv).toString('base64')
+      if (priv && !frozen) info[NOTES_FIELD] = sign(null, msg, priv).toString('base64')
       if (!validFor(msg, info[NOTES_FIELD], pubs)) {
         console.error(`✗ ${y}: las notas no llevan una firma válida de Aula`)
         bad++
       } else console.log(`✓ ${y} → notas firmadas`)
     }
-    if (priv) writeFileSync(path, yaml.dump(info, { lineWidth: -1, noRefs: true }))
+    if (priv && !frozen) writeFileSync(path, yaml.dump(info, { lineWidth: -1, noRefs: true }))
   }
   if (bad) {
     console.error(`\n${bad} problema(s) con la firma.`)

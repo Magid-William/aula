@@ -1,8 +1,9 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DEVELOPER_ID_MAC_REQUIREMENT, LOCAL_MAC_REQUIREMENT } from './mac-trust'
 import {
   appBundleOf,
   cleanupAfterUpdate,
@@ -248,6 +249,43 @@ describe.skipIf(process.platform !== 'darwin')('stageMacUpdate (macOS: ditto, pl
     const app = fakeApp(join(src, 'Aula.app'), '2.0.0')
     execFileSync('/usr/bin/codesign', ['-s', '-', '--force', app])
     expect(await developerRequirement(app)).toBeNull()
+  })
+  it.each(['ad hoc', 'ausente', 'ilegible'])('la firma actual %s no permite saltarse la comprobación de firmante', async (kind) => {
+    const zip = zipOf('2.0.1')
+    const run = async (cmd: string, args: string[]) => {
+      if (args[0] === '-d') {
+        if (kind === 'ilegible') throw new Error('codesign failed')
+        return kind === 'ad hoc' ? 'designated => cdhash H"abc"' : ''
+      }
+      return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    }
+    await expect(stageMacUpdate({ zip, version: '2.0.1', bundleId: 'com.luumlabs.aula', stageDir: join(dir, 'stage'), current: '/current/Aula.app', run })).rejects.toMatchObject({ code: 'verify' })
+  })
+  it('el puente exige Ed25519 antes de aceptar la transición local → Apple', async () => {
+    const { generateKeyPairSync, sign } = await import('node:crypto')
+    const { signedMessage, SIGNATURE_FIELD } = await import('./signature')
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+    const zip = zipOf('2.0.1')
+    const sha512 = await sha512Base64(zip)
+    const current = '/current/Aula.app'
+    // Solo la identidad se simula: ZIP, hash, Ed25519, Info.plist y firma básica se comprueban de verdad.
+    const run = vi.fn(async (cmd: string, args: string[]) => {
+      if (args[0] === '-d') return `designated => ${LOCAL_MAC_REQUIREMENT}`
+      const requirement = args.find((a) => a.startsWith('-R='))
+      if (requirement) {
+        const expected = args.at(-1) === current ? LOCAL_MAC_REQUIREMENT : DEVELOPER_ID_MAC_REQUIREMENT
+        if (requirement !== `-R=${expected}`) throw new Error('different signer')
+        return ''
+      }
+      return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    })
+    const base = { zip, sha512, version: '2.0.1', bundleId: 'com.luumlabs.aula', stageDir: join(dir, 'stage'), current, run }
+    const url = 'Aula-2.0.1-mac.zip'
+    const entry = { url, sha512, [SIGNATURE_FIELD]: sign(null, signedMessage(url, base.version, sha512), privateKey).toString('base64') }
+    await expect(stageMacUpdate({ ...base, signature: { entry: { ...entry, [SIGNATURE_FIELD]: 'invalid' }, publicKey } })).rejects.toMatchObject({ code: 'verify' })
+    expect(run).not.toHaveBeenCalled()
+    await expect(stageMacUpdate(base)).rejects.toMatchObject({ code: 'verify' })
+    expect(version(await stageMacUpdate({ ...base, signature: { entry, publicKey } }))).toBe(base.version)
   })
   it('con firma de desarrollador, la nueva debe cumplir el mismo requisito', async () => {
     const zip = zipOf('2.0.1')

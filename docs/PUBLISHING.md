@@ -15,6 +15,7 @@ docs/SERVER.md).
 - [Testing the published installers on Windows and Linux](#testing-the-published-installers-on-windows-and-linux)
 - [Rehearsing an update locally](#rehearsing-an-update-locally)
 - [Signing](#signing)
+- [The macOS signing bridge](#the-macos-signing-bridge)
 - [Update signatures (Ed25519)](#update-signatures-ed25519)
 
 ## How updates work
@@ -23,7 +24,8 @@ Code: `src/main/electron/updates.ts`, `src/main/services/updates/`, `electron-bu
 
 1. About 45 s after launch and then every 6 hours (if *Settings → About → Update automatically* is on, or when the
    student presses *Check for updates*), Aula asks GitHub for the **latest published release**:
-   `releases.atom` + `releases/latest`, then that release's `latest-mac.yml`, `latest.yml` (Windows) or
+   `releases.atom` + `releases/latest`, then that release's `developer-id-mac.yml` (macOS 0.2.5 and newer),
+   `latest-mac.yml` (older macOS clients), `latest.yml` (Windows) or
    `latest-linux.yml` / `latest-linux-arm64.yml`. **Drafts are never seen** (GitHub doesn't list them) and
    **pre-releases are never offered** (`allowPrerelease: false`, and a version like `0.2.0-beta` is ignored even if it
    isn't marked as a pre-release). A release without this system's `latest*.yml` isn't offered to that system. After a
@@ -57,8 +59,9 @@ signature … did not pass validation: code failed to satisfy specified code req
 1. extracts the downloaded zip (SHA-512 and Ed25519 signature already checked) with `ditto` and verifies the new app:
    bundle id `com.luumlabs.aula`, the expected version, that this Mac's macOS is at least its `LSMinimumSystemVersion`,
    `codesign --verify --deep --strict` (nothing missing or altered) and, if the running app is signed with a
-   certificate (*Aula Local Signing* or a Developer ID, see [Signing](#signing)), the same designated requirement Squirrel
-   would check;
+   certificate, its expected signing identity. The 0.2.5 bridge explicitly permits the pinned Aula local certificate
+   to move to Aula's Apple Developer ID Application identity; an Apple-signed installation cannot move back to the
+   local signer. See [The macOS signing bridge](#the-macos-signing-bridge);
 2. on *Restart* (or quit, or shutdown) swaps it in with two `rename`s in the app's folder — the old app becomes
    `.Aula-previous.app` — and rolls back instantly if anything fails;
 3. reopens Aula; the new version deletes `.Aula-previous.app` once its window loads. If it doesn't manage to start
@@ -82,7 +85,7 @@ A failed *automatic* check (e.g. offline) stays silent.
 
 ## Checklist
 
-1. **Version.** Bump `"version"` in `package.json` and `VERSION` — `MAJOR.MINOR.PATCH`.
+1. **Version.** Bump `"version"` in `package.json`, the root records in `package-lock.json`, and `VERSION` — `MAJOR.MINOR.PATCH`.
 2. **Changelog.** Add the `## [<version>]` entry to `CHANGELOG.md`.
 3. **Release notes.** Write `docs/release-notes/<version>.md` with both languages, each after its marker, so the app
    can show the right one (GitHub hides the markers):
@@ -139,17 +142,19 @@ if it fails it does so before the long desktop builds), then `npm run build` and
 once per system (nothing is uploaded). Each system is finished as soon as it's built: its `latest*.yml` signed and
 `release/<version>/BUILD_INFO.<system>` written (the commit and tree it was built from, and whether there were
 uncommitted changes). So if a later system fails, the ones before it stay ready to upload, and the script says which:
-build only the rest with `--only`. Finally `scripts/release-verify.mjs` checks that every `latest*.yml` is for this
-version and that the SHA-512 of each file matches. Options: `--only mac|win|linux|android` (repeatable; it rebuilds
+build only the rest with `--only`. Finally `scripts/release-verify.mjs` checks the channel metadata and every artifact's
+SHA-512. The legacy Mac channel is the sole version exception: after 0.2.5 it must match the pinned bridge manifest
+exactly. Options: `--only mac|win|linux|android` (repeatable; it rebuilds
 only that system and leaves the files of the others as they are — only **before** the version is released: once the
 tag `v<version>` exists the script stops, see [Adding a `.deb` to a published release](#adding-a-deb-to-a-published-release)
-and [The Android app](#the-android-app-apk)), `--skip-checks`.
+and [The Android app](#the-android-app-apk)), `--skip-checks`, and `--bridge-dir <original-0.2.5-files>` for later Mac
+releases. Skipping checks does not bypass artifact, signature or notarization verification before upload.
 
 What you get in `release/<version>/`:
 
 | System | Files |
 | --- | --- |
-| macOS (universal) | `Aula-<v>-mac.dmg`, `Aula-<v>-mac.zip` (+ `.blockmap`s) and `latest-mac.yml` — **updates download the zip** |
+| macOS (universal) | `Aula-<v>-mac.dmg`, `Aula-<v>-mac.zip` (+ `.blockmap`s), `developer-id-mac.yml`, and the legacy `latest-mac.yml` with its original bridge files — **updates download the zip** |
 | Windows (x64 + arm64 in one installer) | `Aula-Setup-<v>.exe` (+ `.blockmap`) and `latest.yml` |
 | Linux | `Aula-<v>-linux-x86_64.AppImage`, `Aula-<v>-linux-arm64.AppImage` (+ `latest-linux.yml`, `latest-linux-arm64.yml`) and `Aula-<v>-linux-amd64.deb` |
 | Android (arm64-v8a + x86_64, Android 8.0+) | `Aula-<v>-android.apk`, signed with Aula's Android release key. No `latest*.yml`: the app doesn't update itself, people install the new APK over the old one |
@@ -189,7 +194,8 @@ The repository is always given explicitly (it's never guessed from `origin`) and
 release points at your current commit, which must already be on `luumlabs/aula`. The script re-verifies
 `release/<version>/` (and the APK, see [The Android app](#the-android-app-apk)), requires a clean tree, refuses files
 built from other content or from uncommitted changes (`BUILD_INFO.<system>`; a copy with the same tree, like the public
-repository's clean commit, is fine), warns if the repository isn't public, and creates a **draft** release `v<version>`
+repository's clean commit, is fine). The only older artifacts allowed are the exact Mac bridge files fixed by the
+committed manifest. It warns if the repository isn't public, and creates a **draft** release `v<version>`
 (title: `releaseInfo.releaseName`; description: the English part of `docs/release-notes/<version>.md`) with the
 installers, zips, `.blockmap`s, `latest*.yml` and the APK from that folder — exactly the files you tested. The tag is
 created by GitHub when you publish.
@@ -207,7 +213,8 @@ replaces a file (a `latest*.yml` must stay with the files of its own build). For
   again.
 
 That's also how the Mac files and the APK join a draft built by Actions. It refuses to upload unless all three systems
-(`latest-mac.yml`, `latest.yml`, `latest-linux.yml`, `latest-linux-arm64.yml`) and `Aula-<v>-android.apk` end up on the
+(`developer-id-mac.yml`, `latest-mac.yml`, `latest.yml`, `latest-linux.yml`, `latest-linux-arm64.yml`) and
+`Aula-<v>-android.apk` end up on the
 release, counting what the draft already has; `--partial` uploads anyway, on purpose. Every `Aula-…` file the release
 notes name must be there too. Without the script:
 
@@ -219,7 +226,7 @@ gh release create v0.1.1 -R luumlabs/aula --draft --target "$(git rev-parse HEAD
   --notes-file /tmp/notes.md "${files[@]}"
 ```
 
-Upload each `latest*.yml` **together with** the files it lists (same build): if you rebuild one system, upload its
+Upload each channel YAML, including `developer-id-mac.yml`, **together with** the files it lists (same build): if you rebuild one system, upload its
 installer and its `latest*.yml` again, never one without the other — otherwise the SHA-512 won't match and copies will
 report a damaged download (and won't retry that version on their own).
 
@@ -398,8 +405,13 @@ are administrators, so a standard (non-admin) Windows account is only covered by
 
 ## Rehearsing an update locally
 
-Build every version of a rehearsal the same way (all signed with *Aula Local Signing*, or all with `AULA_MAC_ADHOC=1`):
-a copy signed with the certificate rejects an ad-hoc update, as it should.
+For a rehearsal of the local signing identity, sign both versions with *Aula Local Signing*: a copy signed with that
+certificate rejects an ad-hoc update. The signing-migration rehearsal deliberately changes identity after the bridge;
+follow [The macOS signing bridge](#the-macos-signing-bridge) for its required sequence and checks.
+
+Run the GUI rehearsals below in a **dedicated macOS test account**. `AULA_HOME` isolates Aula's data, but published
+copies also use `~/Library/Caches/aula-updater`, and a mock keychain does not isolate that cache. Do not run these
+commands in your normal account or change `HOME` to simulate a separate account.
 
 **Quick rehearsal** (your own builds). `scripts/dev/fake-github-releases.mjs` imitates GitHub's releases on `127.0.0.1`
 (drafts hidden, pre-releases not "latest", ranges for differential downloads). Build two versions that look for updates
@@ -410,13 +422,20 @@ T=$(mktemp -d); npm run build
 for V in 0.1.0 0.1.1; do
   npx electron-builder --mac zip --arm64 --publish never -c.extraMetadata.version=$V -c.directories.output=$T/rel-$V \
     -c.publish.host=127.0.0.1:8765 -c.publish.protocol=http
-  mkdir -p $T/R/v$V && cp $T/rel-$V/{*.zip,*.blockmap,latest-mac.yml} $T/R/v$V/
+  node scripts/release-sign.mjs $T/rel-$V
+  cp $T/rel-$V/latest-mac.yml $T/rel-$V/developer-id-mac.yml
+  mkdir -p $T/R/v$V && cp $T/rel-$V/{*.zip,*.blockmap,latest-mac.yml,developer-id-mac.yml} $T/R/v$V/
 done
 echo '[{"tag":"v0.1.1"},{"tag":"v0.1.0"}]' > $T/R/releases.json        # add "draft": true to hide one
 node scripts/dev/fake-github-releases.mjs $T/R 8765 &
 mkdir -p $T/inst && ditto $T/rel-0.1.0/mac-arm64/Aula.app $T/inst/Aula.app
-AULA_HOME=$(mktemp -d) AULA_UPDATE_CHECK_DELAY_MS=3000 AULA_UPDATE_AUTO_INSTALL=1 $T/inst/Aula.app/Contents/MacOS/Aula
+AULA_HOME=$T/data AULA_UPDATE_CHECK_DELAY_MS=3000 AULA_UPDATE_AUTO_INSTALL=1 \
+  $T/inst/Aula.app/Contents/MacOS/Aula --use-mock-keychain
 ```
+
+These are temporary test versions of the current source: they use `developer-id-mac.yml` even with a synthetic
+version number. Keep them local and delete their signed artifacts after the rehearsal. The simple ZIP-only fixture
+does not replace the universal ZIP, DMG and immutable-bridge checks required for a release.
 
 `AULA_UPDATE_CHECK_DELAY_MS` shortens the first check; `AULA_UPDATE_AUTO_INSTALL=1` presses *Restart and update* as soon
 as the update is ready (`=quit` quits instead, to try install-on-quit). After a few seconds `$T/inst/Aula.app` is 0.1.1
@@ -438,7 +457,7 @@ mkdir -p $T/R/v0.1.1 && cp $T/rel-0.1.1/{*.zip,*.blockmap,latest-mac.yml} $T/R/v
 echo '[{"tag":"v0.1.1"},{"tag":"v0.1.0"}]' > $T/R/releases.json
 node scripts/dev/fake-github-com.mjs $T/R 18443 $T/cert.pem $T/key.pem &
 ditto <the published Aula.app> $T/inst/Aula.app                                           # from the release's .zip or .dmg
-HOME=$T/home AULA_HOME=$T/data AULA_HIDDEN=1 AULA_UPDATE_CHECK_DELAY_MS=3000 AULA_UPDATE_AUTO_INSTALL=1 \
+AULA_HOME=$T/data AULA_HIDDEN=1 AULA_UPDATE_CHECK_DELAY_MS=3000 AULA_UPDATE_AUTO_INSTALL=1 \
   $T/inst/Aula.app/Contents/MacOS/Aula --use-mock-keychain --ignore-certificate-errors \
   "--host-resolver-rules=MAP github.com 127.0.0.1:18443, MAP release-assets.githubusercontent.com 127.0.0.1:18443"
 ```
@@ -451,7 +470,8 @@ does on students' copies. Remove the quarantine first (`xattr -dr com.apple.quar
 quarantined copy nobody approved with *Open Anyway* is stopped by Gatekeeper even when launched from a shell, and macOS
 shows *“Aula” Not Opened* on the screen. The first launch of a quarantined copy, and whether *App Management* lets it
 replace itself in `/Applications`, can only be tried by hand (a test macOS account). Don't run this against
-`/Applications/Aula.app` or with your own `HOME`, and delete the signed rehearsal files and the TLS key afterwards.
+`/Applications/Aula.app` or your real Aula data folder. Keep `--use-mock-keychain`: `AULA_HOME` does not isolate the
+macOS Keychain, and changing `HOME` is not a substitute. Delete the signed rehearsal files and the TLS key afterwards.
 The installed app refuses `--remote-debugging-port` (see [What's hardened](#whats-hardened-in-the-package)): to drive a
 packaged build with CDP (`scripts/dev/security-check.mjs`, measurements), build it with `AULA_AUDIT_BUILD=1 npm run build`
 (`release-local.sh` refuses that).
@@ -460,7 +480,7 @@ packaged build with CDP (`scripts/dev/security-check.mjs`, measurements), build 
 
 | System | Without certificates (now) | With certificates |
 | --- | --- | --- |
-| macOS | Signed with the project's own self-signed certificate **Aula Local Signing** (`scripts/build/mac-sign.cjs`, from the keychain `~/.aula-signing/aula-signing.keychain-db`; ad hoc if it isn't there). Gatekeeper treats it like ad hoc: the first launch needs *Open* / *Open Anyway*. Its designated requirement (`identifier "com.luumlabs.aula" and certificate root = H"2606…"`) is the same for every version, so after one *Always Allow* macOS stops asking for the «Aula Safe Storage» keychain item on each update, and Aula's installer requires every new version to satisfy it. **So every later macOS release must be signed with this certificate**: `release-local.sh` refuses to build or upload macOS without it (`AULA_MAC_ADHOC=1` only for tests). Automatic updates **work** (Aula's own installer, above). | Set `MAC_CERT_P12_BASE64` + `MAC_CERT_PASSWORD` (a *Developer ID Application* certificate) and `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID` to notarize (repository secrets for Actions, or `CSC_LINK`/`CSC_KEY_PASSWORD` + the Apple variables in your shell for a local build). Then, in `electron-builder.yml`, remove `identity: "-"` and set `hardenedRuntime: true`. From that version on, updates must be signed by the same team (the installer checks it). |
+| macOS | Through the **0.2.5 bridge**, signed with **Aula Local Signing** (`scripts/build/mac-sign.cjs`), using the existing pinned certificate. The first launch can still need *Open Anyway*: 0.2.5 is not notarized. `AULA_MAC_ADHOC=1` is for test builds only and never permits upload. | From the later Developer ID release, use the project's Developer ID Application identity, hardened runtime, timestamp and notarization. The archive verifier requires the expected Apple team and a stapled ticket. Both update channels and the unchanged 0.2.5 bridge remain required; see below. |
 | Windows | Unsigned: SmartScreen shows *More info → Run anyway* the first time. Updates work. | `CSC_LINK`/`CSC_KEY_PASSWORD` (or Azure Trusted Signing). electron-updater then requires updates signed by the same publisher. |
 | Linux | AppImage and .deb are not signed (normal for Linux). | — |
 | Android | Signed with Aula's own Android release key (`~/.aula-signing/android/aula-release.keystore`, its password in `aula-release.pass`; made once with `native/android/build.sh --new-key`). Android installs an update over the app only if it's signed with the same key, so **every later APK must be signed with it**: its certificate's SHA-256 is committed in `native/android/release-cert.sha256`, and `release-local.sh` refuses to build with a keystore, or upload an APK, that doesn't match it (see [The Android app](#the-android-app-apk)). | Google Play would need an `.aab` and Play App Signing. |
@@ -478,6 +498,82 @@ install by hand once. To restore it on a new Mac: `security create-keychain -p "
 -P "$(cat p12.pass)" -T /usr/bin/codesign` and `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
 "$(cat keychain.pass)" ~/.aula-signing/aula-signing.keychain-db` (so `codesign` uses it without a dialog).
 
+## The macOS signing bridge
+
+An installed 0.2.4 checks the certificate of its replacement. It cannot install a Developer ID build directly, and
+GitHub's latest-release feed does not walk clients through intermediate releases. Publishing 0.2.5 and immediately
+replacing it with 0.2.6 as latest would therefore leave clients that missed 0.2.5 behind.
+
+The bridge keeps two signed Mac channels on every release:
+
+| Client | Metadata file | What it offers |
+| --- | --- | --- |
+| 0.2.4 and older clients with the current update keys | `latest-mac.yml` | The original, locally signed 0.2.5 bridge |
+| 0.2.5 and newer | `developer-id-mac.yml` | The current Mac version |
+
+On the 0.2.5 release both files announce 0.2.5. The channel name does not mean that 0.2.5 has an Apple signature:
+**the bridge retains the existing local certificate and is not notarized**. Windows and Linux keep their existing
+channels. Configuring the Mac channel must explicitly leave `allowDowngrade` false.
+
+### Preparing and preserving 0.2.5
+
+1. Build and test 0.2.5 with the existing local signing configuration and update keys. Do not change its designated
+   requirement to accept other certificates, and do not change its Ed25519 keys.
+2. The release script prepares both metadata files. Its standalone command is:
+   ```bash
+   node scripts/release-mac-bridge.mjs prepare release/0.2.5 0.2.5
+   node scripts/release-mac-verify.mjs release/0.2.5 0.2.5
+   ```
+   Preparation copies the signed metadata byte for byte. The verifier extracts the final ZIP and checks that it
+   contains the correct universal app with the pinned local signature; an optional unpacked build directory is not
+   a substitute for checking the ZIP that users receive.
+3. After publishing, download the original metadata and Mac artifacts of v0.2.5 into a separate directory. Generate
+   and review their public manifest:
+   ```bash
+   node scripts/release-mac-bridge.mjs manifest /path/to/original-v0.2.5 /tmp/mac-bridge-0.2.5.json
+   ```
+   Commit the reviewed result as `resources/updates/mac-bridge-0.2.5.json` for the subsequent release. The manifest
+   records the original files and their hashes after verifying their metadata and signatures. It cannot be part of
+   the bridge's own source commit: the artifact hashes do not exist until that commit has been built.
+
+Never rebuild the bridge for later releases or change its signed notes. Keep the original files and the public
+manifest. Every subsequent latest release must include them because the GitHub updater resolves the listed download
+filenames under the **latest tag**, even when the metadata's version is 0.2.5. Leaving them only on the v0.2.5 release
+is insufficient.
+
+### The subsequent Developer ID release
+
+Once the bridge and its manifest are available, the later Mac release uses:
+
+```bash
+scripts/release-local.sh --only mac --bridge-dir /path/to/original-v0.2.5
+```
+
+Configure an explicit Developer ID Application identity for team `87BM9KFJZW`, remove the local `mac.sign` hook and
+ad-hoc `identity`, and enable hardened runtime and timestamp signing. The installed builder supports
+`APPLE_KEYCHAIN_PROFILE` for stored notarization credentials. A missing credential, omitted notarization or a warning
+from the builder is **not** a successful notarized release: the final archive verifier must pass. Staple the app before
+creating its ZIP. Any final changes to the DMG must happen before calculating its metadata, blockmap and signatures.
+
+The new app policy is one-way: only the pinned Aula local identity may move to Aula's Apple Developer ID Application
+identity, with Apple's signing chain, the expected certificate type, team and bundle identifier checked. Once running
+under Developer ID, the app rejects the old local identity. Unknown or unreadable current signatures never enable the
+transition. SHA-512 and Aula's Ed25519 update signature are still mandatory before the installer considers either
+signer.
+
+The publication script keeps `latest-mac.yml` and its original artifacts fixed to the committed bridge manifest,
+while `developer-id-mac.yml` and the new artifacts must match the current release. A missing manifest, changed bridge
+byte, unexpected version, unverified final ZIP or absent notarization must stop publication. Do not relax the general
+clean-tree and build-provenance checks to accommodate old bridge files.
+
+Before publishing that later version, rehearse 0.2.4 → 0.2.5 → Developer ID against the fake GitHub server, including a
+client that first connects after the later release is latest, restart/quit installation and rollback. Use isolated
+test data and a mock keychain for automation. `AULA_HOME` alone does not isolate macOS Keychain: checking preservation
+of real Safe Storage authorization and first-launch Gatekeeper behavior requires a separate macOS test account. Do
+not claim those checks from a mock-keychain rehearsal, or promise that changing signing identity causes no macOS
+authorization prompts. Copies from 0.1.x still need the manual update already documented below because their update
+keys were replaced before this bridge.
+
 ## Update signatures (Ed25519)
 
 GitHub and TLS alone aren't enough: whoever got the project's GitHub token or account could otherwise ship code to
@@ -493,7 +589,7 @@ signature**:
 - **Public keys**: both are embedded in the app, `src/main/services/updates/signature.ts → UPDATE_PUBLIC_KEYS`
   (main first). A signature by **either** is valid.
 - **Signing**: `scripts/release-local.sh` runs `node scripts/release-sign.mjs release/<version>` right after building. For
-  every file listed in every `latest*.yml` it checks the SHA-512 and adds `aulaSignature`, an Ed25519 signature of
+  every file listed in the supported channel YAML files (`latest*.yml` and `developer-id-mac.yml`) it checks the SHA-512 and adds `aulaSignature`, an Ed25519 signature of
   `aula-update-v1\n<file name>\n<version>\n<sha512>`. It also signs each `latest*.yml`'s release notes
   (`aulaNotesSignature`, over `aula-notes-v1\n<version>\n<sha512 of the notes>`): the app paints the notes as Markdown
   with links, so unsigned notes are never shown. It refuses a key that isn't the pair of one of the embedded public keys
@@ -503,9 +599,10 @@ signature**:
   (name, version, that SHA-512): on macOS in `mac-install.ts` (before unzipping), on Windows and Linux before the update
   is marked ready (nothing is installed on quit until it passes). Unsigned, badly signed, re-used (other version) or
   altered files are refused with *invalid signature* and that version isn't retried automatically.
-- **Signing by hand** (e.g. a draft built by Actions): download the draft's `latest*.yml` and the files they list into
-  one folder, run `node scripts/release-sign.mjs <folder>`, then `gh release upload v<version> <folder>/latest*.yml
-  --clobber`. Rehearsals with `scripts/dev/fake-github-releases.mjs` need the same step on each `rel-<version>` folder.
+- **Signing by hand** (e.g. a draft built by Actions): download the draft's channel metadata and the files it lists into
+  one folder, run `node scripts/release-sign.mjs <folder>`, then upload the verified metadata, including
+  `developer-id-mac.yml` when present. Do not replace an existing release's metadata with a different build or re-sign
+  the immutable legacy bridge. Rehearsals with `scripts/dev/fake-github-releases.mjs` need signatures on each version.
 
 ### Keeping the keys
 

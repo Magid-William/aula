@@ -5,6 +5,8 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-14
+
 ### Added
 - **New figures, adapted from [Sketchy](https://github.com/ddkbs/sketchy)** (MIT, by ddkbs; credited in
   `THIRD_PARTY_NOTICES.md`):
@@ -46,6 +48,11 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 - Existing courses continue to open. Aula 0.2.4 cannot display all the new figures, and saving a course with new
   figure fields in that older version can discard those fields. Keep courses that use the new figures in this version
   or newer; keep a backup before opening them in an older version.
+
+### Updating
+- **macOS signing transition:** this release keeps Aula's current signing certificate and prepares the updater for a
+  future release signed with an Apple Developer ID certificate. **Aula 0.2.5 is not notarized**; the first manual installation still needs *Open
+  Anyway*. Copies running 0.2.0 or later update normally; copies running 0.1.x need one manual installation.
 
 ## [0.2.4] - 2026-11-13
 

@@ -6,8 +6,8 @@
 //   1. electron-updater descarga el .zip y comprueba su SHA-512 (el de latest-mac.yml); lo volvemos a comprobar y se exige
 //      la firma propia de Aula (Ed25519, ./signature.ts): el SHA-512 solo dice que el zip es el que anuncia el .yml.
 //   2. `ditto` lo descomprime en una carpeta aparte y se comprueba la app: identificador, versión, `codesign --verify
-//      --deep --strict` (que no le falte ni sobre nada) y, si la app abierta tiene firma de desarrollador, que la nueva
-//      cumpla su mismo requisito (lo que haría Squirrel).
+//      --deep --strict` (que no le falte ni sobre nada) y su firmante. Se conserva el requisito de la app abierta,
+//      salvo la transición del certificado local a Developer ID autorizada por Ed25519 (./mac-trust.ts).
 //   3. Al salir, dos `rename` en la misma carpeta: la app actual pasa a `.Aula-previous.app` y la nueva ocupa su sitio. Si
 //      algo falla, se deshace en el acto y la app de siempre sigue donde estaba.
 //   4. La versión nueva, al abrirse bien, borra la copia anterior. Si no llega a abrirse, el vigilante (un `sh` aparte)
@@ -20,6 +20,7 @@ import { basename, dirname, join } from 'node:path'
 import type { KeyObject } from 'node:crypto'
 import { verifyDownloadedUpdate, type SignedFileEntry } from './signature'
 import { compareVersions } from './version'
+import { verifyMacUpdateTrust } from './mac-trust'
 
 /** Por qué no se puede instalar (o no se instaló) una versión. La interfaz lo traduce. */
 export type MacInstallErrorCode = 'translocated' | 'readOnly' | 'corrupt' | 'verify' | 'install' | 'disk' | 'system'
@@ -94,7 +95,7 @@ export interface StageOptions {
   bundleId: string
   /** Carpeta de trabajo (se vacía). */
   stageDir: string
-  /** App abierta ahora: si tiene firma de desarrollador, la nueva debe cumplir su mismo requisito. */
+  /** App abierta ahora: debe tener una firma conocida de Aula. Permite la transición local → Developer ID. */
   current?: string
   /** Firma propia de Aula (Ed25519) del zip: su entrada de latest-mac.yml. La app la pasa SIEMPRE (ver signature.ts). */
   signature?: { entry: SignedFileEntry | null; publicKey?: KeyObject | readonly KeyObject[] }
@@ -142,12 +143,13 @@ export async function stageMacUpdate(o: StageOptions): Promise<string> {
   } catch (e) {
     throw new MacInstallError('verify', `Firma no válida: ${(e as Error).message}`)
   }
-  const requirement = o.current ? await developerRequirement(o.current, exec) : null
-  if (requirement) {
+  if (o.current) {
+    const requirement = await developerRequirement(o.current, exec)
+    if (!requirement) throw new MacInstallError('verify', 'No se pudo identificar la firma de la app abierta')
     try {
-      await exec('/usr/bin/codesign', ['--verify', '--deep', '--strict', `-R=${requirement}`, app])
+      await verifyMacUpdateTrust({ current: o.current, candidate: app, currentRequirement: requirement, verifiedUpdateSignature: o.signature !== undefined, run: exec })
     } catch (e) {
-      throw new MacInstallError('verify', `No la firmó el mismo desarrollador: ${(e as Error).message}`)
+      throw new MacInstallError('verify', `Firmante no autorizado para esta actualización: ${(e as Error).message}`)
     }
   }
   return app
