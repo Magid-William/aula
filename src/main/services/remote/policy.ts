@@ -45,6 +45,7 @@ const OWNER_DENIED: ReadonlySet<string> = new Set([
   'calendar.exportICS', 'calendar.importICS',
   'courses.export', 'courses.import',
   'documents.pick', 'documents.reveal', 'documents.save', 'documents.revealSaved',
+  'figures.save', 'figures.revealSaved',
   'data.exportAll', 'data.deleteAll', 'memory.export',
   'updates.check', 'updates.install', 'updates.openDownloadPage',
   'remote.setEnabled', 'remote.tailnetLogin', 'remote.tailnetLogout'

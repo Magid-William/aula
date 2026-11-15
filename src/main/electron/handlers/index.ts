@@ -9,6 +9,7 @@ import { register as ai } from './ai'
 import { register as agents } from './agents'
 import { register as study } from './study'
 import { register as documents } from './documents'
+import { register as figures } from './figures'
 import { register as automations } from './automations'
 import { register as generation } from './generation'
 import { register as assistant } from './assistant'
@@ -30,6 +31,7 @@ export function registerAllHandlers(): void {
   agents()
   study()
   documents()
+  figures()
   automations()
   generation()
   assistant()
