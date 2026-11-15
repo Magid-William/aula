@@ -36,7 +36,17 @@ export function FigureExportAction({ capture, kind }: { capture: (signal: AbortS
   return (
     <span className="inline-flex print:hidden" data-figure-export={kind} aria-busy={busy}>
       <Menu
-        trigger={(open, expanded) => <IconButton size="sm" label={t(busy ? 'figureExport.saving' : 'figureExport.label')} disabled={busy} aria-haspopup="menu" aria-expanded={expanded} onClick={open}>
+        trigger={(open, expanded) => <IconButton size="sm" label={t(busy ? 'figureExport.saving' : 'figureExport.label')}
+          // No se deshabilita nativamente: perdería el foco al cancelar el diálogo. Tab sigue libre durante la captura.
+          aria-disabled={busy} className="aria-disabled:opacity-35" aria-haspopup="menu" aria-expanded={expanded}
+          onClick={() => { if (!pending.current) open() }}
+          onKeyDown={(event) => {
+            // Menu escucha estas teclas en su contenedor; tampoco debe abrirse mientras se guarda.
+            if (pending.current && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          }}>
           {busy ? <Spinner size={14} /> : <Icon name="download" size={15} />}
         </IconButton>}
         items={(['svg', 'png'] as const).map((format) => ({ label: t(`figureExport.${format}`), disabled: busy, onSelect: () => void save(format) }))}

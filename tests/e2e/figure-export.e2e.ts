@@ -239,8 +239,31 @@ test('menú por teclado, cancelación silenciosa y reintento después de un erro
     await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     await expect(button).toBeEnabled()
+    await expect(button).toBeFocused()
     await expect(page.getByText('Chemical drawing saved', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Couldn’t save the chemical drawing', { exact: true })).toHaveCount(0)
+
+    // Una operación pendiente no debe recuperar el foco si el usuario ya eligió otro control.
+    await app.evaluate(({ dialog }) => {
+      const state = globalThis as unknown as { figureDialogRelease?: (value: { canceled: boolean; filePath: string }) => void }
+      dialog.showSaveDialog = (async () => new Promise(resolve => { state.figureDialogRelease = resolve })) as typeof dialog.showSaveDialog
+    })
+    await button.click()
+    await page.getByRole('menuitem', { name: 'Save SVG…' }).click()
+    await expect.poll(() => app.evaluate(() => typeof (globalThis as unknown as { figureDialogRelease?: unknown }).figureDialogRelease)).toBe('function')
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    const other = figure.getByRole('tab', { name: 'Condensed', exact: true })
+    await other.focus()
+    await app.evaluate(() => {
+      const state = globalThis as unknown as { figureDialogRelease?: (value: { canceled: boolean; filePath: string }) => void }
+      state.figureDialogRelease?.({ canceled: true, filePath: '' })
+      delete state.figureDialogRelease
+    })
+    await expect(button).toBeEnabled()
+    await expect(other).toBeFocused()
 
     const blocked = join(home, 'blocked.svg')
     mkdirSync(blocked)
@@ -249,8 +272,10 @@ test('menú por teclado, cancelación silenciosa y reintento después de un erro
     await page.getByRole('menuitem', { name: 'Save SVG…' }).click()
     await expect(page.getByText('Couldn’t save the chemical drawing', { exact: true })).toBeVisible()
     await expect(button).toBeEnabled()
+    await expect(button).toBeFocused()
     await save(app, page, figure, join(home, 'retry.svg'), 'SVG')
     await expect(page.getByText('Chemical drawing saved', { exact: true })).toBeVisible()
+    await expect(button).toBeFocused()
     expect(errors).toEqual([])
   } finally { await app.close() }
 })
