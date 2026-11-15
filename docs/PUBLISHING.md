@@ -9,6 +9,7 @@ docs/SERVER.md).
 - [Checklist](#checklist)
 - [Publishing from your computer](#publishing-from-your-computer-no-github-actions) (while GitHub Actions is off)
 - [Publishing with GitHub Actions](#publishing-with-github-actions)
+- [Checking packaging changes](#checking-packaging-changes)
 - [The Android app (APK)](#the-android-app-apk)
 - [Test, then publish](#test-then-publish)
 - [The server image (ghcr.io)](#the-server-image-ghcrio)
@@ -285,6 +286,19 @@ creates the tag and a tag-triggered build would upload untested installers over 
 
 Then add the Mac files and the APK (above), and [test and publish](#test-then-publish). Publishing starts the *Server*
 workflow ([The server image](#the-server-image-ghcrio)).
+
+## Checking packaging changes
+
+The **Packaging** workflow (`.github/workflows/packaging.yml`) builds validation installers on native Windows and
+Linux runners with Node 22. It runs on pull requests that change packaging dependencies/configuration and can also
+be started manually. It uses read-only repository permissions, no publication credentials, and a fixed
+`electron-builder --publish never`; it never creates or modifies a GitHub release.
+
+The workflow checks the installer inventory, SHA-512 metadata and release-note content, then keeps the installers
+as Actions artifacts named with the tested commit. `BUILD_INFO.json` records the commit, tree, Node version and
+lockfile hash. These are **validation artifacts**, with unsigned update feeds: do not upload them to a release.
+Inspect their runtime dependencies, exclusions, licenses and unpacked files when changing the packager. Mac
+universal packaging/signing and the release-signature checks remain separate requirements before publication.
 
 ## The Android app (APK)
 

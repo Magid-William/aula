@@ -1,0 +1,105 @@
+name: Packaging
+# Paquetes de validación: nunca crea una release ni utiliza claves de publicación.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron-builder.yml'
+      - 'scripts/build/**'
+      - 'native/tsnet/**'
+      - '.github/workflows/packaging.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the Linux sidecars
+        if: runner.os == 'Linux'
+        run: |
+          native/tsnet/build.sh linux
+          for arch in x64 arm64; do
+            test -x "native/tsnet/bin/linux-$arch/aula-tsnet"
+          done
+      - name: Build validation installers without publishing
+        run: |
+          npx electron-vite build
+          npx electron-builder --publish never -c.directories.output=packaging-ci
+      - name: Verify installer metadata and record the source
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { execFileSync } from 'node:child_process'
+          import { createHash } from 'node:crypto'
+          import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+          import { metadataFiles, regularFile, verifyMetadata } from './scripts/release-common.mjs'
+          const dir = 'packaging-ci'
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version
+          const windows = process.platform === 'win32'
+          assert(windows || process.platform === 'linux')
+          const feeds = windows ? ['latest.yml'] : ['latest-linux-arm64.yml', 'latest-linux.yml']
+          assert.deepEqual(metadataFiles(dir), feeds)
+          const expected = windows
+            ? [`Aula-Setup-${version}.exe`, `Aula-Setup-${version}.exe.blockmap`]
+            : [`Aula-${version}-linux-x86_64.AppImage`, `Aula-${version}-linux-arm64.AppImage`, `Aula-${version}-linux-amd64.deb`]
+          const notes = readFileSync(`docs/release-notes/${version}.md`, 'utf8').replace(/\r\n/g, '\n').trim()
+          const referenced = new Set()
+          for (const feed of feeds) {
+            // Estos paquetes no se publican: valida hashes y notas sin abrir la clave de firma.
+            const info = await verifyMetadata(dir, feed, { version, signatures: false })
+            assert.equal(info.releaseNotes.replace(/\r\n/g, '\n').trim(), notes)
+            for (const entry of info.files) referenced.add(entry.url)
+          }
+          assert.deepEqual([...referenced].sort(), expected.filter(name => !name.endsWith('.blockmap')).sort())
+          for (const name of expected) regularFile(`${dir}/${name}`)
+          const artifacts = readdirSync(dir).filter(name => /\.(exe|AppImage|deb|blockmap|yml)$/.test(name) && !name.startsWith('builder-'))
+          assert.deepEqual(artifacts.sort(), [...expected, ...feeds].sort())
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim()
+          const info = {
+            purpose: 'validation-only; never published', version, platform: process.platform,
+            node: process.version, commit: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'),
+            lockSHA256: createHash('sha256').update(readFileSync('package-lock.json')).digest('hex'),
+            workflowRun: process.env.GITHUB_RUN_ID, artifacts: [...expected, ...feeds]
+          }
+          assert.equal(info.commit, process.env.GITHUB_SHA)
+          writeFileSync(`${dir}/BUILD_INFO.json`, JSON.stringify(info, null, 2) + '\n')
+          console.log(JSON.stringify(info, null, 2))
+          NODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: packaging-${{ runner.os }}-${{ github.sha }}
+          path: |
+            packaging-ci/Aula-*.exe
+            packaging-ci/Aula-*.exe.blockmap
+            packaging-ci/Aula-*.AppImage
+            packaging-ci/Aula-*.deb
+            packaging-ci/latest*.yml
+            packaging-ci/BUILD_INFO.json
+          if-no-files-found: error
+          retention-days: 7
