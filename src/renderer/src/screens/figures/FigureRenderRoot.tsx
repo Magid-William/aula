@@ -123,6 +123,10 @@ window.aulaFigureRender = {
     const measured = mounted.input.kind === 'drawing'
       ? drawingExportBounds(element, figureRenderLayout(mounted.input), scale)
       : diagramExportBounds(element, figureRenderLayout(mounted.input))
+    // La medida natural restaura transform; esperamos también después de esa última mutación.
+    // Desde aquí sólo se lee el DOM hasta la captura nativa.
+    await nextFrame(); await nextFrame()
+    if (window.innerWidth !== width || window.innerHeight !== height) throw new Error('Drawing viewport was constrained')
     const frame = element.getBoundingClientRect()
     if ((['x', 'y', 'width', 'height'] as const).some((key) => Math.abs(bounds[key] - measured[key]) > 1)) {
       // Diagnóstico privado sólo numérico; el proceso principal conserva el error público genérico.
