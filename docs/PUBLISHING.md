@@ -216,15 +216,8 @@ That's also how the Mac files and the APK join a draft built by Actions. It refu
 (`developer-id-mac.yml`, `latest-mac.yml`, `latest.yml`, `latest-linux.yml`, `latest-linux-arm64.yml`) and
 `Aula-<v>-android.apk` end up on the
 release, counting what the draft already has; `--partial` uploads anyway, on purpose. Every `Aula-…` file the release
-notes name must be there too. Without the script:
-
-```bash
-awk '/<!-- *lang:es *-->/ { exit } { print }' docs/release-notes/0.1.1.md > /tmp/notes.md
-shopt -s nullglob   # bash: a kind of file that wasn't built (e.g. no .deb) is skipped instead of failing
-files=(release/0.1.1/latest*.yml release/0.1.1/*.{dmg,zip,exe,AppImage,deb,blockmap,apk})
-gh release create v0.1.1 -R luumlabs/aula --draft --target "$(git rev-parse HEAD)" --title "Aula 0.1.1" \
-  --notes-file /tmp/notes.md "${files[@]}"
-```
+notes name must be there too. Use this checked upload path for 0.2.5 and later so the final Mac ZIP, both channels
+and the preserved bridge files are verified together before the draft is changed.
 
 Upload each channel YAML, including `developer-id-mac.yml`, **together with** the files it lists (same build): if you rebuild one system, upload its
 installer and its `latest*.yml` again, never one without the other — otherwise the SHA-512 won't match and copies will
@@ -261,10 +254,11 @@ with other SHA-512s.
 > [Update signatures](#update-signatures-ed25519)), or store the key as the `AULA_UPDATE_SIGNING_KEY` secret and add a
 > signing step before the upload.
 >
-> **No macOS and no Android in Actions.** The Mac app must be signed with the project's own certificate (see
-> [Signing](#signing)) and the APK with Aula's Android release key, and both exist only on the maintainer's Mac, so
+> **No macOS and no Android in Actions.** Mac signing follows the local bridge and subsequent Developer ID policy (see
+> [Signing](#signing)); the APK uses Aula's Android release key. Signing takes place on the maintainer's Mac, so
 > the workflow builds Windows and Linux only. Add the Mac files and the APK to the same draft from your Mac:
-> `scripts/release-local.sh --only mac --only android`, then `scripts/release-local.sh --upload --repo luumlabs/aula`
+> for 0.2.5, `scripts/release-local.sh --only mac --only android`; for later versions, append
+> `--bridge-dir /path/to/original-v0.2.5`. Then run `scripts/release-local.sh --upload --repo luumlabs/aula`
 > (it adds them to the existing draft; see [Upload](#publishing-from-your-computer-no-github-actions)). The *verify*
 > job lists what's still missing.
 

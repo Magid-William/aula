@@ -20,8 +20,9 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
   - Drawings that move: ready-made objects (block, pulley, car, flask, sun…), geometry marks (angles with the right-angle
     square, measures, braces, axes), smooth curves, hatching, sliders and a clock that move and turn things, and
     step-by-step constructions.
-  - **Mark and ask the tutor:** on a diagram, drawing, labeled figure, map or molecule, circle or highlight a part, add a
-    note and ask; the tutor gets the names of the parts you marked. Labeled figures also get a guided tour.
+  - **Mark and ask the tutor:** in lessons and practice, circle or highlight part of a diagram, drawing, labeled
+    figure, map or structural formula, add a note and ask; the tutor gets the names of the parts you marked. Labeled
+    figures also get a guided tour.
   - Maps colour real countries by name (or by a value per country), frame a named region, draw journeys with arrows,
     keep labels from overlapping, and «Where is…?» can ask for countries. Charts handle long category names, highlight
     the bar or point the lesson is about, and label scatter points.
@@ -30,9 +31,9 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 - **The screen no longer flickers** when the window comes back into view.
 - **You can select and copy text** in lessons, exercises and the chat, and right-click it: Copy, Look Up, Translate,
   Search (in a mock exam, only Copy). Answer fields don't offer spelling suggestions.
-- **Running out of AI credit or hitting a limit while a course is being created no longer loses it:** the message says
-  which limit it is and when it renews, the creation pauses and can be resumed, and you can study the topics that are
-  already written in the meantime.
+- **Running out of AI credit or reaching a longer usage limit while a course is being created no longer loses it:**
+  creation pauses and can be resumed. The message explains the limit and shows when it renews, if known. You can
+  study the topics already written in the meantime.
 - **Choose the language of a new course** next to its level (or let Aula pick it from your system languages); the
   default is in Settings → General.
 - **The system cursor** option is easier to find (Settings → Appearance, and from ⌘K).
