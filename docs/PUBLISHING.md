@@ -106,12 +106,17 @@ A failed *automatic* check (e.g. offline) stays silent.
    into every `latest*.yml`.
 4. **Checks**:
    ```bash
+   if [ -L node_modules ]; then unlink node_modules; fi  # remove only the link, preserving its shared target
    npm ci
    npm run typecheck
    npm test
    npm run build
    npx playwright test -c tests/e2e/playwright.config.ts   # Linux: xvfb-run -a npx playwright …
    ```
+   Install dependencies in each release worktree. Remove an existing `node_modules` symlink with `unlink` before
+   running `npm ci`, so npm operates on local dependencies and preserves the shared target. Packaging requires a
+   physical `node_modules` directory because linked dependencies can omit required runtime modules. The native
+   `.toolchain` directory can remain linked.
    CI (`.github/workflows/ci.yml`) runs the same on Linux and Windows, x64 and arm64. On a Linux machine without a
    desktop, the e2e tests need a window manager and libnotify like a real desktop has (`sudo apt install openbox
    libnotify4`, then `xvfb-run -a sh -c 'openbox & npx playwright test -c tests/e2e/playwright.config.ts'`).
@@ -126,7 +131,10 @@ A failed *automatic* check (e.g. offline) stays silent.
 
 ## Publishing from your computer (no GitHub Actions)
 
-While GitHub Actions can't run (billing), build on a Mac — it's the only system that can build all three:
+Build the signed Mac and Android packages on the maintainer's Mac. The script can also build Windows and Linux when
+their packaging tools run on that host. If the bundled Windows NSIS tool cannot execute on the Mac, use the
+[Release workflow](#publishing-with-github-actions) for Windows and Linux, then add the locally verified Mac and
+Android files to the same draft.
 
 ```bash
 scripts/release-local.sh            # checks + the Android APK and the macOS, Windows and Linux installers in release/<version>/

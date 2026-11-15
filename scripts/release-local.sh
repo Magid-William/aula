@@ -79,6 +79,12 @@ for p in "${ONLY[@]}"; do
   [ "$p" = android ] || DESKTOP=1
 done
 
+# electron-builder pierde dependencias transitivas al empaquetar node_modules enlazado desde otro worktree.
+# Antes de leer claves, compilar o borrar salidas; subir artefactos y compilar solo Android no lo necesitan.
+if [ "$UPLOAD" -eq 0 ] && [ "$DESKTOP" -eq 1 ] && [ -L node_modules ]; then
+  die "node_modules es un enlace simbólico: quita solo el enlace con unlink node_modules; después ejecuta npm ci en este worktree antes de compilar escritorio. No borres su destino."
+fi
+
 VERSION=$(node -p "require('./package.json').version")
 MAC_MODE=$(node --input-type=module -e 'import {macMode} from "./scripts/release-common.mjs"; console.log(macMode(process.argv[1]))' "$VERSION")
 OUT="release/$VERSION"
@@ -263,7 +269,7 @@ if [ $UPLOAD -eq 1 ]; then
     for y in "${YMLS[@]}"; do
       # El título histórico pertenece a los bytes firmados e inmutables del puente.
       if [ "$MAC_MODE" = developer-id ] && [ "${y##*/}" = latest-mac.yml ]; then continue; fi
-      [ "$(sed -n 's/^releaseName: *//p' "$y" | head -1)" = "$TITLE" ] || die "$(basename "$y") no dice «releaseName: $TITLE»: vuelve a compilar ese sistema."
+      [ "$(sed -n 's/^releaseName: *//p' "$y" | head -1)" = "$TITLE" ] || die "$(basename "$y") no dice «releaseName: ${TITLE}»: vuelve a compilar ese sistema."
     done
   fi
   # Android: solo el APK de publicación de esta versión (nunca el de --debug ni el de otra versión)
@@ -303,7 +309,7 @@ if [ $UPLOAD -eq 1 ]; then
     TARGET=$(gh release view "$TAG" -R "$REPO" --json targetCommitish -q .targetCommitish)
     TARGET_TREE=$(gh api "repos/$REPO/commits/$TARGET" --jq .commit.tree.sha 2>/dev/null || true)
     [ "$TARGET_TREE" = "$HEAD_TREE" ] \
-      || die "El borrador $TAG apunta a «$TARGET», con otro contenido que HEAD: añadirle esto mezclaría dos compilaciones. Sube desde ese commit, o borra el borrador en GitHub."
+      || die "El borrador $TAG apunta a «${TARGET}», con otro contenido que HEAD: añadirle esto mezclaría dos compilaciones. Sube desde ese commit, o borra el borrador en GitHub."
     # lo que ya tiene, con el SHA-256 que GitHub calcula de cada archivo subido («sha256:…»; vacío en los antiguos)
     DRAFT_ASSETS=$(gh release view "$TAG" -R "$REPO" --json assets -q '.assets[] | [.name, (.digest // "")] | @tsv')
     ON_DRAFT=$(printf '%s\n' "$DRAFT_ASSETS" | cut -f1)
@@ -546,4 +552,4 @@ say "Comprobando $OUT"
 if ls "$OUT"/latest*.yml >/dev/null 2>&1; then node scripts/release-verify.mjs "$OUT" "$VERSION"; fi
 ls -lh "$OUT" | grep -E '\.(dmg|zip|exe|AppImage|deb|apk|yml)$' || true
 [ "$BUILD_DIRTY" = 0 ] || printf '\n! Compilado con cambios sin commit: sirve para probar, pero --upload no lo subirá.\n'
-say "Siguiente paso: prueba los instaladores de $OUT (y el APK en un teléfono) y luego «scripts/release-local.sh --upload --repo $PUB_OWNER/$PUB_REPO» (sube un borrador, o añade a uno que ya haya)."
+say "Siguiente paso: prueba los instaladores de $OUT (y el APK en un teléfono) y luego «scripts/release-local.sh --upload --repo ${PUB_OWNER}/${PUB_REPO}» (sube un borrador, o añade a uno que ya haya)."
