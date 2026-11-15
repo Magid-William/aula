@@ -3,6 +3,7 @@
 // espera debajo de la respuesta y se envía al terminar. Vacío: la marca de Aula, una frase y sugerencias para empezar.
 // La conversación en sí (pensando, pasos, texto que fluye, desplazamiento) está en Conversation.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { studentTextOf } from '@engine/assistant/trust'
 import { useTranslation } from 'react-i18next'
 import { LayoutGroup, motion } from 'motion/react'
 import { AulaMark, Button, Card, Chip, Companion, Drawer, Icon, InkSpot, toast, useMarkPhase } from '@renderer/design'
@@ -64,18 +65,18 @@ export default function ChatScreen() {
         setThread(th)
       }
       const ok = await conv.send(id, draft)
-      if (!ok) composer.current?.restore(draft.text, draft.mentions, draft.files)
+      if (!ok) composer.current?.restore(studentTextOf(draft), draft.mentions, draft.files)
       void reload()
     } catch (e) {
       toast.error((e as Error).message)
-      composer.current?.restore(draft.text, draft.mentions, draft.files)
+      composer.current?.restore(studentTextOf(draft), draft.mentions, draft.files)
     }
   }
   const ask = (text: string) => void send({ text, files: [], mentions: [] })
   const actions = useMemo<ChatActions>(() => ({ ask }), [activeId, conv.send])
   const cancel = async (id: string) => {
     const m = await conv.cancel(id)
-    if (m) composer.current?.restore(m.text, m.mentions)
+    if (m) composer.current?.restore(studentTextOf(m), m.mentions)
   }
   const open = (id: string) => {
     setActiveId(id)

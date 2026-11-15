@@ -2,12 +2,13 @@
 // respondiste (TutorContext). Usa la conversación del tutor de ese curso (chat.tutorThread) y lo mismo que el chat: sus mensajes,
 // la caja con «@» (las lecciones de este curso primero), la cola de lo que se escribe mientras responde y los cuestionarios.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { studentTextOf } from '@engine/assistant/trust'
 import { useTranslation } from 'react-i18next'
 import { Drawer, AulaMark, Chip, toast, useMarkPhase } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import { Conversation } from '../chat/Conversation'
 import { Composer, type ComposerHandle } from '../chat/Composer'
-import { useConversation, type Draft } from '../chat/data'
+import { draftContext, useConversation, type Draft } from '../chat/data'
 import { ChatActionsContext, type ChatActions } from '../chat/actions'
 import { tutorVisibleFor, useTutor } from './tutorStore'
 
@@ -48,14 +49,14 @@ export function TutorPanel({ screenKey }: { screenKey: string }) {
   const send = (draft: Draft) => {
     if (!thread || (!draft.text.trim() && !draft.files.length)) return
     void conv.send(thread.id, draft, context ?? undefined).then((ok) => {
-      if (!ok) composer.current?.restore(draft.text, draft.mentions, draft.files)
+      if (!ok) composer.current?.restore(studentTextOf({ text: draft.text, context: draftContext(draft, context ?? undefined) }), draft.mentions, draft.files)
     })
   }
   const ask = (text: string) => send({ text, files: [], mentions: [] })
   const actions = useMemo<ChatActions>(() => ({ ask }), [thread?.id, context])
   const cancel = async (id: string) => {
     const m = await conv.cancel(id)
-    if (m) composer.current?.restore(m.text, m.mentions)
+    if (m) composer.current?.restore(studentTextOf(m), m.mentions)
   }
 
   // la pregunta con la que se abrió: se saca del store al enviarla, así que ni otra pantalla ni otro montaje la repiten

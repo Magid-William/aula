@@ -1,7 +1,7 @@
 // Memoria · enganche con el chat con Aula y con el tutor (port de MemoryAssistantHook.swift y AssistantMemory.swift): lo que una
 // conversación necesita de la memoria, en un sitio. El chat global usa la conversación «chat:<id>» y el origen «assistant»; el
 // tutor de un curso, «tutor:<curso>:<id>», el origen «tutor» y lo que Aula recuerda de ese curso primero.
-import { plainText } from '@engine/assistant'
+import { plainText, studentTextOf } from '@engine/assistant'
 import type { AssistantMessage, AssistantThread } from '@shared/assistant/types'
 import type { AgentTool } from '../ai/model'
 import type { MemoryConfirmer, MemoryConversation } from './models'
@@ -44,7 +44,7 @@ export function memoryConversation(thread: AssistantThread, extra: AssistantMess
   for (const m of extra) if (!msgs.some((x) => x.id === m.id)) msgs.push(m)
   const conv: MemoryConversation = {
     id: memoryConversationID(thread.id, course), source: course ? 'tutor' : 'assistant',
-    turns: msgs.filter((m) => !m.failed && m.text.trim() !== '' && !m.origin).map((m) => ({ speaker: m.role === 'user' ? 'student' : 'aula', text: m.role === 'user' ? m.text : plainText(m.text), date: m.date }))
+    turns: msgs.filter((m) => !m.failed && m.text.trim() !== '' && !m.origin).map((m) => ({ speaker: m.role === 'user' ? 'student' : 'aula', text: m.role === 'user' ? studentTextOf(m) : plainText(m.text), date: m.date }))
   }
   if (course) { conv.courseID = course.id; conv.courseTitle = course.title }
   return conv

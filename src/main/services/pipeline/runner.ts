@@ -24,6 +24,7 @@ import type { PageRasterizer } from '@shared/ingest'
 import type { Pack, Skill } from '@shared/schema'
 import { AIError, BudgetError, withAIUse } from '../ai'
 import { classificationText } from '../ai/errors'
+import { waitText } from '../ai/http/providerErrors'
 import type { AIUseScope } from '../costs'
 import { QuestionBroker, NO_ANSWER } from '../agents/questions'
 import { log } from '../log'
@@ -92,6 +93,13 @@ function isFatal(err: unknown): boolean {
 }
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err))
+
+/** Una etapa no termina mientras sus compañeros puedan seguir escribiendo, aunque uno haya fallado. */
+async function waitForAll(work: Promise<void>[]): Promise<void> {
+  const results = await Promise.allSettled(work)
+  const failed = results.find((r) => r.status === 'rejected')
+  if (failed?.status === 'rejected') throw failed.reason
+}
 
 export class GenerationPipeline {
   readonly runID: string
@@ -217,7 +225,10 @@ export class GenerationPipeline {
   }
 
   private setFatal(e: Error): void {
-    if (!this.fatal) this.fatal = e
+    if (this.fatal) return
+    // Guardar la causa antes de cancelar: los compañeros pueden responder con «cancelado» al mismo tiempo.
+    this.fatal = e
+    this.controller.abort()
   }
 
   private checkCancelled(): void {
@@ -304,8 +315,14 @@ export class GenerationPipeline {
   }
 
   private finishWithError(err: unknown): void {
+    err = this.fatal ?? err
+    if (this.fatal) {
+      for (const stage of Object.keys(this.state.stages) as GenerationStage[]) {
+        if (this.state.stages[stage] === 'running') this.state.stages[stage] = 'failed'
+      }
+    }
     const at = this.now().toISOString()
-    if (isCancelled(err, this.controller.signal) && !(err instanceof LimitStop) && !(err instanceof BudgetError)) {
+    if (!this.fatal && isCancelled(err, this.controller.signal) && !(err instanceof LimitStop) && !(err instanceof BudgetError)) {
       // «Detener»: una creación queda en pausa (se reanuda o se queda con lo que hay); una ampliación, detenida
       this.mutate((s) => { s.cancelled = true; s.finishedAt = at; s.aula2.state = isExtend(s.request) ? 'cancelled' : 'paused' })
       return
@@ -487,7 +504,7 @@ export class GenerationPipeline {
     if (!(groups.length >= 2 || (groups.length > 0 && have.size > 0))) return
     this.stage('plan', 'running', tr(`${groups.length} lectores leen tus materiales a la vez`, `${groups.length} readers read your materials at the same time`))
     const course = this.promptCourse(pack)
-    await Promise.all(groups.map(async (ids) => {
+    await waitForAll(groups.map(async (ids) => {
       const titles = pack.sources.filter((s) => ids.includes(s.id)).map((s) => s.title)
       const lane = titles.length === 1 ? tr(`Lector · ${titles[0]}`, `Reader · ${titles[0]}`) : tr(`Lector · ${titles.length} materiales`, `Reader · ${titles.length} materials`)
       try {
@@ -504,8 +521,8 @@ export class GenerationPipeline {
     if (!todo.length) { this.stage('author', 'done', tr('Todas las habilidades ya estaban listas', 'All skills were already ready')); return }
     this.stage('author', 'running', tr(`${todo.length} habilidad(es) por escribir`, `${todo.length} skill(s) to write`))
     await forEachLimited(todo.map((s) => s.id), this.state.request.maxParallel, (id) => this.authorSkill(id))
-    this.checkCancelled()
     if (this.fatal) { this.stage('author', 'failed', this.fatal.message); throw this.fatal }
+    this.checkCancelled()
     const e = this.finishAuthorStage()
     if (e) throw e
   }
@@ -515,6 +532,8 @@ export class GenerationPipeline {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (this.controller.signal.aborted || this.fatal) return
       this.updateSkill(id, (s) => { s.status = attempt === 1 ? 'running' : 'repairing'; s.attempts = attempt })
+      // un repaso (o una creación reanudada sobre lo que ya había) reescribe el tema: no se ofrece como listo mientras cambia
+      const rewriting = this.markRewriting(id, true)
       try {
         const pack = this.loadPack()
         const ref = pack.skills.find((s) => s.id === id)
@@ -531,10 +550,16 @@ export class GenerationPipeline {
           })
         }
       } catch (err) {
-        if (isCancelled(err, this.controller.signal)) return
-        if (isFatal(err)) { if (err instanceof Error) this.setFatal(err); return }
+        // parada a mitad de una reescritura: el tema queda como lo deje la auditoría de lo que hay, no en borrador para siempre
+        if (isCancelled(err, this.controller.signal)) { if (rewriting) this.persistAudit(id); return }
+        if (isFatal(err)) { if (err instanceof Error) this.setFatal(err); if (rewriting) this.persistAudit(id); return }
         this.updateSkill(id, (s) => { s.note = `Error: ${errorText(err)}` })
-        if (attempt === maxAttempts) { this.updateSkill(id, (s) => { s.status = this.loadSkill(id)?.lesson.length ? 'needsReview' : 'failed' }); return }
+        if (attempt === maxAttempts) {
+          // se da por perdido: el curso dice lo mismo que el monitor (por revisar), no «escribiéndose» hasta el final
+          if (this.hasContent(id)) this.persistAudit(id)
+          this.updateSkill(id, (s) => { s.status = this.loadSkill(id)?.lesson.length ? 'needsReview' : 'failed' })
+          return
+        }
         continue
       }
       if (usesTeam(this.state.request)) this.linkPractice(id)
@@ -549,6 +574,18 @@ export class GenerationPipeline {
     this.updateSkill(id, (s) => { s.status = this.loadSkill(id)?.lesson.length ? 'needsReview' : 'failed'; s.openIssues = left.length; s.note = left[0]?.forUser ?? '' })
   }
 
+  /** El tema vuelve a borrador mientras se reescribe: la auditoría del final del intento lo deja otra vez listo o por revisar.
+   * Sin contenido no hay nada que esconder; sin `withLesson`, solo si aún no tiene lección (la que se va a escribir). ¿Se marcó? */
+  private markRewriting(id: string, withLesson: boolean): boolean {
+    const skill = this.loadSkill(id)
+    if (!skill || !(skill.lesson.length || skill.exercises.length) || (skill.status !== 'ready' && skill.status !== 'needsReview')) return false
+    if (!withLesson && skill.lesson.length) return false
+    try {
+      this.store.updateSkill(id, (s) => { s.status = 'draft' })
+      return true
+    } catch { return false }
+  }
+
   private hasContent(id: string): boolean {
     const s = this.loadSkill(id)
     return !!s && (s.lesson.length > 0 || s.exercises.length > 0)
@@ -556,7 +593,7 @@ export class GenerationPipeline {
 
   /** Equipo: la lección y la práctica de una habilidad las escriben dos agentes a la vez. */
   private async writeSkillAsTeam(id: string, title: string, pack: Pack): Promise<void> {
-    await Promise.all((['lesson', 'practice'] as SkillPart[]).map((part) => this.writePart(part, id, title, pack)))
+    await waitForAll((['lesson', 'practice'] as SkillPart[]).map((part) => this.writePart(part, id, title, pack)))
   }
 
   private async writePart(part: SkillPart, id: string, title: string, pack: Pack): Promise<void> {
@@ -706,8 +743,8 @@ export class GenerationPipeline {
     if (!ids.length) { this.stage('verify', 'skipped', tr('Nada que verificar', 'Nothing to verify')); return }
     this.stage('verify', 'running', tr('Un solucionador independiente resuelve los ejercicios sin ver las claves', 'An independent solver works the exercises without seeing the keys'))
     await forEachLimited(ids, this.state.request.maxParallel, (id) => this.verifySkill(id, 'normal'))
-    this.checkCancelled()
     if (this.fatal) { this.stage('verify', 'failed', this.fatal.message); throw this.fatal }
+    this.checkCancelled()
     this.stage('verify', 'done', this.verifySummary())
   }
 
@@ -772,11 +809,11 @@ export class GenerationPipeline {
       try { await this.crossCuttingStage(true) } catch (err) { if (!isCancelled(err, this.controller.signal) && err instanceof Error) this.setFatal(err) }
     })())
     await Promise.all(work)
-    this.checkCancelled()
     if (this.fatal) {
       for (const g of ['author', 'crossCutting', 'verify'] as GenerationStage[]) if (this.state.stages[g] === 'running') this.stage(g, 'failed', this.fatal.message)
       throw this.fatal
     }
+    this.checkCancelled()
     if (!verify) this.stage('verify', 'skipped', tr('Desactivada', 'Turned off'))
     else if (!this.verifyStarted) { if (!verifyWasDone) this.stage('verify', 'skipped', tr('Nada que verificar', 'Nothing to verify')) }
     else this.stage('verify', 'done', this.verifySummary())
@@ -849,14 +886,24 @@ export class GenerationPipeline {
 
   private async extendStage(instruction: string, skill: string | undefined): Promise<void> {
     this.stage('author', 'running', tr('Aplicando tu petición', 'Applying your request'))
+    // «Escribir este tema ahora» de un tema que ya tenía sus ejercicios: no se ofrece como listo con la lección a medias
+    // («Pedir cambios» de un tema con lección deja seguir leyéndolo)
+    const rewriting = skill ? this.markRewriting(skill, false) : false
     const before = this.revisions()
     const pack = this.loadPack()
     const browser = this.browser()
     const prompt = extendPrompt(this.state.request, this.promptCourse(pack), instruction, skill, courseDigest(pack, (id) => this.loadSkill(id)), !!browser)
     const set: ToolSet = skill ? { kind: 'skillAuthor', skill } : { kind: 'all' }
-    await this.runAgent({ role: 'extender', set, stage: 'author', skill, prompt, maxSteps: DEPTHS[this.state.request.depth].maxSteps, timeoutSec: 1800, lane: tr('Cambios que pediste', 'The changes you asked for'), computer: !skill })
+    try {
+      await this.runAgent({ role: 'extender', set, stage: 'author', skill, prompt, maxSteps: DEPTHS[this.state.request.depth].maxSteps, timeoutSec: 1800, lane: tr('Cambios que pediste', 'The changes you asked for'), computer: !skill })
+    } catch (err) {
+      // sin terminar: el tema queda como lo deje la auditoría de lo que hay, no en borrador para siempre
+      if (rewriting && skill) this.persistAudit(skill)
+      throw err
+    }
     const after = this.revisions()
     const changed = [...after.entries()].filter(([id, rev]) => before.get(id) !== rev).map(([id]) => id)
+    if (rewriting && skill && !changed.includes(skill)) this.persistAudit(skill)
     this.seedSkillStates(this.loadPack())
     for (const id of changed) {
       this.persistAudit(id)
@@ -960,8 +1007,8 @@ export class GenerationPipeline {
         lane.status = 'failed'; lane.finishedAt = this.now().toISOString()
         lane.current = isCancelled(err, this.controller.signal) ? tr('Detenido', 'Stopped') : errorText(err)
         this.laneChanged()
-        // el tope de gasto vale para TODA la ejecución (los demás agentes no empiezan); queda para reanudar
-        if (err instanceof BudgetError || err instanceof LimitStop) this.setFatal(err)
+        // Una parada global cancela también los compañeros y sus preguntas pendientes.
+        if (err instanceof Error && isFatal(err)) this.setFatal(err)
         throw err
       } finally {
         this.runningAgents -= 1
@@ -986,13 +1033,19 @@ export class GenerationPipeline {
         return result
       } catch (err) {
         if (isCancelled(err, this.controller.signal) || !(err instanceof AIError)) throw err
-        const decision = retryDecision({ kind: err.kind, status: err.status, retryAfter: err.retryAfter, text: classificationText(err) }, attempt)
+        const decision = retryDecision({ kind: err.kind, status: err.status, retryAfter: err.retryAfter, text: classificationText(err), code: err.code }, attempt)
+        // sin saldo o sin cuota: vale para todos los agentes; se para y se reanuda tras recargar o cambiar de proveedor
+        if (decision.action === 'quota') throw new LimitStop(err.message, undefined, 'ai_quota')
         if (decision.action === 'limit') {
           const at = decision.resumeAfterSec !== undefined ? new Date(this.now().getTime() + decision.resumeAfterSec * 1000) : undefined
           if (!decision.long) throw new LimitStop(err.message, at)
           // un límite que tarda en renovarse: se para y queda para reanudar
-          const mins = Math.round((decision.resumeAfterSec ?? 0) / 60)
-          throw new LimitStop(tr(`${err.message} (el límite se renueva en unos ${mins} min; la ejecución queda guardada para reanudarla).`, `${err.message} (the limit renews in about ${mins} min; the run is saved so you can resume it).`), at)
+          const wait = waitText(decision.resumeAfterSec ?? 0)
+          // si el mensaje ya dice cuándo se renueva (p. ej. el límite diario de Gemini), no se repite
+          const note = err.message.includes(wait)
+            ? tr('(la ejecución queda guardada para reanudarla)', '(the run is saved so you can resume it)')
+            : tr(`(el límite se renueva en unos ${wait}; la ejecución queda guardada para reanudarla)`, `(the limit renews in about ${wait}; the run is saved so you can resume it)`)
+          throw new LimitStop(`${err.message} ${note}.`, at)
         }
         if (decision.action === 'fail') throw err
         // el monitor dice por qué espera y cuándo vuelve a probar

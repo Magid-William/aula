@@ -3,6 +3,50 @@
 All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 [GitHub release](https://github.com/luumlabs/aula/releases) with installers for macOS, Windows and Linux, and installed copies update themselves (except the Linux `.deb`). Release notes in English and Spanish: [`docs/release-notes/`](docs/release-notes).
 
+## [Unreleased]
+
+### Added
+- **New figures, adapted from [Sketchy](https://github.com/ddkbs/sketchy)** (MIT, by ddkbs; credited in
+  `THIRD_PARTY_NOTICES.md`):
+  - Diagram shapes: pyramid, funnel, Venn diagrams with 2 or 3 sets and two-sided mind maps. With `build`, the steps
+    build the figure up one part at a time. Each step of a walkthrough circles its parts with a red pen, and ← → and Esc
+    move through the steps. Comparisons can mark the key difference and what both sides share, and there is an
+    analogy mode («es como»).
+  - Molecules drawn from SMILES (the new `structure` block): rings, chains, double and triple bonds, cis/trans,
+    functional groups detected and shaded, an expanded style, reactions and guided steps. The chemistry tool can draw
+    them too.
+  - Drawings that move: ready-made objects (block, pulley, car, flask, sun…), geometry marks (angles with the right-angle
+    square, measures, braces, axes), smooth curves, hatching, sliders and a clock that move and turn things, and
+    step-by-step constructions.
+  - **Mark and ask the tutor:** on a diagram, drawing, labeled figure, map or molecule, circle or highlight a part, add a
+    note and ask; the tutor gets the names of the parts you marked. Labeled figures also get a guided tour.
+  - Maps colour real countries by name (or by a value per country), frame a named region, draw journeys with arrows,
+    keep labels from overlapping, and «Where is…?» can ask for countries. Charts handle long category names, highlight
+    the bar or point the lesson is about, and label scatter points.
+
+### Fixed
+- **The screen no longer flickers** when the window comes back into view.
+- **You can select and copy text** in lessons, exercises and the chat, and right-click it: Copy, Look Up, Translate,
+  Search (in a mock exam, only Copy). Answer fields don't offer spelling suggestions.
+- **Running out of AI credit or hitting a limit while a course is being created no longer loses it:** the message says
+  which limit it is and when it renews, the creation pauses and can be resumed, and you can study the topics that are
+  already written in the meantime.
+- **Choose the language of a new course** next to its level (or let Aula pick it from your system languages); the
+  default is in Settings → General.
+- **The system cursor** option is easier to find (Settings → Appearance, and from ⌘K).
+- **Stopping a course at an AI limit cancels its other agents and pending questions**, and waits for them before
+  offering resume. The recorded reason remains the original quota, budget or provider failure.
+- **Older drawings in chats and slides remain visible**, including legacy line aliases and node-based Venn diagrams.
+- **Complex figures use bounded layout work**, keeping long chart labels and large drawings responsive.
+- **Marked figure text stays course content when sent to the tutor**, including after a retry or a saved conversation
+  is reopened; it cannot authorize tools as if the student had typed it.
+- **The iOS demonstration includes the licenses for its bundled code and fonts**, including Sketchy's MIT notice.
+
+### Compatibility
+- Existing courses continue to open. Aula 0.2.4 cannot display all the new figures, and saving a course with new
+  figure fields in that older version can discard those fields. Keep courses that use the new figures in this version
+  or newer; keep a backup before opening them in an older version.
+
 ## [0.2.4] - 2026-11-13
 
 ### Fixed

@@ -4,7 +4,7 @@
 // estudiante se responden con el `broker`; al contestar a mitad de turno, el trozo en curso se cierra y su respuesta aparece como
 // mensaje del estudiante (`segmentBreak`).
 import { readFileSync } from 'node:fs'
-import { AssistantTurnTrust, clip, extractCitations, isoLocal, oneLine, textOfBlocks } from '@engine/assistant'
+import { messageTrust, studentTextOf, clip, extractCitations, isoLocal, oneLine, textOfBlocks } from '@engine/assistant'
 import type { AssistantCalendar } from '@engine/calendar'
 import type { ContentValidator } from '@engine/content/validator'
 import { tr } from '@shared/ai/i18n'
@@ -296,8 +296,7 @@ export async function runTurn(input: TurnInput, deps: TurnDeps, events: TurnEven
   const seg = new Segment()
   // qué es del estudiante y qué es ajeno en este turno (AI-02): sus mensajes son suyos; los adjuntos y los materiales o eventos
   // mencionados ya traen texto de otros
-  const ownTexts = [...thread.messages.filter((m) => m.role === 'user' && m.id !== message.id && !m.origin).map((m) => m.text), message.text]
-  const trust = new AssistantTurnTrust(ownTexts, message.attachments.length > 0 || message.mentions.some((r) => r.kind === 'material' || r.kind === 'event'))
+  const trust = messageTrust(thread.messages, message)
   // pasos cuyo permiso se rechazó o caducó: no se hicieron (A3-P2-6)
   const declined = new Set<string>()
   // respuestas escritas en la caja de escribir (no en la tarjeta): la interfaz ya enseña ese mensaje
@@ -420,7 +419,7 @@ export async function runTurn(input: TurnInput, deps: TurnDeps, events: TurnEven
   const history = thread.messages.slice(0, Math.max(0, thread.messages.findIndex((m) => m.id === message.id)))
   const budget = budgetForWindow(model.capabilities.contextWindow)
   // memoria del estudiante: lo que Aula recuerda que viene al caso, delante del contexto del turno
-  const memoryBlock = await memoryContext(deps.memory, message.text, memoryCourse).catch(() => '')
+  const memoryBlock = await memoryContext(deps.memory, studentTextOf(message), memoryCourse).catch(() => '')
   const prompt = turnPrompt({
     message: { ...message, attachments }, history, info, courses: library.listPacks(), runs, mentions, attachments: attachText, earlierFiles: earlier, extra: goalContext, memory: memoryBlock,
     course: course?.pack, budget, platformReader: !!deps.platform?.ready()

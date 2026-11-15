@@ -8,6 +8,8 @@ import type {
 } from '@shared/assistant/types'
 import { decodeExercise, encodeExercise, type Exercise } from '@shared/schema/exercises'
 import { decodeFlashcard, encodeFlashcard, type Flashcard } from '@shared/schema/cards'
+import { redactSecrets } from '@engine/assistant/text'
+import { MAX_MESSAGE_CHARS } from '@shared/assistant/types'
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -121,11 +123,17 @@ export function decodeContext(raw: unknown): TutorContext | undefined {
     courseID: s(raw.courseID), skillID: s(raw.skillID), exerciseID: s(raw.exerciseID), blockID: s(raw.blockID), screen: s(raw.screen), selection: s(raw.selection),
     lastInput: s(raw.lastInput), lastResult: s(raw.lastResult), lessonBlock: n(raw.lessonBlock) !== undefined ? Math.trunc(n(raw.lessonBlock)!) : undefined
   })
+  if (isObj(raw.markedFigure) && typeof raw.markedFigure.studentText === 'string' && typeof raw.markedFigure.context === 'string') {
+    c.markedFigure = {
+      studentText: redactSecrets(raw.markedFigure.studentText.slice(0, MAX_MESSAGE_CHARS)).text,
+      context: redactSecrets(raw.markedFigure.context.slice(0, MAX_MESSAGE_CHARS)).text
+    }
+  }
   return Object.keys(c).length ? c : undefined
 }
 
 export function contextIsEmpty(c: TutorContext | undefined): boolean {
-  return !c || (c.skillID === undefined && c.exerciseID === undefined && c.screen === undefined && c.selection === undefined && c.lessonBlock === undefined)
+  return !c || (c.skillID === undefined && c.exerciseID === undefined && c.blockID === undefined && c.markedFigure === undefined && c.screen === undefined && c.selection === undefined && c.lessonBlock === undefined)
 }
 
 function decodeOrigin(raw: unknown): AssistantMessage['origin'] {

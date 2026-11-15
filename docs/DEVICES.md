@@ -165,6 +165,11 @@ files and the answer to each call. `DemoServer.swift` plays that back:
 - Anything else (creating a course, uploading a file) answers "not available in the demo".
 - In the chat, any question gets a short reply saying it is the demo, with the sample quiz.
 
+The recording also includes `LICENSE.md`, `NOTICE.md`, `THIRD_PARTY_NOTICES.md` (including Sketchy's MIT notice)
+and the build's `THIRD_PARTY_LICENSES.txt`. They travel inside the archive with the renderer and fonts, and the demo
+server serves their full text at the matching root paths. Recording fails before launching the app if any notice is
+missing or empty; run the build first to generate the dependency licenses.
+
 Git does not keep `Demo.aulademo` (it is rebuilt from the app): **record it before archiving the app**, and again
 whenever the interface changes. Without the file the app builds and runs the same, just without the demo button.
 `_verify/verify.sh` checks the server against the recording (`_verify/DemoTest`).

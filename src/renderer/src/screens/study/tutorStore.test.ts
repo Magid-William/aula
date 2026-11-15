@@ -12,6 +12,16 @@ beforeEach(() => {
 })
 
 describe('tutor (A3-P1-1)', () => {
+  it('la procedencia de Marcar no sustituye las preguntas posteriores del compositor', () => {
+    const context = { ...ctx, markedFigure: { studentText: '¿Qué es?', context: 'Una figura' } }
+    useTutor.getState().show(context, '¿Qué es?\n\nUna figura')
+    // El panel tiene esta instantánea para enviar la pregunta inicial.
+    const initial = useTutor.getState().context
+    expect(useTutor.getState().takePrompt()).toBe('¿Qué es?\n\nUna figura')
+    expect(initial?.markedFigure).toEqual(context.markedFigure)
+    expect(useTutor.getState().context?.markedFigure).toBeUndefined()
+    expect(useTutor.getState().context?.courseID).toBe(ctx.courseID)
+  })
   it('la pregunta inicial es de un solo uso', () => {
     useTutor.getState().show(ctx, 'Explain my mistake')
     expect(useTutor.getState().takePrompt()).toBe('Explain my mistake')

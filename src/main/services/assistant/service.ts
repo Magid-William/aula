@@ -7,7 +7,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IDs } from '@engine/base/ids'
-import { AssistantTurns, bestCitationMatch, buildCatalog, extractCitations, oneLine, readable, redactSecrets, titleFrom, type AssistantCatalog } from '@engine/assistant'
+import { AssistantTurns, bestCitationMatch, buildCatalog, extractCitations, figureContentOf, oneLine, readable, redactSecrets, titleFrom, type AssistantCatalog } from '@engine/assistant'
 import type { AssistantCalendar } from '@engine/calendar'
 import { ContentValidator } from '@engine/content/validator'
 import { aiLocale, tr } from '@shared/ai/i18n'
@@ -410,15 +410,15 @@ export class AssistantService {
     const { text, redacted } = redactSecrets((args.text ?? '').trim())
     const run = this.runFor(id)
     const clientID = safeID(args.messageId)
+    const context = decodeContext(args.context)
     // contestar escribiendo a una pregunta o un permiso que espera
     const pendingCard = run.busy ? [...(run.live?.cards ?? [])].reverse().find((c) => isPendingCard(c) && (c.kind === 'question' || c.kind === 'approval') && run.broker.pendingIDs.includes(c.id)) : undefined
-    if (pendingCard && text) {
+    if (pendingCard && text && !figureContentOf({ text, context })) {
       const replyID = clientID ?? IDs.short(8)
       run.composerReply = { id: replyID, emit: !!clientID }
       run.broker.resolve(pendingCard.id, Answer.typed(text, true))
       return { messageId: replyID, queued: false }
     }
-    const context = decodeContext(args.context)
     const mentions = (args.mentions ?? []).slice(0, 12).flatMap((r) => { const x = decodeRef(r); return x ? [x] : [] })
     const attachments = (args.attachments ?? []).filter((p): p is string => typeof p === 'string' && p.length > 0 && p.length < 4096).slice(0, MAX_ATTACHMENTS).map((p) => {
       const a = pendingAttachment(p)

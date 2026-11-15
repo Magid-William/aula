@@ -46,7 +46,7 @@ export function Conversation({ conv, language, onSend, onCancelQueued, empty, cl
     if (!m.failed || i !== messages.length - 1 || busy.busy) return undefined
     const asked = [...messages.slice(0, i)].reverse().find((x) => x.role === 'user' && !x.origin)
     if (!asked || (!asked.text && !asked.mentions.length)) return undefined
-    return () => onSend({ text: asked.text, files: [], mentions: asked.mentions })
+    return () => onSend({ text: asked.text, files: [], mentions: asked.mentions, context: asked.context })
   }
 
   return (
