@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "repository": "luumlabs/aula",
+  "tag": "v0.2.5",
+  "version": "0.2.5",
+  "legacyCertificateSHA1": "26061b07d114b31e63193681c2909e1343076926",
+  "developerTeam": "87BM9KFJZW",
+  "files": [
+    {
+      "name": "latest-mac.yml",
+      "bytes": 9609,
+      "sha512": "Nx4nAAVg4fcOxaPhqX/LN2UvrVY71wKERWyQV5NCrJobN/VbENWnXSzei7N/7skANmVQg3Cii9jD031tzmWS8w=="
+    },
+    {
+      "name": "Aula-0.2.5-mac.zip",
+      "bytes": 261255604,
+      "sha512": "weaYey8XfZdBu848jJaocyhJ8bdBJBLflLJarI1KEvFM+8//SHQYLB+6t2u0YwCtTmoxdyq+VEgQhvuJ2OMSKQ=="
+    },
+    {
+      "name": "Aula-0.2.5-mac.zip.blockmap",
+      "bytes": 273454,
+      "sha512": "Yz3nSiKYNtfyi196/zLMBBzFBGf1kR+ugKEtE09kcOza+w1IMefP17wUCionWAe/iVku5faq3+mz2Q6GijtAgw=="
+    },
+    {
+      "name": "Aula-0.2.5-mac.dmg",
+      "bytes": 271448100,
+      "sha512": "CU+Utm6pWwkIyNOvp8Dx0EAR6yvxKvNE2nEreno6utpfsENpFjvt/b6D/tpTqYxl98tfPOPsOtVoRFJJWmmz1w=="
+    },
+    {
+      "name": "Aula-0.2.5-mac.dmg.blockmap",
+      "bytes": 282563,
+      "sha512": "1W+gGH+UM5BdCOTshkVuDqCZg1zVdNzyu/QT8r2R1HB5TB/Dlu67KfPZ3G/MTS/fwE9U9ZhyQx7oauW4e4K0xg=="
+    }
+  ],
+  "publishedAt": "2026-11-15T04:23:35Z"
+}
