@@ -32,8 +32,10 @@ describe('canal de actualizaciones desde 0.2.5', () => {
     const resources = join(home, 'Aula.app', 'Contents', 'Resources')
     mkdirSync(resources, { recursive: true })
     writeFileSync(join(resources, 'app-update.yml'), 'provider: github\nowner: luumlabs\nrepo: aula\n')
+    const executable = join(home, 'Aula.app', 'Contents', 'MacOS', 'Aula')
     Object.defineProperty(process, 'platform', { value: platform, configurable: true })
-    Object.defineProperty(process, 'execPath', { value: join(home, 'Aula.app', 'Contents', 'MacOS', 'Aula'), configurable: true })
+    // La ruta del Mac simulado usa sus separadores, aunque la prueba corra en Windows; el I/O conserva rutas nativas.
+    Object.defineProperty(process, 'execPath', { value: platform === 'darwin' ? executable.replace(/\\/g, '/') : executable, configurable: true })
     Object.defineProperty(process, 'resourcesPath', { value: resources, configurable: true })
     vi.stubEnv('APPIMAGE', join(home, 'Aula.AppImage'))
     vi.stubEnv('AULA_NO_UPDATES', '')
