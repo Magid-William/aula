@@ -23,16 +23,16 @@ files:
   - "!**/node_modules/@napi-rs/**"
   # lo que las dependencias traen y Aula no usa (J4-9): tipos de TypeScript; de pdf.js solo hace falta legacy/build
   # (pdf.mjs y pdf.worker.mjs), cmaps, standard_fonts, iccs y wasm (la interfaz lleva su propio pdf.js, ya empaquetado);
-  # de docx, la versión para Node (los .cjs; fuera las de navegador); de tesseract.js-core, solo los núcleos LSTM
-  # (Aula usa OEM 1 = LSTM_ONLY: relaxedsimd/simd/básico según la máquina) y sin sus copias en base64 (*.wasm.js)
+  # de docx, la versión para Node (los .cjs; fuera las de navegador). Tesseract 7 necesita también los núcleos
+  # completos: su adaptador de Node puede elegirlos incluso con OEM 1. Conservamos las seis parejas JS/WASM,
+  # relaxedsimd/simd/básico, completas y LSTM; sólo sobran sus copias en base64 (*.wasm.js).
   - "!**/node_modules/**/*.d.{ts,cts,mts}"
   - "!**/node_modules/pdfjs-dist/{build,web,image_decoders,types}/**"
   - "!**/node_modules/pdfjs-dist/legacy/{web,image_decoders}/**"
   - "!**/node_modules/pdfjs-dist/legacy/build/{*.min.mjs,pdf.sandbox*}"
   - "!**/node_modules/docx/dist/*.{iife.js,mjs}"
   - "!**/node_modules/tesseract.js-core/*.wasm.js"
-  - "!**/node_modules/tesseract.js-core/tesseract-core{,-simd,-relaxedsimd}.wasm"
-  - "!**/node_modules/tesseract.js-core/tesseract-core-{simd,relaxedsimd}.js"
+afterPack: scripts/build/verify-ocr.cjs
 # avisos legales legibles fuera del asar (Aula.app/Contents/Resources, o resources/ en Windows y Linux): la licencia
 # de Aula y sus términos del §7 (NOTICE.md), los avisos de terceros y el texto de la licencia de cada dependencia que va dentro (lo genera
 # scripts/build/third-party-licenses.ts al compilar)

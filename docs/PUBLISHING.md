@@ -300,6 +300,12 @@ lockfile hash. These are **validation artifacts**, with unsigned update feeds: d
 Inspect their runtime dependencies, exclusions, licenses and unpacked files when changing the packager. Mac
 universal packaging/signing and the release-signature checks remain separate requirements before publication.
 
+Every desktop package also runs `scripts/build/verify-ocr.cjs` after packing, before signing or making installers.
+It checks the actual `app.asar` (including unpacked entries) against the installed dependency: all six Tesseract
+core variants must retain their JavaScript and WASM files. Tesseract 7's Node adapter can select a full core even
+when Aula requests LSTM-only OCR. Only the duplicate base64 `*.wasm.js` files are excluded. The release tests load
+the six real packaged cores and check that missing or damaged files fail this guard; no language download is needed.
+
 ## The Android app (APK)
 
 `native/android` (see its README) builds `Aula-<version>-android.apk`. It goes on every release next to the installers:
