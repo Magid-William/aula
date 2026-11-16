@@ -44,6 +44,8 @@ export function projectDiagramScene(state: DiagramCommittedState, appearance: Di
     strokes: drawing.strokes.map((s) => ({ d: s.d, spine: s.spine, reach: s.reach, ...(s.dry ? { dry: s.dry, dryWidth: s.dryWidth } : {}) }))
   })
   const line = (text: string, fields: Partial<Omit<DiagramTextLine, 'text'>> = {}): DiagramTextLine => ({ text, content: 'rich', color: color('var(--text)'), font: 'inherit', size: 14, lineHeight: 19, weight: 400, tabular: false, clamp: 0, breakWords: false, fullWidth: false, height: null, marginTop: 0, ...fields })
+  // `t-caption` del lienzo vivo (12 px con la raíz de 15, en rem: crece con el tamaño del texto)
+  const caption = { size: rootFontPx * 12 / 15, lineHeight: rootFontPx, weight: 500 as const }
   // leading-4 del lienzo vivo es 1rem: también sigue el tamaño de texto elegido por el estudiante.
   const detail = (text: string, fields: Partial<Omit<DiagramTextLine, 'text'>> = {}): DiagramTextLine => line(text, { size: 12, lineHeight: rootFontPx, color: color('var(--text2)'), ...fields })
   const label = (box: Box, lines: DiagramTextLine[], fields: Partial<Omit<DiagramLabel, 'kind' | 'lines'>> = {}): DiagramLabel => ({
@@ -84,7 +86,7 @@ export function projectDiagramScene(state: DiagramCommittedState, appearance: Di
     if (inked && hl) for (const e of edges) if (edgeLit(e.key) && !e.dashed) primitives.push(path(e.d, { stroke: color('var(--surface)'), strokeWidth: 1.2, dash: [2, 12], dashOffset: flowPhases.get(e.key) ?? 0, opacity: 0.85 }))
     if (l.cycle) {
       const { cx, cy } = l.cycle
-      if (step !== null && b.steps.length) primitives.push(label({ x: cx - 60, y: cy - 40, w: 120, h: 80 }, [line(String(step + 1), { content: 'plain', font: 'serif', size: 34, lineHeight: 38, tabular: true }), line(state.ofStepsText, { content: 'plain', size: 11, lineHeight: 14, weight: 500, color: color('var(--text3)') })], { layout: 'column', align: 'center', vertical: 'center' }))
+      if (step !== null && b.steps.length) primitives.push(label({ x: cx - 60, y: cy - 40, w: 120, h: 80 }, [line(String(step + 1), { content: 'plain', font: 'serif', size: 34, lineHeight: 38, tabular: true }), line(state.ofStepsText, { content: 'plain', ...caption, color: color('var(--text3)') })], { layout: 'column', align: 'center', vertical: 'center' }))
       else {
         // Icono repeat de Aula (rejilla 24) resuelto a coordenadas naturales de 26px.
         const k = 26 / 24, x = cx - 13, y = cy - 13, p = (a: number, v: number): number => a + v * k
@@ -94,7 +96,7 @@ export function projectDiagramScene(state: DiagramCommittedState, appearance: Di
     }
     for (const e of edges) if (e.label && e.labelAt) {
       const on = edgeLit(e.key)
-      primitives.push(label({ x: e.labelAt[0], y: e.labelAt[1], w: 0, h: 0 }, [line(e.label, { size: 11, lineHeight: 14, weight: 500, color: color(on ? 'var(--accent-text)' : 'var(--text2)') })], { width: null, height: null, maxWidth: 200, anchor: 'center', paddingX: rootFontPx * 0.5, paddingY: 1, wrap: 'nowrap', truncate: true, shape: 'round', background: color(on ? 'var(--accent-wash)' : 'var(--surface)'), border: color(on ? 'var(--accent-line)' : 'var(--line)'), borderWidth: 0.5, opacity: hl && !on ? 0.3 : 1 }))
+      primitives.push(label({ x: e.labelAt[0], y: e.labelAt[1], w: 0, h: 0 }, [line(e.label, { ...caption, color: color(on ? 'var(--accent-text)' : 'var(--text2)') })], { width: null, height: null, maxWidth: 200, anchor: 'center', paddingX: rootFontPx * 0.5, paddingY: 1, wrap: 'nowrap', truncate: true, shape: 'round', background: color(on ? 'var(--accent-wash)' : 'var(--surface)'), border: color(on ? 'var(--accent-line)' : 'var(--line)'), borderWidth: 0.5, opacity: hl && !on ? 0.3 : 1 }))
     }
     for (const n of l.nodes.filter((node) => shown(node.id))) {
       const on = lit(n.id), p = diagramNodePresentation(n.node, on)

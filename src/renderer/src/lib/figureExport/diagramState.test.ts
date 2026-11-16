@@ -91,6 +91,14 @@ describe('proyección completa Diagram desde el commit', () => {
       expect(validateDiagramRenderScene(scene)).toEqual(scene)
     }
   })
+  it.each([15, 19.5])('la etiqueta de una flecha y el «de N pasos» del ciclo siguen a t-caption (12 px con raíz de 15) con raíz de %spx', (rootFontPx) => {
+    const flow = projectDiagramScene(committed({ nodes, edges }), appearance, rootFontPx, resolve)
+    const edgeLabel = labels(flow).flatMap((label) => label.lines).find((line) => line.text === 'transforma')!
+    expect(edgeLabel).toMatchObject({ size: rootFontPx * 12 / 15, lineHeight: rootFontPx, weight: 500 })
+    const cycle = projectDiagramScene(committed({ kind: 'cycle', nodes, edges: [], steps: [{ nodes: ['a'], md: 'Paso' }] }, 0), appearance, rootFontPx, resolve)
+    const ofSteps = labels(cycle).flatMap((label) => label.lines).find((line) => line.text === 'de 1 pasos')!
+    expect(ofSteps).toMatchObject({ size: rootFontPx * 12 / 15, lineHeight: rootFontPx, weight: 500 })
+  })
   it.each([undefined, 'pyramid', 'funnel', 'mindmap'])('build %s elimina texto/flechas/anillos futuros antes de IPC y congela copias', (form) => {
     const state = committed({ form, build: true, title: 'PRIVATE_TITLE', caption: 'PRIVATE_CAPTION', nodes: [{ id: 'a', label: 'Visible' }, { id: 'PRIVATE_NODE', label: 'HIDDEN_LABEL', detail: 'HIDDEN_DETAIL' }], edges: [{ from: 'a', to: 'PRIVATE_NODE', label: 'HIDDEN_EDGE' }], steps: [{ nodes: ['a'], md: 'PRIVATE_STEP' }, { nodes: ['PRIVATE_NODE'], title: 'HIDDEN_STEP', md: 'HIDDEN_ANSWER' }] }, 0)
     state.hl!.focus.add('PRIVATE_NODE')
