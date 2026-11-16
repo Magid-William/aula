@@ -473,7 +473,7 @@ export async function captureTake(o: CaptureOptions): Promise<TakeMeta> {
   if (o.take.home) cpSync(o.take.home, home, { recursive: true })
   else {
     cpSync(join(o.appDir, 'resources/demo-course/Packs'), join(home, 'Packs'), { recursive: true })
-    writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: o.take.lang ?? 'es', name: 'Boris' } }))
+    writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: o.take.lang ?? 'es', name: 'Maya' } }))
   }
   const tBoot = Date.now()
   const s = await launch(o, home)
