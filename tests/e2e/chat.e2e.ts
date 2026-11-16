@@ -66,7 +66,8 @@ test('un cuestionario en la conversación: fallo, acierto, la nota, y sigue igua
   // otra pantalla y vuelta a la conversación: la nota sigue ahí (se guardó en la tarjeta)
   await go(page, { name: 'home' })
   await go(page, { name: 'chat' })
-  await page.getByRole('button', { name: /Give me a quick quiz/ }).first().click()
+  // en la lista de conversaciones (una sugerencia del chat vacío podría llamarse igual)
+  await page.locator('[data-thread-list]').getByRole('button', { name: /Give me a quick quiz/ }).first().click()
   await expect(page.locator('[data-studyset="quiz"]').getByTestId('quiz-score')).toHaveText('1 of 2 right the first time')
   expect(errors).toEqual([])
   await app.close()
@@ -204,6 +205,96 @@ test('el tutor se abre al lado del ejercicio con su contexto y responde', async 
     await expect.poll(async () => page.locator('[data-role="assistant"]').count(), { timeout: 60_000 }).toBeGreaterThan(0)
   }
   expect(errors).toEqual([])
+  await app.close()
+})
+
+test('el tutor va al lado del ejercicio (no tapa «Try again»), dice qué mira, Esc lo cierra primero y en una ventana estrecha se abre encima', async () => {
+  test.setTimeout(150_000)
+  const { app, page } = await launch({ home: homeWithDemoCourse() })
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await go(page, { name: 'study', id: 'exam-2-math112', mode: 'practice', skill: 'exact-trig-values' })
+  await page.locator('main input:visible').first().click()
+  await page.keyboard.type('1/2')
+  await page.keyboard.press('Enter')
+  await page.getByRole('button', { name: 'Explain my mistake' }).click()
+  // 1440×900: una columna al lado, que empuja el ejercicio a la izquierda
+  const column = page.locator('aside[aria-label="Your tutor"]')
+  await expect(column).toBeVisible()
+  await expect(page.getByText('Your tutor', { exact: true })).toHaveCount(1)
+  await expect(page.locator('[data-tutor-looking]')).toHaveText(/^Looking at: .+/)
+  await expect.poll(async () => page.locator('[data-role="assistant"]').count(), { timeout: 60_000 }).toBeGreaterThan(0)
+  await page.waitForTimeout(500)
+  const side = (await column.boundingBox())!
+  for (const el of [page.getByRole('button', { name: /^Try again/ }), page.locator('main input:visible').first()]) {
+    await expect(el).toBeVisible()
+    const box = (await el.boundingBox())!
+    expect(box.x + box.width).toBeLessThanOrEqual(side.x)
+  }
+  // Esc cierra el tutor y se queda en el ejercicio (no sale del estudio); el foco vuelve a lo que lo abrió, no a <body>
+  const explain = page.getByRole('button', { name: 'Explain my mistake' })
+  await expect(page.getByRole('textbox', { name: 'Message Aula…' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(column).toHaveCount(0)
+  await expect(page.getByText('Your tutor', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Try again/ })).toBeVisible()
+  await expect(explain).toBeFocused()
+  // con la × pasa lo mismo
+  await explain.click()
+  await expect(column).toBeVisible()
+  await expect(page.locator('[data-streaming="true"]')).toHaveCount(0, { timeout: 60_000 })
+  await column.getByRole('button', { name: 'Close the tutor' }).click()
+  await expect(column).toHaveCount(0)
+  await expect(explain).toBeFocused()
+  // ventana estrecha: no cabe al lado, se abre encima como un cajón (y Esc también lo cierra primero, con el foco de vuelta)
+  await page.setViewportSize({ width: 1000, height: 680 })
+  await page.waitForTimeout(300)
+  await explain.click()
+  await expect(page.getByText('Your tutor', { exact: true })).toBeVisible()
+  await expect(column).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('Your tutor', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Try again/ })).toBeVisible()
+  await expect(explain).toBeFocused()
+  expect(errors).toEqual([])
+  await app.close()
+})
+
+test('el chat vacío: Aula habla primero con el examen y lo pendiente, tres ideas de sus cursos y el aviso tras el primer mensaje', async () => {
+  test.setTimeout(120_000)
+  // modo demostración: el curso de ejemplo hace de curso del estudiante (si no, su examen no es «tuyo»)
+  const { app, page } = await launch({ home: homeWithDemoCourse(), env: { AULA_SEED: 'demo', AULA_DEMO: '1' } })
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await go(page, { name: 'chat' })
+  const opening = page.locator('[data-chat-opening]')
+  await expect(opening.getByRole('heading', { level: 1 })).toHaveText(/^Exam #2 — Trigonometry is (in \d+ days|tomorrow|today)\.$/)
+  await expect(opening).toContainText(/Today: \d+ mistakes? to go over/)
+  const ideas = opening.getByRole('list', { name: 'Ideas from your courses' }).getByRole('button')
+  await expect(ideas).toHaveCount(3)
+  await expect(ideas.last()).toHaveText(/^What’s on Exam #2 — Trigonometry\?$/)
+  // sin pegatinas ni chips: el flexo a tinta y la lista
+  await expect(opening.locator('img')).toHaveCount(0)
+  // «puede equivocarse», solo cuando ya hay algo que comprobar
+  const disclaimer = page.getByText('Aula can make mistakes: double-check what matters.')
+  await expect(disclaimer).toBeHidden()
+  const first = (await ideas.first().textContent())?.trim() ?? ''
+  await ideas.first().click()
+  await expect(page.locator('[data-role="user"]').filter({ hasText: first }).first()).toBeVisible()
+  await expect(opening).toHaveCount(0)
+  await expect(disclaimer).toBeVisible()
+  expect(errors).toEqual([])
+  await app.close()
+})
+
+test('sin cursos propios (solo el de ejemplo), el chat vacío pregunta qué estudiamos y no hace suyo el examen de ejemplo', async () => {
+  test.setTimeout(90_000)
+  const { app, page } = await launch()
+  await go(page, { name: 'chat' })
+  const opening = page.locator('[data-chat-opening]')
+  await expect(opening.getByRole('heading', { level: 1 })).toHaveText('What shall we study?')
+  await expect(opening).not.toContainText('Exam #2')
+  await expect(opening.getByRole('button')).toHaveCount(3)
   await app.close()
 })
 

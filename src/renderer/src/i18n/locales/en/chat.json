@@ -7,7 +7,7 @@
   "today": "Today",
   "yesterday": "Yesterday",
   "earlier": "Earlier",
-  "emptyTitle": "How can I help?",
+  "emptyTitle": "What shall we study?",
   "emptyBody": "Ask me anything, ask for a course or a quick quiz, or tell me when your next exam is.",
   "placeholder": "Message Aula…",
   "send": "Send",
@@ -45,6 +45,13 @@
   ],
   "tutorTitle": "Your tutor",
   "tutorAsk": "Ask the tutor",
+  "tutorClose": "Close the tutor",
+  "tutorLooking": {
+    "exercise": "Looking at: exercise {{n}} of {{m}}",
+    "lesson": "Looking at: {{skill}}, step {{n}}",
+    "topicExercise": "Looking at: an exercise on {{skill}}",
+    "topic": "Looking at: {{skill}}"
+  },
   "tutorEmpty": "Ask me anything about this topic: we’ll work through it together, step by step.",
   "tutorQuick": [
     "Explain it another way",
@@ -234,5 +241,24 @@
   "moreActions": "More actions",
   "renameMenu": "Rename…",
   "renameTitle": "Rename conversation",
-  "expired": "Expired · ask again"
+  "expired": "Expired · ask again",
+  "opening": {
+    "exam_one": "{{exam}} is tomorrow.",
+    "exam_other": "{{exam}} is in {{count}} days.",
+    "examToday": "{{exam}} is today.",
+    "pending": "Today: {{list}}.",
+    "and": " and ",
+    "mistakes_one": "{{count}} mistake to go over",
+    "mistakes_other": "{{count}} mistakes to go over",
+    "cards_one": "{{count}} flashcard due",
+    "cards_other": "{{count}} flashcards due",
+    "ideas": "Ideas from your courses",
+    "ideaTopic": "Explain “{{topic}}” with an example",
+    "ideaMistakes_one": "Go over my last mistake with me",
+    "ideaMistakes_other": "Go over my mistakes with me, one by one",
+    "ideaCards_one": "Quiz me on the flashcard that’s due",
+    "ideaCards_other": "Quiz me on today’s {{count}} flashcards",
+    "ideaExam": "What’s on {{exam}}?",
+    "ready": "Ask me anything about your courses."
+  }
 }

@@ -1,7 +1,7 @@
 // A3-P1-1: el tutor no se reabre en otras pantallas ni repite su pregunta inicial.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { navigate, routeKey, useNav, type Route } from '@renderer/app/router'
-import { tutorVisibleFor, useTutor } from './tutorStore'
+import { tutorLooking, tutorVisibleFor, useTutor } from './tutorStore'
 
 const practice: Route = { name: 'study', id: 'c1', mode: 'practice', skill: 's1' }
 const ctx = { courseID: 'c1', skillID: 's1', screen: 'practice' }
@@ -65,7 +65,7 @@ describe('tutor (A3-P1-1)', () => {
 })
 
 describe('lo que se está mirando (el botón fijo del tutor)', () => {
-  beforeEach(() => useTutor.setState({ published: null, publisher: null }))
+  beforeEach(() => useTutor.setState({ published: null, publisher: null, publishedPosition: null, position: null }))
 
   it('la pantalla que se va no borra lo que ya publicó la siguiente', () => {
     const before = Symbol('antes')
@@ -85,5 +85,50 @@ describe('lo que se está mirando (el botón fijo del tutor)', () => {
     expect(useTutor.getState().open).toBe(true)
     expect(useTutor.getState().prompt).toBeNull()
     expect(tutorVisibleFor(useTutor.getState(), routeKey(practice))).toBe(true)
+  })
+})
+
+describe('la línea «Mirando: …» del tutor', () => {
+  const exercise = { courseID: 'c1', skillID: 's1', exerciseID: 'e3', screen: 'practice' }
+  beforeEach(() => useTutor.setState({ open: false, context: null, prompt: null, owner: null, published: null, publisher: null, publishedPosition: null, position: null }))
+
+  it('dice el ejercicio de la sesión, el paso de la lección o el tema; sin datos, nada', () => {
+    expect(tutorLooking(exercise, { n: 1, m: 10 }, 'Reference angles')).toEqual({ kind: 'exercise', n: 1, m: 10 })
+    expect(tutorLooking(exercise, null, 'Reference angles')).toEqual({ kind: 'topicExercise', skill: 'Reference angles' })
+    expect(tutorLooking({ courseID: 'c1', skillID: 's1', screen: 'lesson', lessonBlock: 1 }, null, 'Reference angles')).toEqual({ kind: 'lesson', skill: 'Reference angles', step: 2 })
+    expect(tutorLooking({ courseID: 'c1', skillID: 's1', screen: 'cards' }, null, ' Reference angles ')).toEqual({ kind: 'topic', skill: 'Reference angles' })
+    expect(tutorLooking({ courseID: 'c1', screen: 'cards' }, null, undefined)).toBeNull()
+    expect(tutorLooking(null, { n: 1, m: 10 }, 'Reference angles')).toBeNull()
+    // una posición rota no se enseña
+    expect(tutorLooking(exercise, { n: 0, m: 10 }, 'Reference angles')).toEqual({ kind: 'topicExercise', skill: 'Reference angles' })
+  })
+
+  it('«Explícame mi error» sabe en qué ejercicio va si es el publicado; si es otro, no se lo inventa', () => {
+    useTutor.getState().publish(exercise, Symbol('modo'), { n: 3, m: 10 })
+    useTutor.getState().show({ ...exercise, lastInput: '27' }, 'Explain my mistake')
+    expect(useTutor.getState().position).toEqual({ n: 3, m: 10 })
+    useTutor.getState().close()
+    useTutor.getState().show({ ...exercise, exerciseID: 'otro' }, 'Explain my mistake')
+    expect(useTutor.getState().position).toBeNull()
+  })
+
+  it('abierto, sigue al ejercicio siguiente; con la pregunta inicial aún sin enviar, no la pisa', () => {
+    const marked = { ...exercise, markedFigure: { studentText: '¿Qué es?', context: 'Una figura' } }
+    useTutor.getState().show(marked, '¿Qué es?')
+    useTutor.getState().publish({ ...exercise, exerciseID: 'e4' }, Symbol('modo'), { n: 4, m: 10 })
+    expect(useTutor.getState().context).toEqual(marked)
+    expect(useTutor.getState().takePrompt()).toBe('¿Qué es?')
+    useTutor.getState().publish({ ...exercise, exerciseID: 'e5' }, Symbol('modo'), { n: 5, m: 10 })
+    expect(useTutor.getState().context?.exerciseID).toBe('e5')
+    expect(useTutor.getState().position).toEqual({ n: 5, m: 10 })
+    // otro curso no se mezcla
+    useTutor.getState().publish({ ...exercise, courseID: 'c2', exerciseID: 'x' }, Symbol('modo'))
+    expect(useTutor.getState().context?.courseID).toBe('c1')
+  })
+
+  it('cerrado, publicar no lo abre ni cambia su contexto', () => {
+    useTutor.getState().publish(exercise, Symbol('modo'), { n: 2, m: 10 })
+    expect(useTutor.getState().open).toBe(false)
+    expect(useTutor.getState().context).toBeNull()
   })
 })

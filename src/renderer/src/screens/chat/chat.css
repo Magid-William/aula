@@ -16,11 +16,18 @@
 }
 
 /* La voz de Aula: sus palabras van en serif sobre el papel, sin burbuja (lo que escribe el estudiante va en la suya, en
-   la letra de la interfaz). El código, las tablas y las fórmulas conservan su letra. */
+   la letra de la interfaz). El código, las tablas y las fórmulas conservan su letra. En rem (17 px al 100 %), para que el
+   ajuste «Tamaño del texto» también la escale. */
 .chat-para .aula-rich > :is(p, ul, ol, blockquote) {
   font-family: var(--font-serif);
-  font-size: 17px;
+  font-size: calc(17rem / 15);
   line-height: 1.6;
+}
+
+/* En el tutor (la columna al lado del ejercicio), la voz de Aula es una nota al margen: el mismo serif, un punto más pequeño */
+.tutor-notes .chat-para .aula-rich > :is(p, ul, ol, blockquote) {
+  font-size: calc(15.5rem / 15);
+  line-height: 1.55;
 }
 
 /* Párrafos que llegan: aparecen subiendo un poco */

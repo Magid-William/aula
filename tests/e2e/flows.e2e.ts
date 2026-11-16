@@ -78,7 +78,8 @@ test('«Responder» desde Novedades abre el chat con el texto listo y lo enviado
   await box.pressSequentially('what do I need first?')
   await box.press('Enter')
   await expect(page.locator('[data-role="user"]').filter({ hasText: 'what do I need first?' }).first()).toBeVisible()
-  await expect(page.getByText('How can I help?')).toHaveCount(0)
+  // la conversación ya no está vacía: Aula no vuelve a abrir con su saludo
+  await expect(page.locator('[data-chat-opening]')).toHaveCount(0)
   expect(errors).toEqual([])
   await app.close()
 })

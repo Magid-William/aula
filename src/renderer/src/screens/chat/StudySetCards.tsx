@@ -6,14 +6,14 @@
 //   solo se ve la portada, y solo el cuestionario con el que se está trabajando escucha el teclado. Cada primer intento se guarda en
 //   la tarjeta (chat.answerCard): al volver a abrir la conversación sigue donde se quedó o enseña la nota.
 // · Tarjetas: se giran con un clic o con la barra espaciadora y se pasan con ← →.
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { create } from 'zustand'
 import type { AssistantCard, AssistantStudySet } from '@shared/assistant/types'
 import type { Exercise } from '@shared/schema/exercises'
 import type { SkillRef } from '@shared/schema/pack'
-import { AnimatedNumber, Button, Card, CourseIcon, Dialog, Icon, IconButton, ProgressBar, Select, Tooltip, cx, pixelBurst, spring, toast, useTheme, type IconName } from '@renderer/design'
+import { AnimatedNumber, Button, Card, CourseIcon, Dialog, Icon, IconButton, ProgressBar, Select, Tooltip, cx, InkBurst, spring, toast, useTheme, type IconName } from '@renderer/design'
 import { ExerciseActions, ExerciseView, inputSummary, useExercise, type GradeResult, type RunState } from '@renderer/exercises'
 import { makeBlockContext } from '@renderer/blocks/types'
 import { RichText } from '@renderer/lib/RichText'
@@ -85,7 +85,8 @@ function QuizCard({ set, ...ref }: CardRef & { set: AssistantStudySet }) {
   const [phase, setPhase] = useState<QuizPhase>(() => (progress.done ? 'summary' : 'cover'))
   const [index, setIndex] = useState(0)
   const [round, setRound] = useState(0)
-  const scoreEl = useRef<HTMLDivElement>(null)
+  // todo bien a la primera, recién terminado: unas rayitas a tinta alrededor de la nota (no al volver a abrir la conversación)
+  const [celebrate, setCelebrate] = useState(false)
   const ctx = useMemo(() => makeBlockContext(ref.packId, i18n.language, { mode: 'chat' }), [ref.packId, i18n.language])
   const total = set.exercises.length
   const title = set.title || t('quiz.title')
@@ -97,6 +98,7 @@ function QuizCard({ set, ...ref }: CardRef & { set: AssistantStudySet }) {
     setPhase('question')
   }
   const repeat = () => {
+    setCelebrate(false)
     setFirstTry({})
     setRound((r) => r + 1)
     start(0)
@@ -111,9 +113,7 @@ function QuizCard({ set, ...ref }: CardRef & { set: AssistantStudySet }) {
     if (index < total - 1) setIndex(index + 1)
     else {
       setPhase('summary')
-      requestAnimationFrame(() => {
-        if (scoreEl.current && !reducedMotion && quizProgress(set, firstTry).right === total) pixelBurst(scoreEl.current, { count: 12 })
-      })
+      setCelebrate(quizProgress(set, firstTry).right === total)
     }
   }
   const askMistake = (n: number, e: Exercise, run: RunState) => {
@@ -153,8 +153,9 @@ function QuizCard({ set, ...ref }: CardRef & { set: AssistantStudySet }) {
           </motion.div>
         ) : phase === 'summary' ? (
           <motion.div key="summary" className="mt-3" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={fade}>
-            <div ref={scoreEl} className="flex items-baseline gap-2" aria-live="polite">
-              <span className="t-number text-[34px] leading-none text-text">
+            <div className="flex items-baseline gap-2" aria-live="polite">
+              <span className="relative t-number text-[34px] leading-none text-text">
+                {celebrate && <InkBurst seed={`quiz:${set.id}:${round}`} size={64} delay={200} className="-left-5 -top-4" />}
                 <AnimatedNumber value={progress.right} />
               </span>
               <span className="font-serif text-[20px] text-text2">{t('quiz.of', { total })}</span>

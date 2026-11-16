@@ -48,6 +48,8 @@ test('A3-P1-1: el tutor no se reabre en otras pantallas ni repite «Explain my m
   await page.keyboard.press('Enter')
   await page.getByRole('button', { name: 'Explain my mistake' }).click()
   await expect(page.getByText('Your tutor')).toBeVisible()
+  // el título del tutor, una sola vez (el botón de la cápsula se llama de otra forma)
+  await expect(page.getByText('Your tutor', { exact: true })).toHaveCount(1)
   await expect.poll(() => tutorAsks(home), { timeout: 30_000 }).toBe(1)
   // sin cerrar el panel: a Inicio y después a otras pantallas de estudio
   await go(page, { name: 'home' })
