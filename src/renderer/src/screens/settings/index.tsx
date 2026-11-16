@@ -306,7 +306,8 @@ function AboutCard({ s, update }: { s: AppSettings; update: Upd }) {
             <ToggleRow title={t('about.autoUpdate')} checked={s.data.autoUpdate} onChange={(v) => void update({ data: { autoUpdate: v } })} />
           </div>
           <UpdateStatus state={upd} asked={asked} current={current} />
-          {info?.secretProtection === 'basic' && <div className="t-footnote text-warning mt-2">{t('about.noKeyring')}</div>}
+          {/* «instala GNOME Keyring o KWallet»: solo Linux (en macOS y Windows nunca se guarda sin cifrar) */}
+          {info?.secretProtection === 'basic' && info.platform === 'linux' && <div className="t-footnote text-warning mt-2">{t('about.noKeyring')}</div>}
         </>
       )}
       {api.owner && info?.secretProtection === 'basic' && <div className="t-footnote text-text3 mt-3">{t('about.noKeyringServer')}</div>}

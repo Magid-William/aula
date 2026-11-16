@@ -8,12 +8,15 @@ import { app, powerMonitor, session as electronSession, type Session, type Downl
 import { acceptLanguages, chromeUserAgent, hostOf } from '@engine/platforms'
 import { log } from '@main/services/log'
 import { accountIsOnLocalNetwork, createDestinationGuard, privateAllowedFor, type DestinationGuard } from '@main/services/platforms/destinations'
+import { assertSessionsOpen } from '@main/services/platforms/session-gate'
 import { tr } from '@shared/ai/i18n'
 import { blockedAddressKind, externalSchemeOf, type BlockedAddressKind } from './signin-hints'
 
 /** Partición de una cuenta; null = navegación sin cuenta (sesión en memoria, sin cookies de ninguna plataforma). */
 export function partitionFor(accountId: string | null): string {
   if (accountId == null) return 'platform-web'
+  // macOS con el llavero denegado: ninguna partición guardada se abre (Chromium borraría las cookies que no descifra)
+  assertSessionsOpen()
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(accountId)) throw new Error(tr('Id de cuenta no válido', 'Invalid account id'))
   return `persist:platform-${accountId}`
 }

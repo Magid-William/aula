@@ -5,7 +5,7 @@ export interface SecretStore {
   set(key: string, value: string): void
   delete(key: string): void
   keys(): string[]
-  /** true = el archivo existe pero no se puede leer (llavero cerrado o denegado): nada se escribe hasta poder leerlo. */
+  /** true = el archivo existe pero no se puede leer, o no se puede cifrar (llavero cerrado o denegado): nada se escribe. */
   locked?(): boolean
 }
 
