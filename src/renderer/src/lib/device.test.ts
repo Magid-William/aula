@@ -38,6 +38,9 @@ describe('keySafeNote', () => {
     expect(keySafeNote('owner', 'basic')).toBe('keySafeServerBasic')
     expect(keySafeNote('owner', 'os')).toBe('keySafeServer')
   })
+  it('sin llavero ahora en macOS o Windows (no se guarda nada) no promete nada', () => {
+    for (const role of ROLES) expect(keySafeNote(role, 'unavailable')).toBeNull()
+  })
   it('los dispositivos que no guardan claves no llevan nota', () => {
     expect(keySafeNote('macDevice', 'os')).toBeNull()
     expect(keySafeNote('serverDevice', 'basic')).toBeNull()

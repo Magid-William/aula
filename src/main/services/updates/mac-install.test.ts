@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEVELOPER_ID_MAC_REQUIREMENT, LOCAL_MAC_REQUIREMENT } from './mac-trust'
@@ -168,6 +168,74 @@ describe.skipIf(windows)('vigilante', () => {
     } finally {
       alive.kill()
     }
+  })
+  /** `mv` o `rm` de pega delante en el PATH: falla (como un EPERM de App Management) cuando la ruta es `path`; antes, si se
+   *  pide, crea `occupy` (otra cosa ocupa ese sitio entretanto). Lo demás pasa al de verdad. */
+  function failing(tool: 'mv' | 'rm', path: string, occupy?: string): NodeJS.ProcessEnv {
+    const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
+    const real = execFileSync('/bin/sh', ['-c', `command -v ${tool}`], { encoding: 'utf8' }).trim()
+    const bin = join(dir, 'bin')
+    mkdirSync(bin, { recursive: true })
+    writeFileSync(
+      join(bin, tool),
+      `#!/bin/sh\nfor a in "$@"; do case "$a" in -*) ;; *) first="$a"; break ;; esac; done\n` +
+        `if [ "$first" = ${sq(path)} ]; then ${occupy ? `mkdir -p ${sq(occupy)}; ` : ''}echo "${tool}: Operation not permitted" >&2; exit 1; fi\n` +
+        `exec ${sq(real)} "$@"\n`
+    )
+    chmodSync(join(bin, tool), 0o755)
+    return { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
+  }
+  const runWatchdog = (env?: NodeJS.ProcessEnv) => {
+    const script = join(dir, 'w.sh')
+    writeFileSync(script, watchdogScript(opts(join(dir, 'nunca'))))
+    return spawnSync('/bin/sh', [script], { env }).status
+  }
+  const failedLeftovers = () => readdirSync(dir).filter((f) => f.startsWith('.Aula-failed'))
+
+  it('S3 · si la nueva no se deja apartar, la anterior NO acaba dentro de ella: todo queda como estaba', { timeout: 20000 }, () => {
+    const target = join(dir, 'Aula.app')
+    const backup = join(dir, '.Aula-previous.app')
+    fakeApp(target, '2.0.1')
+    fakeApp(backup, '2.0.0')
+    expect(runWatchdog(failing('mv', target))).toBe(0)
+    expect(existsSync(join(target, '.Aula-previous.app'))).toBe(false) // anidada: codesign --deep --strict fallaría siempre
+    expect(version(target)).toBe('2.0.1')
+    expect(version(backup)).toBe('2.0.0')
+    expect(failedLeftovers()).toEqual([])
+    expect(existsSync(join(dir, 'Updates', 'failed.json'))).toBe(false)
+  })
+  it('S3 · una copia fallida de otra vez que no se deja borrar: la nueva no entra en ella y vuelve la anterior', { timeout: 20000 }, () => {
+    const target = join(dir, 'Aula.app')
+    const stale = join(dir, '.Aula-failed.app')
+    fakeApp(target, '2.0.1')
+    fakeApp(join(dir, '.Aula-previous.app'), '2.0.0')
+    fakeApp(stale, '1.9.0')
+    expect(runWatchdog(failing('rm', stale))).toBe(0)
+    expect(existsSync(join(stale, 'Aula.app'))).toBe(false)
+    expect(version(stale)).toBe('1.9.0')
+    expect(version(target)).toBe('2.0.0')
+    expect(existsSync(join(target, '.Aula-previous.app'))).toBe(false)
+    expect(failedLeftovers()).toEqual(['.Aula-failed.app']) // solo la vieja: la de esta vez se borró
+    expect(JSON.parse(readFileSync(join(dir, 'Updates', 'failed.json'), 'utf8'))).toMatchObject({ version: '2.0.1', reason: 'start' })
+  })
+  it('S3 · si la anterior no vuelve y algo ocupa ya el sitio, la nueva no se mete dentro', { timeout: 20000 }, () => {
+    const target = join(dir, 'Aula.app')
+    const backup = join(dir, '.Aula-previous.app')
+    fakeApp(target, '2.0.1')
+    fakeApp(backup, '2.0.0')
+    expect(runWatchdog(failing('mv', backup, target))).toBe(0)
+    expect(existsSync(join(target, '.Aula-failed.app'))).toBe(false)
+    expect(version(join(dir, '.Aula-failed.app'))).toBe('2.0.1')
+    expect(version(backup)).toBe('2.0.0')
+    expect(existsSync(join(dir, 'Updates', 'failed.json'))).toBe(false)
+  })
+  it('S3 · si la nueva ya no está, vuelve la anterior igual', { timeout: 20000 }, () => {
+    fakeApp(join(dir, '.Aula-previous.app'), '2.0.0')
+    expect(runWatchdog()).toBe(0)
+    expect(version(join(dir, 'Aula.app'))).toBe('2.0.0')
+    expect(existsSync(join(dir, '.Aula-previous.app'))).toBe(false)
+    expect(failedLeftovers()).toEqual([])
+    expect(JSON.parse(readFileSync(join(dir, 'Updates', 'failed.json'), 'utf8'))).toMatchObject({ version: '2.0.1', reason: 'start' })
   })
   it('rutas con comillas y espacios', () => {
     const s = watchdogScript({ ...opts('/tmp/x'), target: "/Users/a/Mis 'apps'/Aula.app" })

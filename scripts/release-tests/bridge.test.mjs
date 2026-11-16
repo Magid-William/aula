@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { BRIDGE_FILES, BRIDGE_VERSION, DEVELOPER_FEED, LEGACY_FEED, ROOT, artifactMessage, notesMessage, hashFile, yaml, verifyMetadata, macMode } from '../release-common.mjs'
-import { bridgeManifest, confirmPublishedBridge, prepareMacChannels, readBridgeManifest, verifyBridgeFiles, verifyMacChannels } from '../release-mac-bridge.mjs'
+import { bridgeManifest, checkPublishedBridge, confirmPublishedBridge, prepareMacChannels, readBridgeManifest, verifyBridgeFiles, verifyMacChannels } from '../release-mac-bridge.mjs'
 
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'aula-bridge-test-'))
@@ -125,6 +125,30 @@ test('manifest generation confirms published stable public assets, including the
   draft = true; await assert.rejects(confirmPublishedBridge(manifest, fetcher), /publicado/)
   draft = false; corrupt = true; await assert.rejects(confirmPublishedBridge(manifest, fetcher), /bytes públicos/)
   corrupt = false; missing = true; await assert.rejects(confirmPublishedBridge(manifest, fetcher), /Falta el original público/)
+})
+
+test('after publishing, the five bridge originals must be downloadable unchanged under the latest tag', async (t) => {
+  const f = await baseline(t)
+  const requested = []
+  let change = () => null
+  const fetcher = async (url) => {
+    requested.push(url)
+    const name = url.split('/').pop()
+    const altered = change(name)
+    if (altered === 404) return new Response('Not Found', { status: 404 })
+    return new Response(altered ?? readFileSync(join(f.dir, name)))
+  }
+  await checkPublishedBridge('luumlabs/aula', 'v0.2.6', { ...f, fetcher })
+  assert.deepEqual(requested.map((url) => url.replace('https://github.com/luumlabs/aula/releases/download/', '')).sort(), BRIDGE_FILES.map((name) => `v0.2.6/${name}`).sort())
+  for (const [name, altered, expected] of [
+    [LEGACY_FEED, 404, /v0\.2\.6 no tiene latest-mac\.yml \(404\)/],
+    ['Aula-0.2.5-mac.dmg.blockmap', 404, /no tiene Aula-0\.2\.5-mac\.dmg\.blockmap/],
+    ['Aula-0.2.5-mac.zip', Buffer.from('rebuilt bridge'), /no coincide con el manifiesto/],
+    [LEGACY_FEED, Buffer.concat([readFileSync(join(f.dir, LEGACY_FEED)), Buffer.from('\n')]), /más grande que el original/]
+  ]) {
+    change = (file) => file === name ? altered : null
+    await assert.rejects(checkPublishedBridge('luumlabs/aula', 'v0.2.6', { ...f, fetcher }), expected)
+  }
 })
 
 test('signing future feeds never rewrites the frozen legacy YAML, and --only is strict', async (t) => {

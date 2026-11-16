@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PlatformAccount } from '@shared/settings/platforms'
 import { platformSecretKeys } from '@shared/settings/platforms'
 import type { PlatformAccountView } from '@shared/platforms/types'
@@ -17,6 +17,7 @@ import { cachedMoodleSesskey, rememberMoodleSesskey } from './session-check'
 import { KeepAliveScheduler } from './keepalive'
 import type { PlatformProbeOutcome } from './probe'
 import { platformStatus } from './status'
+import { assertSessionsOpen, setSessionGate } from './session-gate'
 
 log.setSink(() => undefined)
 
@@ -55,7 +56,9 @@ function harness(opts: { silentResult?: boolean } = {}): Harness {
     }
   }
   const adapter: PlatformBrowserAdapter = {
+    // como el adaptador de verdad (partitionFor): con las sesiones en pausa, la sesión guardada no se abre
     sessionFetch: (id) => {
+      assertSessionsOpen()
       logLines.push(`fetch:${id}`)
       return http.fetch
     },
@@ -68,9 +71,11 @@ function harness(opts: { silentResult?: boolean } = {}): Harness {
       return 1
     },
     clearSession: async (id) => {
+      assertSessionsOpen()
       logLines.push(`clear:${id}`)
     },
     openSignIn: (a, hooks): SignInSession => {
+      assertSessionsOpen()
       logLines.push(`window:${a.id}`)
       let resolve!: (v: SignInResult) => void
       const promise = new Promise<SignInResult>((r) => (resolve = r))
@@ -823,5 +828,42 @@ describe('issue 25: alta de Moodle por su raíz', () => {
     expect(moodleAccountURL('http://m.uni.edu/', { finalURL: 'https://m.uni.edu/login/index.php', wwwroot: 'http://m.uni.edu', kind: 'moodle' })).toBe('https://m.uni.edu/')
     // el sondeo acabó por https en OTRO host: no se cambia el esquema
     expect(moodleAccountURL('http://m.uni.edu/', { finalURL: 'https://login.microsoftonline.com/x', kind: null })).toBe('http://m.uni.edu/')
+  })
+})
+
+describe('0.2.6: sesiones en pausa (llavero denegado en macOS)', () => {
+  afterEach(() => setSessionGate('open'))
+
+  it('comprobar pide reabrir Aula, no se queda en «Comprobando…» y no marca nada como cerrado', async () => {
+    const h = harness()
+    h.http.route(SELF, json(SELF, { status: 'unauthenticated' }, 401))
+    setSessionGate('paused')
+    await expect(h.c.check(canvas.id)).rejects.toMatchObject({ code: 'platforms_keychain_restart' })
+    expect(h.c.view(canvas.id).status).toBe('unknown')
+    expect(getAccount(canvas.id)?.lastState).toBeUndefined()
+    expect(h.log.filter((l) => l.startsWith('fetch:'))).toEqual([])
+    await expect(h.c.ensureSignedIn(canvas.id)).rejects.toMatchObject({ code: 'platforms_keychain_restart' })
+    expect(h.log.some((l) => l.startsWith('window:'))).toBe(false)
+  })
+
+  it('no abre la ventana de acceso ni la deja en «iniciando sesión»', async () => {
+    const h = harness()
+    setSessionGate('paused')
+    await expect(h.c.signIn(canvas.id)).rejects.toMatchObject({ code: 'platforms_keychain_restart' })
+    expect(h.c.view(canvas.id).signingIn).toBe(false)
+    expect(h.c.isSigningIn(canvas.id)).toBe(false)
+    expect(h.log).toEqual([])
+  })
+
+  it('cerrar sesión o quitar la cuenta espera a reabrir Aula: la copia de las cookies de Aula no se borra', async () => {
+    const h = harness()
+    const key = platformSecretKeys.cookies(canvas.id)
+    secrets().set(key, '{"v":1,"savedAt":1,"cookies":[]}')
+    setSessionGate('paused')
+    await expect(h.c.signOut(canvas.id)).rejects.toMatchObject({ code: 'platforms_keychain_restart' })
+    await expect(h.c.remove(canvas.id)).rejects.toMatchObject({ code: 'platforms_keychain_restart' })
+    expect(secrets().get(key)).not.toBeNull()
+    expect(getAccount(canvas.id)).toBeTruthy()
+    expect(h.log).toEqual([])
   })
 })

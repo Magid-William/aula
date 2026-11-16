@@ -298,16 +298,23 @@ done
 # sigue abierta (lenta, pero viva): no se toca (ruta exacta del ejecutable, sin expresiones regulares)
 ps -axo comm= 2>/dev/null | grep -Fqx -- "$EXEC" && exit 0
 [ -d "$BACKUP" ] || exit 0
+# mv sobre una carpeta que existe mete lo movido DENTRO: nunca un mv a una ruta ocupada (una app dentro de otra hace
+# fallar codesign --deep --strict y bloquea las actualizaciones siguientes)
 FAILEDAPP="$(dirname "$TARGET")/.$(basename "$TARGET" .app)-failed.app"
 rm -rf "$FAILEDAPP"
+# una copia fallida de otra vez que no se deja borrar: otro nombre
+[ -e "$FAILEDAPP" ] && FAILEDAPP="\${FAILEDAPP%.app}-$$.app" && rm -rf "$FAILEDAPP"
+[ -e "$FAILEDAPP" ] && exit 0
 mv "$TARGET" "$FAILEDAPP" 2>/dev/null
+# la nueva no se dejó apartar: todo queda como está
+[ -e "$TARGET" ] && exit 0
 if mv "$BACKUP" "$TARGET"; then
   rm -rf "$FAILEDAPP"
   mkdir -p "$(dirname "$FAILED")"
   printf '{"version":"%s","reason":"start","at":"%s"${fingerprint ? `,"fingerprint":"${fingerprint}"` : ''}}\\n' "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$FAILED"
   "$EXEC"${(o.args ?? []).map((a) => ' ' + q(a)).join('')} >/dev/null 2>&1 &
 else
-  mv "$FAILEDAPP" "$TARGET" 2>/dev/null
+  [ -e "$TARGET" ] || mv "$FAILEDAPP" "$TARGET" 2>/dev/null
 fi
 exit 0
 `
