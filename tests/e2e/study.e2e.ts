@@ -102,6 +102,35 @@ test('«Estudiar ahora» entra directamente en el primer paso del plan y salir v
   await app.close()
 })
 
+test('«Empezar el repaso» no pisa el plan: salir vuelve a Repasar y «Estudiar ahora» sigue con los pasos de aprender', async () => {
+  // con seis semanas de estudio simuladas hay tarjetas y errores que tocan hoy
+  const { app, page } = await launch({ home: homeWithDemoCourse(), env: { AULA_SEED: 'demo' } })
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  const course = page.locator('[data-screen="course"][data-active="true"]')
+  const study = page.locator('[data-screen="study"][data-active="true"]')
+  // la cola de repaso, y salir de ella: de vuelta a Repasar (no a la agenda del plan)
+  await go(page, { name: 'course', id: PACK, tab: 'review' })
+  await course.getByRole('button', { name: 'Start reviewing', exact: true }).click()
+  await expect(study.getByRole('button', { name: /^Exit/ })).toBeVisible()
+  await study.getByRole('button', { name: /^Exit/ }).click()
+  await expect(course.getByRole('tab', { name: 'Review', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('heading', { name: /Today’s plan|Keep going/ })).toHaveCount(0)
+  // otra vez, y esta se deja por otra pantalla; después, «Estudiar ahora» → salir: la agenda es el plan entero
+  await course.getByRole('button', { name: 'Start reviewing', exact: true }).click()
+  await expect(study.getByRole('button', { name: /^Exit/ })).toBeVisible()
+  await go(page, { name: 'home' })
+  await go(page, { name: 'course', id: PACK })
+  await course.getByRole('button', { name: 'Study now', exact: true }).click()
+  await expect(study.getByRole('button', { name: /^Exit/ })).toBeVisible()
+  await study.getByRole('button', { name: /^Exit/ }).click()
+  await expect(study.getByRole('heading', { name: /Today’s plan|Keep going/ })).toBeVisible()
+  await expect(study.getByText(/^Learn: /).first()).toBeVisible()
+  await expect(study.getByText('Flashcard review', { exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+  await app.close()
+})
+
 test('un fallo se corrige con el boli rojo: lo escrito tachado, el porqué al margen y «Try again» pegado debajo', async () => {
   const { app, page } = await launch({ home: homeWithDemoCourse() })
   // un ejercicio del arco cuya respuesta exacta lleva π («Give the exact value»): se vuelve a entrar hasta que sale

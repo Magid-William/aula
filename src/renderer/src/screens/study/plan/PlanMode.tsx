@@ -24,10 +24,11 @@ const KIND_ICON: Record<PlanItem['kind'], IconName> = { review: 'cards', mistake
 export function PlanMode({ data }: { data: CourseData }) {
   const { t } = useTranslation('study')
   const packId = data.pack.id
-  const session = usePlanStore((s) => s.session)
-  const plan = session && activePlan(packId) ? session : null
+  // solo el plan de hoy: la cola de «Empezar el repaso» es otra sesión y no se mezcla con esta
+  const session = usePlanStore((s) => s.sessions.plan)
+  const plan = session && activePlan(packId, 'plan') ? session : null
   const onExit = (): void => {
-    endPlan()
+    endPlan('plan')
     navigate({ name: 'course', id: packId }, { replace: true })
   }
   const built = useRef(false)

@@ -81,7 +81,7 @@ export function SessionSummary({ title, body, stats, celebrate = true, children,
   )
 }
 
-/** Siguiendo «Estudiar ahora»: el paso queda hecho y se ofrece el siguiente. */
+/** Siguiendo «Estudiar ahora» (o «Empezar el repaso»): el paso queda hecho y se ofrece el siguiente. */
 export function PlanContinue({ packId }: { packId: string }) {
   const { t } = useTranslation('study')
   const plan = activePlan(packId)
@@ -92,12 +92,12 @@ export function PlanContinue({ packId }: { packId: string }) {
   if (!next) return null
   return (
     <div className="flex w-full items-center gap-3 rounded-[18px] bg-accent-wash px-4 py-3 text-left">
-      <Icon name="today" size={18} className="shrink-0 text-accent-text" />
+      <Icon name={next.scope === 'review' ? 'repeat' : 'today'} size={18} className="shrink-0 text-accent-text" />
       <span className="min-w-0 flex-1">
-        <span className="block t-ui font-semibold text-accent-text">{t('plan.nextStep')}</span>
+        <span className="block t-ui font-semibold text-accent-text">{next.scope === 'review' ? t('plan.nextReview') : t('plan.nextStep')}</span>
         <span className="block t-callout truncate"><RichText text={next.item.title} inline /></span>
       </span>
-      <Button variant="primary" size="lg" iconRight={<Icon name="arrow-right" size={15} />} onClick={() => runStep(packId, next.index)}>{t('plan.continue')}</Button>
+      <Button variant="primary" size="lg" iconRight={<Icon name="arrow-right" size={15} />} onClick={() => runStep(packId, next.index, { scope: next.scope })}>{t('plan.continue')}</Button>
     </div>
   )
 }

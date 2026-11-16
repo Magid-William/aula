@@ -37,10 +37,12 @@ export function ReviewTab({ pack }: { pack: Pack }) {
     try {
       const items = reviewPlanItems(dailyPlan(data.pack, data.skills, data.progress, data.progress.settings.dailyMinutes || 45, now, gradeLang(i18n.language), isAvailable))
       const notebook = mistakesNotebook(data.progress, data.skills, now)
-      const cards = dueCards(data.pack, data.skills, data.progress, { now }).length
-      return { items, notebook, counts: reviewCounts(items, { cards, mistakes: notebook.filter((m) => m.due).length }) }
+      const queue = dueCards(data.pack, data.skills, data.progress, { now })
+      // las nuevas no «tocan» (no son repaso), pero «Repasar tarjetas» las ofrece: la frase lo dice cuando no hay nada más
+      const fresh = queue.filter((c) => c.isNew).length
+      return { items, notebook, fresh, counts: reviewCounts(items, { cards: queue.length, mistakes: notebook.filter((m) => m.due).length }) }
     } catch {
-      return { items: [], notebook: [], counts: { minutes: 0 } }
+      return { items: [], notebook: [], fresh: 0, counts: { minutes: 0 } }
     }
     // el plan se calcula con el progreso a la vista (al resolver un error, se rehace)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -53,19 +55,22 @@ export function ReviewTab({ pack }: { pack: Pack }) {
     counts.mistakes ? t('review.mistakes', { count: counts.mistakes }) : null,
     counts.practice ? t('review.practice', { count: counts.practice }) : null
   ].filter((x): x is string => !!x)
+  const due = parts.length > 0 && today.items.length > 0
+  const headline = due
+    ? t('review.today', { list: new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(parts), minutes: counts.minutes })
+    : today.fresh > 0 ? t('review.nothingNew', { count: today.fresh }) : t('review.nothing')
   const start = (): void => {
-    // los pasos de repaso del plan de hoy, uno tras otro (sin cambiar el motor): al terminar cada uno se ofrece el siguiente
-    startPlan(pack.id, today.items)
-    runStep(pack.id, 0)
+    // los pasos de repaso del plan de hoy, uno tras otro (sin cambiar el motor): al terminar cada uno se ofrece el siguiente.
+    // Es su propia sesión: no pisa el plan de «Estudiar ahora», y al salir o terminar se vuelve aquí
+    startPlan(pack.id, today.items, { scope: 'review' })
+    runStep(pack.id, 0, { scope: 'review' })
   }
 
   return (
     <Stagger className="flex flex-col gap-4" gap={0.05}>
       <Card enterAnim padded="lg" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-        <p className="t-title2 text-text max-w-[760px] [text-wrap:pretty]">
-          {parts.length && today.items.length ? t('review.today', { list: new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(parts), minutes: counts.minutes }) : t('review.nothing')}
-        </p>
-        {parts.length > 0 && today.items.length > 0 && (
+        <p className="t-title2 text-text max-w-[760px] [text-wrap:pretty]">{headline}</p>
+        {due && (
           <Button variant="primary" size="lg" icon={<Icon name="repeat" size={16} />} onClick={start}>
             {t('review.start')}
           </Button>

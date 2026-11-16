@@ -513,6 +513,7 @@
     "start": "Start",
     "continue": "Continue",
     "nextStep": "Next in the plan",
+    "nextReview": "Next in the review",
     "stepsDone": "{{n}} of {{m}} steps",
     "steps_one": "{{count}} step",
     "steps_other": "{{count}} steps",

@@ -248,6 +248,8 @@
     "practice_other": "{{count}} ejercicios de práctica",
     "start": "Empezar el repaso",
     "nothing": "Hoy no toca repasar nada.",
+    "nothingNew_one": "Hoy no toca repasar nada. Tienes {{count}} tarjeta nueva para cuando quieras.",
+    "nothingNew_other": "Hoy no toca repasar nada. Tienes {{count}} tarjetas nuevas para cuando quieras.",
     "cardsTitle": "Tarjetas",
     "mistakesTitle": "Cuaderno de errores",
     "practiceTitle": "Práctica por tema",

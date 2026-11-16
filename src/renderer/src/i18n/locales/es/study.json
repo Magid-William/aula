@@ -513,6 +513,7 @@
     "start": "Empezar",
     "continue": "Seguir",
     "nextStep": "Siguiente del plan",
+    "nextReview": "Siguiente del repaso",
     "stepsDone": "{{n}} de {{m}} pasos",
     "steps_one": "{{count}} paso",
     "steps_other": "{{count}} pasos",

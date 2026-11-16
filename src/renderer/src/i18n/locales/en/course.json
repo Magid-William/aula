@@ -248,6 +248,8 @@
     "practice_other": "{{count}} practice exercises",
     "start": "Start reviewing",
     "nothing": "Nothing due today.",
+    "nothingNew_one": "Nothing due today. {{count}} new flashcard is ready whenever you like.",
+    "nothingNew_other": "Nothing due today. {{count}} new flashcards are ready whenever you like.",
     "cardsTitle": "Flashcards",
     "mistakesTitle": "Mistakes notebook",
     "practiceTitle": "Practice by topic",
