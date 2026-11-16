@@ -3,7 +3,7 @@ import { SettingsPatchError, sanitizeSettingsPatch } from './patch'
 
 describe('sanitizeSettingsPatch', () => {
   it('deja pasar lo que cambia la interfaz', () => {
-    expect(sanitizeSettingsPatch({ general: { theme: 'dark', textScale: 1.1, name: 'Boris' }, onboarded: true })).toEqual({ general: { theme: 'dark', textScale: 1.1, name: 'Boris' }, onboarded: true })
+    expect(sanitizeSettingsPatch({ general: { theme: 'dark', textScale: 1.1, name: 'Maya' }, onboarded: true })).toEqual({ general: { theme: 'dark', textScale: 1.1, name: 'Maya' }, onboarded: true })
     expect(sanitizeSettingsPatch({ persistent: { enabled: true, quietHours: { from: '22:00', to: '08:00' } } })).toEqual({ persistent: { enabled: true, quietHours: { from: '22:00', to: '08:00' } } })
     expect(sanitizeSettingsPatch({ platforms: { keepSignedIn: false } })).toEqual({ platforms: { keepSignedIn: false } })
   })

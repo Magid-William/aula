@@ -1,10 +1,12 @@
 import type { DrawingRenderSceneV1 } from './figuresDrawing'
 import type { DiagramRenderSceneV1 } from './figuresDiagram'
+import type { ChartRenderSceneV1 } from './figuresChart'
 
 export interface FigureRenderBounds { x: number; y: number; width: number; height: number }
 export type FigureRenderInput =
   | { kind: 'drawing'; scene: DrawingRenderSceneV1 }
   | { kind: 'diagram'; scene: DiagramRenderSceneV1 }
+  | { kind: 'chart'; scene: ChartRenderSceneV1 }
 
 /** Protocolo privado main→renderer; no forma parte del puente de la aplicación. */
 export interface FigureRenderApi {

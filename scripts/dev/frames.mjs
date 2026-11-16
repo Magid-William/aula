@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 const out = resolve(process.argv[2]); mkdirSync(out, { recursive: true })
 const home = mkdtempSync(join(tmpdir(), 'aula-fr-'))
-writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: 'es', name: 'Boris' } }))
+writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: 'es', name: 'Maya' } }))
 const app = await electron.launch({ args: [resolve('.'), '--no-sandbox'], env: { ...process.env, AULA_HOME: home, AULA_DEMO: '1' } })
 const win = await app.firstWindow()
 await win.setViewportSize({ width: 1440, height: 900 })

@@ -14,7 +14,7 @@ mkdirSync(outDir, { recursive: true })
 const home = mkdtempSync(join(tmpdir(), 'aula-tour-'))
 // la biblioteca empieza con el curso de ejemplo real
 cpSync(resolve('resources/demo-course/Packs'), join(home, 'Packs'), { recursive: true })
-writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: lang, name: 'Boris' } }))
+writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: lang, name: 'Maya' } }))
 
 const app = await electron.launch({ args: [resolve('.'), '--no-sandbox'], env: { ...process.env, AULA_HOME: home, AULA_DEMO: '1' } })
 const win = await app.firstWindow()

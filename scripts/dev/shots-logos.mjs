@@ -18,7 +18,7 @@ const TEST_KEYS = {
 
 async function run(onboarded, theme, fn) {
   const home = mkdtempSync(join(tmpdir(), 'aula-logos-'))
-  writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded, general: { language: lang, theme, name: onboarded ? 'Boris' : '' } }))
+  writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded, general: { language: lang, theme, name: onboarded ? 'Maya' : '' } }))
   const app = await electron.launch({ args: [resolve('.'), '--no-sandbox'], env: { ...process.env, AULA_HOME: home, AULA_DEMO: '1' } })
   try {
     const win = await app.firstWindow()
