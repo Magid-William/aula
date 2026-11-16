@@ -46,7 +46,7 @@ test('the committed builder config signs the Mac app with Developer ID only', ()
   assert.notEqual(config.mac.notarize, false)
   assert.equal(config.mac.entitlements, 'build/entitlements.mac.plist')
   assert.equal(config.mac.entitlementsInherit, 'build/entitlements.mac.plist')
-  assert.equal(config.dmg.sign, false, 'a signed but un-notarized DMG is worse than an unsigned one holding a stapled app')
+  assert.equal(config.dmg.sign, false, 'electron-builder would sign the DMG without notarizing it; release-mac-dmg.mjs signs, notarizes and staples it')
   // Windows sigue sin firmar: forceCodeSigning global rompería su instalador
   assert.equal(config.forceCodeSigning, undefined)
   assert.equal(config.win.forceCodeSigning, undefined)
@@ -89,7 +89,8 @@ test('the identity is the SHA-1 of the only valid Developer ID Application of Au
 
 /**
  * El guion real en una copia aislada. Todo lo que firmaría, notarizaría, compilaría o leería claves es de mentira y lo
- * apunta en un registro: `npx` (electron-builder) sale con 97 sin compilar nada.
+ * apunta en un registro: `npx` (electron-builder) sale con 97 sin compilar nada, salvo con AULA_TEST_BUILD=1, que deja
+ * una app de mentira y sigue (el DMG, la firma de los feeds y la verificación final también son de mentira).
  */
 function releaseFixture(t, { version = '0.2.6', change, plist = ENTITLEMENTS, identities = IDENTITIES } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'aula-mac-guard-'))
@@ -102,13 +103,21 @@ function releaseFixture(t, { version = '0.2.6', change, plist = ENTITLEMENTS, id
   const logger = (name) => `import { appendFileSync } from 'node:fs'\nappendFileSync(process.env.AULA_TEST_TOOL_LOG, ${JSON.stringify(name)} + ' ' + process.argv.slice(2).join(' ') + '\\n')\n`
   writeFileSync(join(root, 'scripts/release-sign.mjs'), logger('release-sign'))
   writeFileSync(join(root, 'scripts/release-mac-bridge.mjs'), logger('release-mac-bridge'))
+  writeFileSync(join(root, 'scripts/release-mac-verify.mjs'), logger('release-mac-verify'))
+  writeFileSync(join(root, 'scripts/release-verify.mjs'), logger('release-verify'))
+  // AULA_TEST_DMG_EXIT: el paso del DMG falla (p. ej. Apple no lo notariza)
+  writeFileSync(join(root, 'scripts/release-mac-dmg.mjs'), logger('release-mac-dmg') + 'process.exitCode = Number(process.env.AULA_TEST_DMG_EXIT || 0)\n')
   const tool = (name, body) => writeFileSync(join(root, 'tools', name), `#!/bin/sh\n${body}\n`, { mode: 0o755 })
   const record = (name) => `printf '${name} %s\\n' "$*" >> "$AULA_TEST_TOOL_LOG"`
   tool('npm', record('npm'))
-  tool('npx', `${record('npx')}\nenv | grep -E '^(APPLE|CSC)_' | sort | sed 's/^/env /' >> "$AULA_TEST_TOOL_LOG"\nexit 97`)
+  const app = '"$out/mac-universal/Aula.app/Contents/Resources/bin"'
+  tool('npx', `${record('npx')}\nenv | grep -E '^(APPLE|CSC)_' | sort | sed 's/^/env /' >> "$AULA_TEST_TOOL_LOG"
+[ "\${AULA_TEST_BUILD:-}" = 1 ] || exit 97
+for a in "$@"; do case "$a" in -c.directories.output=*) out="\${a#*=}" ;; esac; done
+mkdir -p ${app} && printf sidecar > ${app}/aula-tsnet && chmod +x ${app}/aula-tsnet`)
   tool('security', `${record('security')}\nprintf '%s\\n' "$AULA_TEST_IDENTITIES"`)
   tool('xcrun', `${record('xcrun')}\ncase "$1" in notarytool) [ "\${AULA_TEST_NOTARY:-ok}" = ok ] || { echo 'Error: No Keychain password item found for profile' >&2; exit 69; } ;; --find) echo /usr/bin/stapler ;; esac`)
-  tool('codesign', `${record('codesign')}\nexit 98`)
+  tool('codesign', `${record('codesign')}\n[ "$1" = -dv ] && { echo Signature=adhoc; exit 0; }\nexit 98`)
   tool('uname', 'echo Darwin')
   tool('go', 'exit 0')
   tool('lipo', 'echo x86_64 arm64')
@@ -201,4 +210,50 @@ test('Mac releases up to the 0.2.5 bridge are no longer built (its local signer 
   assert.match(result.stderr, /macOS 0\.2\.5 ya no se compila/)
   assert.equal(built(result.log), false)
   assert.doesNotMatch(result.log, /^(security|xcrun) /m)
+})
+
+// lo que hace el guion con lo compilado, en orden (sin los env de npx)
+const steps = (log) => log.split('\n').filter((line) => /^(npm|npx|release-[a-z-]+) /.test(line))
+
+test('release-local.sh finishes the DMG right after the build and before the update feeds are signed', (t) => {
+  const f = releaseFixture(t, { version: '0.2.7' })
+  const result = f.run({ AULA_TEST_BUILD: '1' })
+  assert.equal(result.status, 0, result.stderr)
+  const bridge = join(f.root, 'bridge')
+  assert.deepEqual(steps(result.log), [
+    `release-mac-bridge check-baseline ${bridge}`,
+    'release-sign --check-key',
+    'npm run build',
+    `npx electron-builder --mac --publish never -c.directories.output=release/0.2.7 -c.mac.identity=${DEV_ID}`,
+    // con la misma identidad fijada y el mismo perfil del notario que la app
+    `release-mac-dmg finish release/0.2.7 0.2.7 --identity ${DEV_ID} --keychain-profile faro-notary`,
+    // la firma de las actualizaciones y el canal Developer ID (copia de latest-mac.yml) ya ven el DMG final
+    'release-sign release/0.2.7 --only latest-mac.yml',
+    `release-mac-bridge prepare release/0.2.7 0.2.7 --bridge-dir ${bridge}`,
+    'release-mac-verify release/0.2.7 0.2.7'
+  ])
+  assert.match(readFileSync(join(f.root, 'release/0.2.7/BUILD_INFO.mac'), 'utf8'), /^dirty=0$/m)
+  const custom = releaseFixture(t, { version: '0.2.7' }).run({ AULA_TEST_BUILD: '1', AULA_NOTARY_PROFILE: 'aula-notary' })
+  assert.equal(custom.status, 0, custom.stderr)
+  assert.match(custom.log, new RegExp(`^release-mac-dmg finish release/0\\.2\\.7 0\\.2\\.7 --identity ${DEV_ID} --keychain-profile aula-notary$`, 'm'))
+})
+
+test('a DMG that is not signed, notarized and stapled stops the release before the update feeds are signed', (t) => {
+  const f = releaseFixture(t, { version: '0.2.7' })
+  const result = f.run({ AULA_TEST_BUILD: '1', AULA_TEST_DMG_EXIT: '1' })
+  assert.equal(result.status, 1, result.stderr)
+  assert.match(result.stderr, /El DMG de macOS no quedó firmado, notarizado y grapado/)
+  assert.equal(steps(result.log).at(-1), `release-mac-dmg finish release/0.2.7 0.2.7 --identity ${DEV_ID} --keychain-profile faro-notary`)
+  assert.doesNotMatch(result.log, /^release-sign release\//m)
+  assert.doesNotMatch(result.log, /^release-mac-(bridge prepare|verify) /m)
+  assert.equal(existsSync(join(f.root, 'release/0.2.7/BUILD_INFO.mac')), false, 'nothing counts as ready to upload')
+})
+
+test('AULA_MAC_ADHOC=1 test builds leave the DMG alone', (t) => {
+  const result = releaseFixture(t, { version: '0.2.7' }).run({ AULA_TEST_BUILD: '1', AULA_MAC_ADHOC: '1' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.log, /^codesign -dv release\/0\.2\.7\/mac-universal\/Aula\.app$/m)
+  assert.doesNotMatch(result.log, /release-mac-dmg|^(security|xcrun) /m)
+  assert.match(result.log, /^release-sign release\/0\.2\.7 --only latest-mac\.yml$/m)
+  assert.doesNotMatch(result.log, /^release-mac-verify /m)
 })
