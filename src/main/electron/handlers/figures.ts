@@ -5,7 +5,7 @@ import { AulaError } from '@main/services/errors'
 import { FigureExports } from '@main/services/figures/service'
 import { isServerMode } from '@main/services/remote/server-mode'
 import { handle, type RpcContext } from '../rpc'
-import { renderDrawingPng, renderDiagramPng, cancelFigureRender } from '../figure-render'
+import { renderDrawingPng, renderDiagramPng, renderChartPng, cancelFigureRender } from '../figure-render'
 
 export function register(): void {
   const exports = new FigureExports(), watched = new WeakSet<object>()
@@ -23,6 +23,7 @@ export function register(): void {
   }
   handle('figures.renderDrawingPng', (args, ctx) => { local(ctx); return renderDrawingPng(args, ctx.sender) })
   handle('figures.renderDiagramPng', (args, ctx) => { local(ctx); return renderDiagramPng(args, ctx.sender) })
+  handle('figures.renderChartPng', (args, ctx) => { local(ctx); return renderChartPng(args, ctx.sender) })
   handle('figures.cancelRender', (args, ctx) => { local(ctx); cancelFigureRender(args, ctx.sender) })
   handle('figures.save', async (args, ctx) => {
     const parent = local(ctx)

@@ -7,6 +7,7 @@ import type { ChartBlock, ChartSeries } from '@shared/schema/blocks'
 import type { BlockContext } from '../types'
 import { useAnimate, useSeen, useWidth } from '../shared'
 import { withAlpha } from '../colors'
+import { ChartSvg } from './presentation'
 import { formatNumber } from '../plot/ticks'
 import { canvasMeasure, useFontsReady } from '../visual/shared/measure'
 import { categoryLabels, compactNumber, labelLines, niceDomain, valueExtent } from './scale'
@@ -67,7 +68,7 @@ export function HBarChart({ b, series, colors, fmt, ctx, ink }: { b: ChartBlock;
   const height = axisY + 22 + (b.yLabel ? 18 : 0)
   return (
     <div ref={ref} className="relative w-full" style={{ height }} onPointerLeave={() => setHover(null)}>
-      <svg width={width} height={height} className="absolute inset-0 overflow-visible" role="img" aria-label={b.title ?? ''}>
+      <ChartSvg branch="horizontal-bars" width={width} height={height} className="absolute inset-0 overflow-visible" role="img" aria-label={b.title ?? ''}>
         {/* rejilla y marcas debajo, el cero más marcado */}
         <g stroke="var(--line)" strokeWidth={1}>
           {dom.ticks.map((v, i) => <line key={i} x1={X(v)} x2={X(v)} y1={top - 2} y2={axisY} stroke={Math.abs(v) < 1e-12 ? 'var(--line-strong)' : undefined} strokeOpacity={Math.abs(v) < 1e-12 ? 0.7 : 1} />)}
@@ -166,16 +167,16 @@ export function HBarChart({ b, series, colors, fmt, ctx, ink }: { b: ChartBlock;
         )}
         {/* zonas de cursor: la fila entera */}
         {labels.map((_, i) => <rect key={`h${i}`} x={0} y={top + i * rowH} width={width} height={rowH} fill="transparent" onPointerEnter={() => setHover(i)} />)}
-      </svg>
+      </ChartSvg>
       {hover !== null && (
-        <div className="pointer-events-none absolute z-10 rounded-[10px] border-[0.5px] border-line bg-raised px-2.5 py-1.5 t-footnote shadow-[var(--e2)] whitespace-nowrap" style={{ top: Math.max(0, top + hover * rowH + rowH), right: 8 }}>
-          <div className="mb-0.5 font-semibold text-text">{labels[hover]}</div>
+        <div data-chart-panel data-chart-shadow="e2" className="pointer-events-none absolute z-10 rounded-[10px] border-[0.5px] border-line bg-raised px-2.5 py-1.5 t-footnote shadow-[var(--e2)] whitespace-nowrap" style={{ top: Math.max(0, top + hover * rowH + rowH), right: 8 }}>
+          <div data-chart-text className="mb-0.5 font-semibold text-text">{labels[hover]}</div>
           {series.map((s, k) =>
             s.points[hover] ? (
               <div key={k} className="flex items-center gap-1.5 text-text2">
-                {series.length > 1 && <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: colors[k] }} />}
-                <span>{series.length > 1 ? s.name : b.yLabel ?? ''}</span>
-                <span className="ml-auto pl-3 tabular font-semibold text-text">{fmt(s.points[hover].y)}</span>
+                {series.length > 1 && <span data-chart-panel className="inline-block h-2 w-2 rounded-[2px]" style={{ background: colors[k] }} />}
+                <span data-chart-text>{series.length > 1 ? s.name : b.yLabel ?? ''}</span>
+                <span data-chart-text className="ml-auto pl-3 tabular font-semibold text-text">{fmt(s.points[hover].y)}</span>
               </div>
             ) : null
           )}

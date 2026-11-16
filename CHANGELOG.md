@@ -5,6 +5,14 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 
 ## [Unreleased]
 
+### New
+- **Save a chart as PNG** from its desktop export menu. Bar, line, area, pie, scatter and histogram charts keep
+  their current layout, axes, values, legends and hover readout, including painted overflow. Entrance animations
+  appear complete in the image while the live chart continues normally.
+
+### Fixed
+- **Saving a figure with Enter or Space from its menu keeps the current slide open.**
+
 ## [0.2.6] - 2026-11-16
 
 ### New

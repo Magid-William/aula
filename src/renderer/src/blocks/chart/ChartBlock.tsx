@@ -3,7 +3,7 @@
 // la paleta validada en orden (con leyenda). El dato del que habla la lección (`highlight`) se destaca. Cursor: lectura
 // del dato. Nombres en dos líneas, barras horizontales y destacados adaptados de Sketchy
 // (https://github.com/ddkbs/sketchy), MIT © 2026 ddkbs: src/figures/chart.ts.
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { cx, useTheme } from '@renderer/design'
 import type { BlockOf, ChartBlock, ChartSeries } from '@shared/schema/blocks'
@@ -13,6 +13,11 @@ import { categoricalColors, inkColor, seriesColors, withAlpha } from '../colors'
 import { formatNumber } from '../plot/ticks'
 import { canvasMeasure, useFontsReady } from '../visual/shared/measure'
 import { HBarChart } from './HBarChart'
+import { ChartCaptureContext, ChartSvg, type CommittedChartSvg } from './presentation'
+import { FigureExportAction } from '@renderer/lib/figureExport/FigureExportAction'
+import { captureChartPng } from '@renderer/lib/figureExport/chart'
+import { freezeChartExportState, type ChartCommittedState } from '@renderer/lib/figureExport/chartState'
+import { api } from '@renderer/lib/api'
 import { placeScatterLabels } from './pointLabels'
 import {
   arcPath, bands, categoryLabels, compactNumber, fitsTwoLines, foldSlices, isCategoricalX, isNumericLabel, labelLines, niceDomain, pieSlices, preferHorizontal, safeSeries, shortTimeLabels,
@@ -37,11 +42,24 @@ export function ChartBlockView({ block, ctx }: BlockProps<BlockOf<'chart'>>) {
   const pie = block.kind === 'pie'
   const colors = seriesColors(series.length, ctx.hue, dark)
   const legend = !pie && series.length > 1
+  const empty = series.length === 0 || series.every((s) => s.points.length === 0)
+  const body = useRef<HTMLDivElement>(null), svg = useRef<CommittedChartSvg | null>(null), committed = useRef<ChartCommittedState | null>(null)
+  useLayoutEffect(() => {
+    const state: ChartCommittedState = { chartKind: block.kind, empty, dark }
+    committed.current = state
+    return () => { if (committed.current === state) committed.current = null }
+  })
+  const capturePng = useCallback((signal: AbortSignal): Promise<Uint8Array> => {
+    if (!committed.current || !body.current) return Promise.reject(new Error('Chart is unavailable'))
+    const scene = freezeChartExportState(committed.current, body.current, svg.current)
+    return captureChartPng(scene, signal)
+  }, [])
   return (
-    <Figure ctx={ctx} title={block.title} caption={<Caption text={block.caption} />}>
+    <Figure ctx={ctx} title={block.title} caption={<Caption text={block.caption} />} tools={ctx.mode !== 'print' && !api.remote ? <FigureExportAction kind="chart" capturePng={capturePng} /> : undefined}>
+      <ChartCaptureContext value={svg}><div ref={body} data-chart-export-body>
       {legend && <Legend items={series.map((s, i) => ({ label: s.name, color: colors[i] }))} line={block.kind === 'line' || block.kind === 'scatter'} />}
-      {series.length === 0 || series.every((s) => s.points.length === 0) ? (
-        <div className="grid h-[160px] place-items-center rounded-[12px] bg-sunken t-callout text-text3">{t('chart.empty')}</div>
+      {empty ? (
+        <div data-chart-panel className="grid h-[160px] place-items-center rounded-[12px] bg-sunken t-callout text-text3"><span data-chart-text>{t('chart.empty')}</span></div>
       ) : pie ? (
         <PieChart b={block} series={series} colors={colors} fmt={fmt} ctx={ctx} />
       ) : block.kind === 'bar' || block.kind === 'histogram' ? (
@@ -49,6 +67,7 @@ export function ChartBlockView({ block, ctx }: BlockProps<BlockOf<'chart'>>) {
       ) : (
         <XYChart b={block} series={series} colors={colors} fmt={fmt} ctx={ctx} ink={inkColor(ctx.hue, dark)} />
       )}
+      </div></ChartCaptureContext>
     </Figure>
   )
 }
@@ -57,8 +76,8 @@ function Legend({ items, line }: { items: Array<{ label: string; color: string }
   return (
     <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
       {items.map((it, i) => (
-        <span key={i} className="inline-flex items-center gap-1.5 t-ui text-text2">
-          <span aria-hidden className={line ? 'h-[3px] w-3.5 rounded-full' : 'h-2.5 w-2.5 rounded-[3px]'} style={{ background: it.color }} />
+        <span key={i} data-chart-legend className="inline-flex items-center gap-1.5 t-ui text-text2">
+          <span aria-hidden data-chart-panel className={line ? 'h-[3px] w-3.5 rounded-full' : 'h-2.5 w-2.5 rounded-[3px]'} style={{ background: it.color }} />
           {it.label}
         </span>
       ))}
@@ -70,7 +89,7 @@ function Legend({ items, line }: { items: Array<{ label: string; color: string }
 function Tip({ x, y, width, children }: { x: number; y: number; width: number; children: ReactNode }) {
   const right = x > width / 2
   return (
-    <div className="pointer-events-none absolute z-10 rounded-[10px] border-[0.5px] border-line bg-raised px-2.5 py-1.5 t-footnote shadow-[var(--e2)] whitespace-nowrap" style={{ top: Math.max(0, y), ...(right ? { right: width - x + 12 } : { left: x + 12 }) }}>
+    <div data-chart-panel data-chart-shadow="e2" className="pointer-events-none absolute z-10 rounded-[10px] border-[0.5px] border-line bg-raised px-2.5 py-1.5 t-footnote shadow-[var(--e2)] whitespace-nowrap" style={{ top: Math.max(0, y), ...(right ? { right: width - x + 12 } : { left: x + 12 }) }}>
       {children}
     </div>
   )
@@ -79,9 +98,9 @@ function Tip({ x, y, width, children }: { x: number; y: number; width: number; c
 function TipRow({ color, label, value }: { color?: string; label: string; value: string }) {
   return (
     <div className="flex items-center gap-1.5 text-text2">
-      {color && <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: color }} />}
-      <span>{label}</span>
-      <span className="ml-auto pl-3 tabular font-semibold text-text">{value}</span>
+      {color && <span data-chart-panel className="inline-block h-2 w-2 rounded-[2px]" style={{ background: color }} />}
+      <span data-chart-text>{label}</span>
+      <span data-chart-text className="ml-auto pl-3 tabular font-semibold text-text">{value}</span>
     </div>
   )
 }
@@ -223,8 +242,8 @@ function BarChart({ b, series, colors, fmt, ctx, ink }: ChartProps) {
   return (
     <div ref={probe} className="w-full">
     <div ref={ref} className="relative w-full" style={{ height }} onPointerLeave={() => setHover(null)}>
-      <svg width={width} height={height} className="absolute inset-0 overflow-visible" role="img" aria-label={b.title ?? ''}>
-        <Axes rect={rect} ticks={dom.ticks} Y={Y} lang={ctx.language} b={b} height={height} />
+      <ChartSvg branch="vertical-bars" width={width} height={height} className="absolute inset-0 overflow-visible" role="img" aria-label={b.title ?? ''}>
+        {Axes({ rect, ticks: dom.ticks, Y, lang: ctx.language, b, height })}
         {/* con varias series, la categoría destacada lleva una banda de la tinta del curso */}
         {!single && hl.map((on, i) => on && <rect key={`hb${i}`} x={rect.x + i * (rect.w / n)} y={rect.y} width={rect.w / n} height={rect.h} fill={withAlpha(ink ?? 'var(--accent)', 10)} rx={6} />)}
         {hover !== null && bs[hover] && <rect x={rect.x + hover * (rect.w / n)} y={rect.y} width={rect.w / n} height={rect.h} fill="var(--fill1)" rx={6} />}
@@ -292,15 +311,15 @@ function BarChart({ b, series, colors, fmt, ctx, ink }: ChartProps) {
             )}
           </motion.g>
         )}
-        <CategoryLabels layout={cats} centers={centers} y={rect.y + rect.h + 16} hl={hl} />
+        {CategoryLabels({ layout: cats, centers, y: rect.y + rect.h + 16, hl })}
         {/* zonas de cursor: la banda entera de cada categoría */}
         {Array.from({ length: n }, (_, i) => (
           <rect key={`h${i}`} x={rect.x + i * (rect.w / n)} y={rect.y} width={rect.w / n} height={rect.h + 20} fill="transparent" onPointerEnter={() => setHover(i)} />
         ))}
-      </svg>
+      </ChartSvg>
       {hover !== null && (
         <Tip x={centers[hover] ?? 0} y={rect.y} width={width}>
-          <div className="mb-0.5 font-semibold text-text">{labels[hover]}</div>
+          <div data-chart-text className="mb-0.5 font-semibold text-text">{labels[hover]}</div>
           {series.map((s, k) => (s.points[hover] ? <TipRow key={k} color={series.length > 1 ? colors[k] : undefined} label={series.length > 1 ? s.name : b.yLabel ?? ''} value={fmt(s.points[hover].y)} /> : null))}
         </Tip>
       )}
@@ -374,10 +393,10 @@ function XYChart({ b, series, colors, fmt, ctx }: ChartProps) {
       }}
       onPointerLeave={() => setHover(null)}
     >
-      <svg width={width} height={height} className="absolute inset-0 overflow-visible" role="img" aria-label={b.title ?? ''}>
-        <Axes rect={rect} ticks={dom.ticks} Y={Y} lang={ctx.language} b={b} height={height} />
+      <ChartSvg branch="cartesian" width={width} height={height} className="absolute inset-0 overflow-visible" role="img" aria-label={b.title ?? ''}>
+        {Axes({ rect, ticks: dom.ticks, Y, lang: ctx.language, b, height })}
         {cats ? (
-          <CategoryLabels layout={cats} centers={labels.map((_, i) => X(0, i))} y={rect.y + rect.h + 16} hl={hl} />
+          CategoryLabels({ layout: cats, centers: labels.map((_, i) => X(0, i)), y: rect.y + rect.h + 16, hl })
         ) : (
           <g fontSize={11} fill="var(--text3)" className="tabular" textAnchor="middle">
             {xdom.ticks.map((v, i) => (
@@ -442,10 +461,10 @@ function XYChart({ b, series, colors, fmt, ctx }: ChartProps) {
           </motion.g>
         )}
         {near && near.points.map((p) => <circle key={`n${p.k}`} cx={p.x} cy={p.y} r={5.5} fill={colors[p.k]} stroke="var(--surface)" strokeWidth={2} pointerEvents="none" />)}
-      </svg>
+      </ChartSvg>
       {near && (
         <Tip x={near.x} y={rect.y} width={width}>
-          <div className="mb-0.5 font-semibold text-text">{near.title ?? (categorical ? labels[near.i] : `${b.xLabel ?? 'x'} = ${formatNumber(near.xv, ctx.language)}`)}</div>
+          <div data-chart-text className="mb-0.5 font-semibold text-text">{near.title ?? (categorical ? labels[near.i] : `${b.xLabel ?? 'x'} = ${formatNumber(near.xv, ctx.language)}`)}</div>
           {near.points.map((p) => (
             <TipRow key={p.k} color={series.length > 1 ? colors[p.k] : undefined} label={series.length > 1 ? series[p.k].name : b.yLabel ?? ''} value={fmt(p.v)} />
           ))}
@@ -503,15 +522,10 @@ function PieChart({ b, series, fmt, ctx }: ChartProps) {
   const cx0 = size / 2
   const R = size / 2 - 6
   const r0 = R * 0.6
-  const sweep = p * Math.PI * 2
   const focus = hover !== null ? slices.find((s) => s.index === hover) : undefined
-  return (
-    <div ref={ref} className={cx('flex w-full items-center gap-6', side ? 'flex-row' : 'flex-col')}>
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} role="img" aria-label={b.title ?? ''} onPointerLeave={() => setHover(null)}>
-          {slices.map((s) => {
-            if (s.a0 >= sweep) return null
-            const a1 = Math.min(s.a1, sweep)
+  const slicePaths = (progress: number): ReactNode => slices.map((s) => {
+            if (s.a0 >= (progress * Math.PI * 2)) return null
+            const a1 = Math.min(s.a1, (progress * Math.PI * 2))
             const mid = (s.a0 + s.a1) / 2
             // el sector destacado sale un poco, como al pasar el ratón
             const off = hover === s.index || (hover === null && items[s.index]?.highlight) ? 5 : 0
@@ -529,13 +543,18 @@ function PieChart({ b, series, fmt, ctx }: ChartProps) {
                 onPointerEnter={() => setHover(s.index)}
               />
             )
-          })}
-        </svg>
+          })
+  return (
+    <div ref={ref} className={cx('flex w-full items-center gap-6', side ? 'flex-row' : 'flex-col')}>
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <ChartSvg branch="donut" layoutWidth={width} settled={slicePaths(1)} width={size} height={size} role="img" aria-label={b.title ?? ''} onPointerLeave={() => setHover(null)}>
+          {slicePaths(p)}
+        </ChartSvg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div className="max-w-[60%]">
-            <div className="t-caption truncate text-text3">{focus ? items[focus.index].label : t('chart.total')}</div>
-            <div className="font-serif text-[22px] leading-[28px] tabular text-text">{focus ? fmt(focus.value) : fmt(total)}</div>
-            {focus && <div className="t-caption tabular text-text2">{percent(focus.share * 100, ctx.language, 1)}</div>}
+            <div data-chart-text className="t-caption truncate text-text3">{focus ? items[focus.index].label : t('chart.total')}</div>
+            <div data-chart-text className="font-serif text-[22px] leading-[28px] tabular text-text">{focus ? fmt(focus.value) : fmt(total)}</div>
+            {focus && <div data-chart-text className="t-caption tabular text-text2">{percent(focus.share * 100, ctx.language, 1)}</div>}
           </div>
         </div>
       </div>
@@ -545,6 +564,7 @@ function PieChart({ b, series, fmt, ctx }: ChartProps) {
           return (
             <motion.li
               key={i}
+              data-chart-enter-x data-chart-panel data-chart-background={hover === i ? 'var(--fill1)' : 'transparent'}
               className={cx('flex items-center gap-2.5 rounded-[8px] px-2 py-1 t-callout transition-colors', hover === i && 'bg-fill1')}
               onPointerEnter={() => setHover(i)}
               onPointerLeave={() => setHover(null)}
@@ -552,10 +572,10 @@ function PieChart({ b, series, fmt, ctx }: ChartProps) {
               animate={seen ? { opacity: 1, x: 0 } : undefined}
               transition={{ delay: 0.2 + i * 0.06, duration: 0.3 }}
             >
-              <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colors[i % colors.length] }} />
-              <span className={cx('min-w-0 flex-1 truncate text-text', it.highlight && 'font-semibold')}>{it.label}</span>
-              {valueColumn && <span className="tabular text-text2">{fmt(it.value)}</span>}
-              <span className="min-w-12 whitespace-nowrap text-right tabular font-semibold text-text">{percent(share * 100, ctx.language, share < 0.01 ? 2 : share < 0.1 ? 1 : 0)}</span>
+              <span aria-hidden data-chart-panel className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colors[i % colors.length] }} />
+              <span data-chart-text className={cx('min-w-0 flex-1 truncate text-text', it.highlight && 'font-semibold')}>{it.label}</span>
+              {valueColumn && <span data-chart-text className="tabular text-text2">{fmt(it.value)}</span>}
+              <span data-chart-text className="min-w-12 whitespace-nowrap text-right tabular font-semibold text-text">{percent(share * 100, ctx.language, share < 0.01 ? 2 : share < 0.1 ? 1 : 0)}</span>
             </motion.li>
           )
         })}
