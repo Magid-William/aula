@@ -41,11 +41,12 @@ export type KeySafeNote = 'keySafe' | 'keySafeBasic' | 'keySafeServer' | 'keySaf
  * La nota bajo las claves de IA: dónde queda una clave pegada desde aquí y si va cifrada. Las claves se guardan donde
  * corre Aula: en este ordenador (la ventana) o en el servidor (el propietario, que las pega desde su móvil). Con
  * `protection` 'basic' (Linux sin llavero; un servidor arranca con `--password-store=basic`) se guardan sin cifrar.
- * `undefined` mientras no se sabe cómo se protegen: `null`, sin nota, para no prometer un cifrado que quizá no hay.
+ * `undefined` mientras no se sabe cómo se protegen: `null`, sin nota, para no prometer un cifrado que quizá no hay; lo
+ * mismo con 'unavailable' (macOS o Windows sin llavero ahora: no se guarda nada y lo explica el aviso de la barra lateral).
  * Solo guardan claves la ventana y el propietario: los demás dispositivos eligen entre lo ya listo (`null`).
  */
-export function keySafeNote(role: DeviceRole, protection: 'os' | 'basic' | undefined): KeySafeNote | null {
-  if (!protection || settingsElsewhere(role)) return null
+export function keySafeNote(role: DeviceRole, protection: 'os' | 'basic' | 'unavailable' | undefined): KeySafeNote | null {
+  if (!protection || protection === 'unavailable' || settingsElsewhere(role)) return null
   const basic = protection === 'basic'
   if (role === 'owner') return basic ? 'keySafeServerBasic' : 'keySafeServer'
   return basic ? 'keySafeBasic' : 'keySafe'

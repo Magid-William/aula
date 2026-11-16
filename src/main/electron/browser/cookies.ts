@@ -6,6 +6,7 @@ import type { PlatformAccount } from '@shared/settings/platforms'
 import { hostOf, platformInfo, type CookieLike } from '@engine/platforms'
 import { cookiesToRestore, saveCookieSnapshot } from '@main/services/platforms/cookie-store'
 import { platformSettings } from '@main/services/platforms/accounts'
+import { sessionGate } from '@main/services/platforms/session-gate'
 import { log } from '@main/services/log'
 import { platformSession } from './sessions'
 
@@ -26,6 +27,8 @@ function priorityHosts(account: PlatformAccount): string[] {
 
 /** Guarda la copia de las cookies de la cuenta (si cambió). */
 export async function snapshotCookies(account: PlatformAccount): Promise<boolean> {
+  // sesiones en pausa (llavero denegado en macOS): ni se abre la partición ni se toca la copia buena de secrets.enc
+  if (sessionGate() !== 'open') return false
   const ses = platformSession(account.id)
   try {
     const all = await ses.cookies.get({})

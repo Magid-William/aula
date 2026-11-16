@@ -27,6 +27,7 @@ import { KeepAliveScheduler, type CheckVerdict } from './keepalive'
 import { MoodleClient, moodleStepPendingText } from './moodle'
 import { probePlatform, type PlatformProbeOutcome } from './probe'
 import { checkSession, rememberMoodleSesskey, type SessionCheckResult } from './session-check'
+import { assertSessionsOpen } from './session-gate'
 import { accountView, effectiveStatus, platformStatus, statusDetail } from './status'
 
 /** Cómo terminó la ventana de inicio de sesión (lo produce la ventana; contrato con src/main/electron/browser/signin.ts). */
@@ -529,7 +530,14 @@ export class PlatformController {
     }
     const rt = effectiveStatus(a)
     if (rt.status !== 'signedIn') this.setStatus(a, 'checking', statusDetail('checking'))
-    const v = await this.runCheck(a)
+    let v: CheckVerdict
+    try {
+      v = await this.runCheck(a)
+    } catch (err) {
+      // p. ej. las sesiones en pausa (llavero denegado en macOS): no se queda en «Comprobando…»
+      this.settleChecking(getAccount(a.id) ?? a)
+      throw err
+    }
     this.scheduler.markChecked(a.id, v === 'signedIn' ? 'signedIn' : v === 'signedOut' ? 'needsSignIn' : effectiveStatus(a).status)
     return this.view(a.id)
   }
@@ -543,6 +551,12 @@ export class PlatformController {
   /** Abre la ventana de acceso (o la trae al frente si ya está abierta) y espera a que se inicie sesión o se cierre. */
   signIn(accountId: string): Promise<{ signedIn: boolean; account: PlatformAccountView }> {
     const account = requireAccount(accountId)
+    // la ventana usa la sesión guardada: con las sesiones en pausa (llavero denegado en macOS), no se abre
+    try {
+      assertSessionsOpen()
+    } catch (err) {
+      return Promise.reject(err)
+    }
     const open = this.signIns.get(account.id)
     if (open) {
       open.session.focus()
@@ -690,6 +704,8 @@ export class PlatformController {
   /** Cierra la sesión: borra el almacenamiento de la partición y la copia de las cookies (el calendario y el token se quedan). */
   async signOut(accountId: string): Promise<PlatformAccountView> {
     const a = requireAccount(accountId)
+    // con las sesiones en pausa se borraría la copia de Aula y las cookies seguirían en el disco: hasta reabrir Aula, no
+    assertSessionsOpen()
     this.signedOutByUser.add(a.id)
     await this.forgetSession(a)
     const updated = updateAccount(a.id, { lastState: 'needsSignIn' })
@@ -700,6 +716,7 @@ export class PlatformController {
 
   async remove(accountId: string): Promise<void> {
     const a = requireAccount(accountId)
+    assertSessionsOpen()
     await this.forgetSession(a)
     removeAccount(a.id)
     platformStatus.delete(a.id)

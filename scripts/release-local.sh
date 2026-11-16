@@ -23,8 +23,11 @@
 #                                            APK se niega (publicada, los que faltan dejarían de ver versiones o no
 #                                            tendrían qué instalar): --partial para subirla así a sabiendas
 #
-# macOS se firma con el certificado propio «Aula Local Signing» (~/.aula-signing/, scripts/build/mac-sign.cjs): sin él
-# se niega, porque las copias ya firmadas con él rechazarían una versión ad hoc. AULA_MAC_ADHOC=1 para probar sin él.
+# macOS (desde 0.2.6) se firma con Developer ID: la ÚNICA identidad válida «Developer ID Application: … (87BM9KFJZW)»
+# del llavero, fijada por su SHA-1, con hardened runtime y el sello de tiempo de Apple, y se notariza con el perfil de
+# notarytool $AULA_NOTARY_PROFILE (si no, «faro-notary»). La configuración, la identidad y el perfil se comprueban antes
+# de compilar. AULA_MAC_ADHOC=1 compila una app SOLO de prueba (ad hoc, sin hardened runtime ni notarizar; --upload la
+# rechaza). La 0.2.5 y anteriores ya no se compilan: la 0.2.5 publicada es el puente inmutable (--bridge-dir).
 # Android se firma con la clave de publicación de Aula para Android (~/.aula-signing/android, o $AULA_ANDROID_KEYSTORE;
 # native/android/build.sh): solo en este ordenador, nunca en CI. Android solo instala una actualización encima de la app
 # si la firma es de la misma clave, así que su huella (el SHA-256 de su certificado, que es público) está en el
@@ -95,6 +98,10 @@ APK="Aula-$VERSION-android.apk"
 PUB_OWNER=$(sed -n 's/^  owner: *//p' electron-builder.yml | head -1)
 PUB_REPO=$(sed -n 's/^  repo: *//p' electron-builder.yml | head -1)
 TITLE=$(sed -n 's/^  releaseName: *//p' electron-builder.yml | head -1)
+# macOS: el SHA-1 de la identidad Developer ID (lo resuelve la comprobación de credenciales) y lo que electron-builder
+# usaría en vez del perfil del notario y de esa identidad (otras credenciales, otro llavero, otro certificado)
+MAC_IDENTITY=""
+MAC_SIGNING_ENV=(APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_KEYCHAIN CSC_LINK CSC_NAME CSC_KEY_PASSWORD CSC_KEYCHAIN)
 
 # ── Android: la clave de publicación y las herramientas (las mismas que busca native/android/build.sh) ────────────────
 ANDROID_KEYSTORE="${AULA_ANDROID_KEYSTORE:-$HOME/.aula-signing/android/aula-release.keystore}"
@@ -277,9 +284,9 @@ if [ $UPLOAD -eq 1 ]; then
     for a in "${APKS[@]}"; do [ "${a##*/}" = "$APK" ] || die "$a no es $APK: quítalo de $OUT (solo se sube el APK de publicación de esta versión)."; done
     android_check_apk "$OUT/$APK"
   fi
-  # Comprueba exactamente el ZIP que se subirá, aunque no quede una .app descomprimida. Sin bypass ad hoc.
+  # Comprueba exactamente el ZIP y el DMG que se subirán, aunque no quede una .app descomprimida. Sin bypass ad hoc.
   if [ ${#MAC_FILES[@]} -gt 0 ] || [ -f "$OUT/latest-mac.yml" ] || [ -f "$OUT/developer-id-mac.yml" ]; then
-    node scripts/release-mac-verify.mjs "$OUT" "$VERSION" || die "El ZIP final de macOS no cumple la identidad y firma exigidas."
+    node scripts/release-mac-verify.mjs "$OUT" "$VERSION" || die "El ZIP final o el DMG final de macOS no cumplen la identidad, la firma y la notarización exigidas."
   fi
   HEAD_SHA=$(git rev-parse HEAD)
   HEAD_TREE=$(git rev-parse 'HEAD^{tree}')
@@ -392,13 +399,10 @@ if [ "$MAC_MODE" = developer-id ]; then
   for p in "${ONLY[@]}"; do
     if [ "$p" = mac ]; then
       [ -n "$BRIDGE_DIR" ] || die "Desde 0.2.6 hace falta --bridge-dir con los originales públicos de v0.2.5."
+      # sin identity (ni null ni "-") ni sign propio, hardenedRuntime y forceCodeSigning, sin timestamp (el de Apple), sin
+      # notarize: false y allow-jit en los dos entitlements (scripts/release-mac-config.mjs)
+      node scripts/release-mac-config.mjs check || die "La configuración de Mac aún no es Developer ID: el firmador local de 0.2.5 no sirve."
       node scripts/release-mac-bridge.mjs check-baseline "$BRIDGE_DIR" || die "El puente no coincide con su manifiesto inmutable."
-      node --input-type=module -e '
-        import {readFileSync} from "node:fs"; import {yaml} from "./scripts/release-common.mjs";
-        const m = yaml.load(readFileSync("electron-builder.yml", "utf8")).mac;
-        if (m.hardenedRuntime !== true || m.identity === "-" || m.sign || m.notarize === false) {
-          console.error("Configura Developer ID, hardenedRuntime y notarización; el firmador local de 0.2.5 no sirve."); process.exit(1)
-        }' || die "La configuración de Mac aún no es Developer ID."
     fi
   done
 fi
@@ -414,11 +418,25 @@ for p in "${ONLY[@]}"; do
   case "$p" in mac|linux) need_go ;; esac
   case "$p" in
     mac)
-      # macOS: el certificado estable «Aula Local Signing» (scripts/build/mac-sign.cjs; A1-P1-5)
-      [ "${AULA_MAC_ADHOC:-}" = 1 ] && { printf '\n! AULA_MAC_ADHOC=1: macOS se firma ad hoc (solo para probar; --upload lo rechaza).\n'; continue; }
-      [ "$MAC_MODE" != developer-id ] || continue
-      [ -f "$HOME/.aula-signing/aula-signing.keychain-db" ] && [ -f "$HOME/.aula-signing/keychain.pass" ] \
-        || die "Falta el llavero de «Aula Local Signing» (~/.aula-signing/aula-signing.keychain-db + keychain.pass): sin él, las copias de macOS rechazarían esta versión (docs/PUBLISHING.md → Signing)." ;;
+      if [ "${AULA_MAC_ADHOC:-}" = 1 ]; then
+        # solo para probar: ad hoc, sin hardened runtime ni notarizar (lo fuerza la compilación); nada de credenciales
+        unset APPLE_KEYCHAIN_PROFILE "${MAC_SIGNING_ENV[@]}"
+        printf '\n! AULA_MAC_ADHOC=1: macOS sale ad hoc, sin hardened runtime ni notarizar (solo para probar; --upload lo rechaza).\n'
+        continue
+      fi
+      [ "$MAC_MODE" = developer-id ] \
+        || die "macOS $VERSION ya no se compila: desde 0.2.6 se firma con Developer ID, el firmador local se retiró y la v0.2.5 publicada es el puente inmutable. AULA_MAC_ADHOC=1 compila una de prueba."
+      [ "$(uname)" = Darwin ] || die "El instalador de macOS solo se puede firmar y notarizar en un Mac."
+      # la identidad por su SHA-1: con un nombre, electron-builder podría acabar en «Apple Distribution» del mismo equipo
+      MAC_IDENTITY=$(security find-identity -v -p codesigning | node scripts/release-mac-config.mjs identity) \
+        || die "Hace falta exactamente una identidad válida «Developer ID Application» del equipo de Aula en el llavero (security find-identity -v -p codesigning): docs/PUBLISHING.md → The Developer ID release."
+      # la notarización, solo con el perfil de notarytool: nada más elige llavero, identidad ni credenciales
+      unset "${MAC_SIGNING_ENV[@]}"
+      export APPLE_KEYCHAIN_PROFILE="${AULA_NOTARY_PROFILE:-faro-notary}"
+      xcrun notarytool history --keychain-profile "$APPLE_KEYCHAIN_PROFILE" >/dev/null \
+        || die "El perfil de notarytool «${APPLE_KEYCHAIN_PROFILE}» no funciona (xcrun notarytool history): créalo con xcrun notarytool store-credentials, o di otro con AULA_NOTARY_PROFILE."
+      xcrun --find stapler >/dev/null || die "Falta stapler (xcrun --find stapler): instala Xcode o sus herramientas de línea de órdenes."
+      printf '✓ macOS: Developer ID %s… y perfil de notarytool «%s»\n' "${MAC_IDENTITY:0:8}" "$APPLE_KEYCHAIN_PROFILE" ;;
     android)
       # Android: todo lo que usa native/android/build.sh y la clave buena (la de la huella del repositorio)
       android_build_tools
@@ -504,8 +522,20 @@ for p in "${ONLY[@]}"; do
          native/tsnet/build.sh || die "No se pudo compilar native/tsnet/bin/aula-tsnet (hace falta Go en .toolchain/go: lo dice native/tsnet/build.sh)."
          lipo -archs native/tsnet/bin/aula-tsnet | grep -q 'x86_64' && lipo -archs native/tsnet/bin/aula-tsnet | grep -q 'arm64' \
            || die "native/tsnet/bin/aula-tsnet no es universal (arm64 + x86_64)."
-         npx electron-builder --mac --publish never -c.directories.output="$OUT"
-         [ -x "$OUT/mac-universal/Aula.app/Contents/Resources/bin/aula-tsnet" ] || die "El paquete de macOS salió sin Resources/bin/aula-tsnet." ;;
+         # Developer ID por su SHA-1 (notariza con APPLE_KEYCHAIN_PROFILE). Prueba: ad hoc, sin hardened runtime ni notarizar
+         if [ "${AULA_MAC_ADHOC:-}" = 1 ]; then
+           MAC_SIGN=(-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false -c.mac.forceCodeSigning=false)
+         else
+           [ -n "$MAC_IDENTITY" ] || die "Falta la identidad Developer ID: no se compila macOS sin la comprobación de credenciales."
+           MAC_SIGN=("-c.mac.identity=$MAC_IDENTITY")
+         fi
+         npx electron-builder --mac --publish never -c.directories.output="$OUT" "${MAC_SIGN[@]}"
+         [ -x "$OUT/mac-universal/Aula.app/Contents/Resources/bin/aula-tsnet" ] || die "El paquete de macOS salió sin Resources/bin/aula-tsnet."
+         # con identity=- electron-builder aún prefiere una identidad del llavero cuyo nombre lleve «-»: ad hoc de verdad
+         if [ "${AULA_MAC_ADHOC:-}" = 1 ]; then
+           codesign -dv "$OUT/mac-universal/Aula.app" 2>&1 | grep -x 'Signature=adhoc' >/dev/null \
+             || die "AULA_MAC_ADHOC=1 no salió ad hoc (electron-builder eligió una identidad del llavero): no la uses."
+         fi ;;
     win) npx electron-builder --win --publish never -c.directories.output="$OUT" ;;
     linux)
       # el componente de Tailscale para Linux (x64 y arm64): «Aula en tus dispositivos» y Aula como servidor. Si falta,

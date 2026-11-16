@@ -86,8 +86,9 @@ describe('licencia y avisos (A6-P1-4, A6-P1-5)', () => {
 })
 
 describe('README coherente con la release (A6-P2-7, A6-P2-19)', () => {
-  it('el póster no descarga el máster de 256 MB: enlaza al corte web y dice cuánto pesa', () => {
-    for (const f of ['README.md', 'README.es.md']) {
+  // el corto está ahora en docs/FEATURES*.md (el README se quedó con la demo de 90 s)
+  it('el corto no descarga el máster de 256 MB: enlaza al corte web y dice cuánto pesa', () => {
+    for (const f of ['docs/FEATURES.md', 'docs/FEATURES.es.md']) {
       const md = read(f)
       expect(md, f).not.toMatch(/releases\/download\/v[\d.]+\/Aula-film\.mp4/)
       expect(md, f).toMatch(/releases\/download\/v[\d.]+\/Aula-film-web\.mp4/)
@@ -96,11 +97,12 @@ describe('README coherente con la release (A6-P2-7, A6-P2-19)', () => {
     }
   })
 
-  it('la versión de Node del README es la que piden las herramientas (package.json → engines)', () => {
+  it('la versión de Node del README y de CONTRIBUTING es la que piden las herramientas (package.json → engines)', () => {
     const engines = (JSON.parse(read('package.json')) as { engines: { node: string } }).engines.node
     expect(engines).toBe('^20.19.0 || >=22.12.0')
-    expect(read('README.md')).toMatch(/Node\.js 22\*\* \(22\.12 or later; 20\.19 or later also works\)/)
-    expect(read('README.es.md')).toMatch(/Node\.js 22\*\* \(22\.12 o posterior; también vale 20\.19 o posterior\)/)
+    expect(read('README.md')).toMatch(/Node\.js 22\.12 or later/)
+    expect(read('README.es.md')).toMatch(/Node\.js 22\.12 o posterior/)
+    expect(read('CONTRIBUTING.md')).toMatch(/Node\.js 22\.12 or later \(20\.19 or later also works\)/)
   })
 })
 
@@ -116,17 +118,24 @@ describe('la .deb de Linux y el código de cada versión (A6-P1-3, A6-P2-14)', (
   const version = (JSON.parse(read('package.json')) as { version: string }).version
   const deb = `Aula-${version}-linux-amd64.deb`
 
-  it('README, notas y plantilla cuentan lo mismo de la .deb, y lo que de verdad hace', () => {
-    for (const f of ['README.md', 'README.es.md', `docs/release-notes/${version}.md`]) expect(read(f), f).toContain(deb)
+  it('README, instalación, notas y plantilla cuentan lo mismo de la .deb, y lo que de verdad hace', () => {
+    expect(read(`docs/release-notes/${version}.md`)).toContain(deb)
+    // el README y docs/INSTALL*.md nombran los archivos con <version>/<versión>, así una versión nueva no los deja viejos
+    const named = { en: deb.replace(version, '<version>'), es: deb.replace(version, '<versión>') }
+    for (const f of ['README.md', 'docs/INSTALL.md']) expect(read(f), f).toContain(named.en)
+    for (const f of ['README.es.md', 'docs/INSTALL.es.md']) expect(read(f), f).toContain(named.es)
+    for (const f of ['README.md', 'README.es.md', 'docs/INSTALL.md', 'docs/INSTALL.es.md']) {
+      expect(read(f), f).not.toMatch(/Aula-(Setup-)?\d+\.\d+\.\d+/)
+    }
     expect(read('.github/ISSUE_TEMPLATE/bug_report.yml')).toContain('Linux (.deb)')
     // la .deb no se actualiza sola: Aula avisa y Ajustes → Acerca de lleva a descargarla de las releases
-    expect(read('README.md')).not.toMatch(/offers the new one to download/)
-    expect(read('README.md')).toMatch(/download its `\.deb` from the \[releases\]/)
-    expect(read('README.es.md')).toMatch(/descarga su `\.deb` de las \[versiones publicadas\]/)
+    expect(read('docs/INSTALL.md')).not.toMatch(/offers the new one to download/)
+    expect(read('docs/INSTALL.md')).toMatch(/download its `\.deb` from the \[releases\]/)
+    expect(read('docs/INSTALL.es.md')).toMatch(/descarga su `\.deb` de las \[versiones publicadas\]/)
     // en Ubuntu ≥ 23.10 la AppImage arranca sin el aislamiento de Chromium (AppRun de electron-builder), no «se cierra»
-    expect(read('README.md')).not.toMatch(/closes right away/)
-    expect(read('README.md')).toMatch(/starts with that sandbox turned off/)
-    expect(read('README.es.md')).toMatch(/arranca con ese aislamiento apagado/)
+    expect(read('docs/INSTALL.md')).not.toMatch(/closes right away/)
+    expect(read('docs/INSTALL.md')).toMatch(/starts with that sandbox turned off/)
+    expect(read('docs/INSTALL.es.md')).toMatch(/arranca con ese aislamiento apagado/)
   })
 
   it('PUBLISHING no manda a --only para añadir la .deb a una versión ya etiquetada', () => {

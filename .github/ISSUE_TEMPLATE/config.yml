@@ -4,5 +4,8 @@ contact_links:
     url: https://github.com/luumlabs/aula/security/advisories/new
     about: Report vulnerabilities privately, not in a public issue.
   - name: How to install Aula
-    url: https://github.com/luumlabs/aula#download-and-install
-    about: First launch, "Open Anyway", Linux notes and choosing your AI.
+    url: https://github.com/luumlabs/aula/blob/main/docs/INSTALL.md
+    about: First launch on each system, updates, Linux notes and troubleshooting.
+  - name: Want to help? Start with a good first issue
+    url: https://github.com/luumlabs/aula/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
+    about: Small, scoped tasks that say which files to touch and how to check them.

@@ -132,7 +132,7 @@ export class ClaudeStreamParser implements CLIEventParser {
   private readonly startedTools = new Map<string, string>()
   private readonly suspectToolIDs = new Set<string>()
   private result?: ResultInfo
-  private assistantFailure?: { message: string; kind?: AgentErrorKind }
+  private assistantFailure?: CLIFailure
   private rateLimit?: RateLimitInfo
   private warnedAboutLimit = false
   private readonly unparsed: string[] = []
@@ -339,11 +339,16 @@ export class ClaudeStreamParser implements CLIEventParser {
     if (error) {
       // mensaje sintético con un error de la API («Not logged in», límite de uso…): no es texto del asistente
       let kind: AgentErrorKind | undefined
+      let status: number | undefined
       if (error === 'authentication_failed') kind = 'notLoggedIn'
       else if (error === 'rate_limit') kind = 'rateLimited'
       else if (error === 'invalid_request') kind = 'badResponse'
-      else if (error === 'server_error' || error === 'unknown' || error === 'billing_error') kind = 'http'
-      this.assistantFailure = { message: combinedText || error, kind }
+      else if (error === 'billing_error') {
+        // sin saldo (clave de API): esperar no lo arregla
+        kind = 'http'
+        status = 402
+      } else if (error === 'server_error' || error === 'unknown') kind = 'http'
+      this.assistantFailure = { message: combinedText || error, kind, status }
       return
     }
     const id = str(message.id)
@@ -458,7 +463,7 @@ export class ClaudeStreamParser implements CLIEventParser {
       }
       const candidates = [result.text, result.errors.length > 0 ? result.errors.join('\n') : undefined, this.assistantFailure?.message]
       const message = candidates.find((c) => c !== undefined && c.trim() !== '') ?? `error: ${result.subtype}`
-      return { type: 'failed', failure: { message, kind: this.assistantFailure?.kind, retryAfter: this.rateLimit?.retryAfter } }
+      return { type: 'failed', failure: { message, kind: this.assistantFailure?.kind, status: this.assistantFailure?.status, retryAfter: this.rateLimit?.retryAfter } }
     }
     const text = result.text ? result.text : this.lastAssistantText
     const stopReason = result.stopReason === 'max_tokens' ? 'length' : 'stop'

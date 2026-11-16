@@ -123,7 +123,7 @@ export function decodeDrawItem(raw: unknown): DrawItem | undefined {
   return out
 }
 
-/** Escribe un elemento; lo nuevo va además de una forma que una versión antigua sabe pintar (ver `withOldVersionFallbacks`). */
+/** Escribe un elemento; algunos nuevos van además de una forma que pinta una versión antigua (`withOldVersionFallbacks`). */
 export const encodeDrawItem = (v: DrawItem): JSONObject =>
   withOldVersionFallbacks(v, { ...pickKeys(v, ['kind', ...DRAW_NUMBERS, 'points', 'text', 'anchor', 'stroke', 'fill', 'dashed', 'label']), ...encodeDrawItemMore(v) })
 

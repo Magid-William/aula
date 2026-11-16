@@ -2,8 +2,11 @@
 // prepare <carpeta> <versión> [--bridge-dir <originales-v0.2.5>]
 // manifest <originales-v0.2.5> <salida.json>  (solo después de publicar; comprueba también GitHub)
 // check-baseline <originales-v0.2.5>         (manifiesto público del repositorio + archivos originales)
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, createWriteStream, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { once } from 'node:events'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { finished } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import {
@@ -97,6 +100,37 @@ export async function confirmPublishedBridge(manifest, fetcher = fetch) {
     if (bytes !== file.bytes || hash.digest('base64') !== file.sha512) throw new Error(`Los bytes públicos de ${file.name} no son los originales verificados`)
   }
   return { ...manifest, publishedAt: release.published_at }
+}
+
+/**
+ * Después de publicar: los cinco originales del puente, descargados como los piden las copias 0.2.4 (bajo la etiqueta de
+ * la versión MÁS RECIENTE, no la de v0.2.5), siguen siendo los bytes del manifiesto. Sin ellos, esas copias se quedan atrás.
+ */
+export async function checkPublishedBridge(repo, tag, { fetcher = fetch, manifestPath = MANIFEST, keys = publicKeys() } = {}) {
+  const manifest = readBridgeManifest(manifestPath)
+  const dir = mkdtempSync(join(tmpdir(), 'aula-public-bridge-'))
+  try {
+    for (const file of manifest.files) {
+      const response = await fetcher(`https://github.com/${repo}/releases/download/${tag}/${file.name}`, { signal: AbortSignal.timeout(20 * 60_000) })
+      if (!response.ok || !response.body) throw new Error(`${tag} no tiene ${file.name} (${response.status})`)
+      const out = createWriteStream(join(dir, file.name), { flags: 'wx' })
+      let bytes = 0
+      try {
+        for await (const chunk of response.body) {
+          bytes += chunk.length
+          if (bytes > file.bytes) throw new Error(`${file.name} de ${tag} es más grande que el original`)
+          if (!out.write(chunk)) await once(out, 'drain')
+        }
+      } finally {
+        out.end()
+        await finished(out)
+      }
+    }
+    await verifyBridgeFiles(dir, { manifestPath, keys })
+    return manifest
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 async function main() {

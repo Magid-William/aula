@@ -41,6 +41,7 @@
   },
   "cancel": "Detener",
   "resume": "Reanudar",
+  "resumeFailed": "No se pudo reanudar la creación",
   "keep": "Quedarme con lo que hay",
   "keepFailed": "No se pudo terminar con lo que hay",
   "done": "Tu curso está listo",

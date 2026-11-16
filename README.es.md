@@ -1,138 +1,161 @@
+<!-- Mantener a la par con README.md: mismas secciones en el mismo orden, mismas imágenes (las fijas en -es). -->
 <p align="right"><a href="README.md">English</a> · <b>Español</b></p>
 
 <p align="center">
-  <img src="docs/media/aula-icon.png" width="128" height="128" alt="El icono de Aula: un arco de ladrillo dibujado a tinta y acuarela, con el sol saliendo dentro">
+  <img src="docs/media/landing/icon-176.png" width="88" height="88" alt="El icono de Aula: un arco de ladrillo dibujado a tinta y acuarela, con el sol saliendo dentro">
 </p>
 
 <h1 align="center">Aula</h1>
 
+<h3 align="center">Convierte tus apuntes en un curso, con una tutora de IA que lo estudia contigo.</h3>
+
 <p align="center">
-  <b>Tus apuntes se convierten en un curso. Y Aula lo estudia contigo.</b><br>
-  Una app para estudiar en macOS, Windows y Linux, con una compañera para iPad y iPhone.<br>
-  Dale tus apuntes, diapositivas, grabaciones y exámenes de otros años, o solo un tema.
+  Una app de estudio gratuita y de código abierto para tu ordenador. Dale tus apuntes, diapositivas o exámenes de
+  otros años, tráelos de Moodle o Canvas, o dale solo un tema, y tendrás lecciones, ejercicios que se corrigen al
+  momento, tarjetas y simulacros de examen. Usa el plan de ChatGPT o Claude que ya pagas, o una IA local gratis (un
+  LLM en tu ordenador) que funciona sin internet.
 </p>
 
 <p align="center">
-  <a href="https://github.com/luumlabs/aula/releases/latest"><img src="https://img.shields.io/github/v/release/luumlabs/aula?style=flat-square&label=descargar&color=1d1d1f" alt="Última versión"></a>
-  <a href="LICENSE.md"><img src="https://img.shields.io/badge/licencia-AGPL--3.0-B9553A?style=flat-square" alt="Licencia: AGPL-3.0"></a>
-  <img src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6b6b6b?style=flat-square" alt="macOS, Windows y Linux">
-  <img src="https://img.shields.io/badge/estado-acceso%20anticipado-D9822B?style=flat-square" alt="Estado: acceso anticipado">
-  <a href="https://www.reddit.com/user/astrolafi"><img src="https://img.shields.io/badge/Reddit-u%2Fastrolafi-FF4500?style=flat-square&logo=reddit&logoColor=white" alt="Sigue a u/astrolafi en Reddit"></a>
+  <a href="https://github.com/luumlabs/aula/releases/latest"><img src="https://img.shields.io/github/v/release/luumlabs/aula?style=flat-square&label=descargar&color=B4502F" alt="Descargar la última versión"></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/c%C3%B3digo%20abierto-AGPL--3.0-1d1d1f?style=flat-square" alt="Código abierto con licencia AGPL-3.0"></a>
 </p>
 
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/20fd0765-a471-4f6f-87be-39ccd13d7d93" controls muted playsinline></video>
-  <br><sub><b>90 segundos, sin voz.</b> Un curso entero de principio a fin: la lección, un ejercicio que se corrige al
-responder, el cuaderno de errores, las tarjetas y el simulacro. Si el reproductor no arranca, <a href="docs/media/demo/aula-demo-90s.mp4">mira el archivo</a></sub>
-</p>
-
-<p align="center">
-  <a href="https://github.com/luumlabs/aula/releases/download/v0.1.0/Aula-film-web.mp4">
-    <img src="docs/media/film-poster.png" width="1000" alt="Mira el corto sobre Aula (1:50): de noche, un estudiante con bufanda roja camina entre hojas que vuelan hacia un gran arco encendido">
+  <a href="#mírala-en-90-segundos">
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="docs/media/landing/hero-still.jpg">
+      <img src="docs/media/landing/hero.gif" width="960" alt="Diez segundos de Aula: unos apuntes, unas diapositivas, una foto de la pizarra y la grabación de una clase entran en un curso nuevo, Statistics for psychology; un equipo de agentes de IA lo planifica, escribe las lecciones y los ejercicios y comprueba las respuestas, y el curso queda listo con 4 temas, 36 ejercicios y 24 tarjetas">
+    </picture>
   </a>
-  <br><sub><b>Nueve días.</b> Un corto de animación sobre Aula, pintado con código (1:50, vídeo de 26 MB, rótulos en inglés)</sub>
+  <br>
+  <sub><a href="#mírala-en-90-segundos">Mira la demo de 90 segundos</a> · la app de verdad, acelerada y con la IA simulada de sus pruebas (rótulos en inglés)</sub>
 </p>
 
-Te da lecciones cortas, ejercicios que se corrigen al responder, tarjetas de memoria y un simulacro con la misma
-estructura que el examen real. Después te ayuda a ir trabajándolo, un poco cada día, hasta el examen.
+<p align="center">
+  <a href="https://github.com/luumlabs/aula/releases/latest"><b>Descargar para Windows, macOS o Linux</b></a>
+  &nbsp;·&nbsp; gratis, sin cuenta ni rastreo
+</p>
 
-No está atada a una asignatura. Cálculo, química orgánica, anatomía, un idioma, el examen de conducir, un libro que quieras entender bien. Si tienes materiales de clase, Aula los usa, así que el curso sigue tu temario. Si no, basta con algo como *Estadística para Psicología, final en mayo* para empezar.
+## Lo que puedes hacer
 
-Tus cursos y tu progreso se guardan en tu ordenador. Aula funciona con la IA que ya pagas (una suscripción a Claude o ChatGPT, o una clave
-de API) o con un modelo gratis que corre en tu propio equipo. No hay cuentas ni rastreo.
+### Tutora de IA
 
-### De un vistazo
+Pregúntale cualquier duda de lo que estudias. Aula lo busca en tus propios apuntes, te dice la página y dibuja lo que
+explica. Junto a cada ejercicio te da pistas sin soltarte la respuesta.
 
-- **Cualquier material se convierte en un curso.** PDF, diapositivas, fotos de la pizarra, grabaciones de audio y
-  vídeo de una clase, enlaces o lo que hay en tu plataforma de estudio. [Cursos](#cursos)
-- **Lecciones que enseñan antes de preguntar.** Figuras, imágenes reales, gráficas y modelos en 3D que puedes girar, y
-  un ejemplo resuelto antes del primer ejercicio. [Lecciones](#lecciones)
-- **Práctica que se queda.** Ejercicios que se corrigen al responder, un cuaderno con tus errores, tarjetas con
-  repetición espaciada y simulacros con la forma del examen real. [Práctica](#práctica)
-- **Una tutora que sabe lo que estás haciendo.** Pregúntale por el ejercicio que tienes delante o por el documento
-  abierto, y crea o cambia un curso con solo pedirlo. [Hablar con Aula](#hablar-con-aula)
-- **Siempre activa, si quieres.** Revisa tu plataforma y tu calendario, te recuerda las entregas y te deja un repaso
-  corto antes de un examen. Solo lee: nunca entrega nada por ti. [Todo lo demás](#todo-lo-demás)
-- **En tu iPad, tu iPhone y Android.** Tus cursos se quedan en tu Mac, o en un servidor tuyo sin Mac ninguno, y estudias
-  desde tus dispositivos. [Dispositivos](docs/DEVICES.md) · [Servidor](docs/SERVER.md)
-- **Privada y tuya.** Sin cuenta, sin rastreo, tus datos en tu ordenador y la IA que tú elijas, también una gratuita
-  que funciona sin conexión. [Privacidad](#privacidad)
+![El chat de Aula responde «¿Por qué cos 210° es negativo?»: cita los apuntes de la unidad 3 del estudiante, dice la página 3 y dibuja y = cos x con 210° marcado](docs/media/landing/tutor-es.jpg)
+
+<sub>Esta respuesta es de la IA simulada que usan las pruebas de Aula, sobre el curso de ejemplo (en inglés). Tu IA escribe la suya.</sub>
+
+### Cursos
+
+Lecciones cortas que te hacen pensar antes de darte la explicación, con figuras trazadas a partir de las matemáticas de
+verdad, ejemplos resueltos, ejercicios que se corrigen al momento y tarjetas con repetición espaciada.
+
+<p>
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="docs/media/landing/lesson-still.jpg">
+    <img src="docs/media/landing/lesson.gif" width="800" alt="Una lección de Aula: antes de seguir leyendo, el estudiante adivina el ángulo de referencia de 150°, elige 30° y recibe «¡Bien razonado!»; después una figura dibuja 150° y su ángulo de referencia de 30°">
+  </picture>
+</p>
+
+### Apuntes
+
+Aula convierte un curso en apuntes para imprimir: una guía de estudio, un resumen o una chuleta con las fórmulas y los
+errores que no debes cometer, en PDF o Word. Tus PDF se abren en un lector donde puedes subrayar y preguntar por una
+página.
+
+![El principio de una chuleta que Aula preparó para un examen de trigonometría: fórmulas a la izquierda y, a la derecha, errores típicos, cada uno con la respuesta mal, la buena y el porqué](docs/media/landing/notes-es.jpg)
+
+### Exámenes
+
+Un simulacro cronometrado con las mismas secciones, minutos y puntos que el examen de verdad. Al acabar tienes un informe
+por temas y un botón para practicar lo que fallaste. También puedes imprimir un examen de práctica.
+
+![El simulacro de Aula para un examen de trigonometría: 15 preguntas, 75 minutos y 100 puntos, secciones con los puntos del examen real y el botón para empezar](docs/media/landing/exam-es.jpg)
+
+## Mírala en 90 segundos
+
+<!-- El vídeo es la URL del adjunto sola en su línea: GitHub la convierte en un reproductor que también funciona para
+     quien no ha iniciado sesión. Una etiqueta <video src="…"> deja la URL de github.com, que esas visitas no pueden abrir. -->
+
+https://github.com/user-attachments/assets/7becaa0b-db21-4d95-b9d6-fc581fab9b4d
+
+<sub>Un curso entero, de principio a fin: se crea con cuatro archivos y después vienen una lección, un ejercicio que pilla
+un error típico, el cuaderno de errores, las tarjetas, un simulacro y el plan de hoy. Sin voz y con rótulos en inglés.
+¿No carga el reproductor? <a href="https://github.com/luumlabs/aula/raw/main/docs/media/demo/aula-demo-90s.mp4">Descarga el MP4 (9 MB)</a>.</sub>
+
+## Por qué Aula
+
+- **Cualquier asignatura, tu temario.** Cálculo, química orgánica, anatomía, un idioma, el examen de conducir. Con tus
+  materiales de clase, el curso sigue tu temario. Sin ellos, basta con algo como *Estadística para Psicología, final en
+  mayo*.
+- **Lee lo que ya tienes.** PDF, Word, PowerPoint, fotos de la pizarra, grabaciones de clase, enlaces o tu plataforma:
+  Moodle, Canvas, Blackboard, Google Classroom, Brightspace y más. Solo lee: nunca entrega nada por ti.
+- **Tu IA, o una gratis que funciona sin conexión.** La suscripción a Claude o ChatGPT que ya pagas, una clave de API o
+  un modelo local (llama.cpp, Ollama, LM Studio) en tu propio ordenador.
+- **Se acuerda por ti.** Tarjetas con repetición espaciada (FSRS), un cuaderno que te devuelve tus errores a los 1, 3,
+  7, 16 y 35 días, y un plan para hoy que empieza por lo que más te sube la nota.
+- **Donde estudies.** Windows, macOS y Linux. Si Aula está en un Mac o en un [servidor en casa](docs/SERVER.md),
+  también puedes abrirla desde tu [iPhone, tu iPad o tu Android](docs/DEVICES.md).
+
+Cada pantalla, herramienta y atajo: [docs/FEATURES.es.md](docs/FEATURES.es.md).
+
+<sub>Aula es joven y se hace en abierto. Si te parece útil, darle una estrella al repositorio (el botón Star, arriba del
+todo) ayuda a que otros estudiantes la encuentren.</sub>
+
+## Para empezar
+
+**Para usarla.** Descarga el instalador de tu sistema desde la
+[última versión](https://github.com/luumlabs/aula/releases/latest). Es gratis y no pide cuenta.
+
+- **Windows** 10 y 11 (x64 y ARM): `Aula-Setup-<versión>.exe`. Si aparece SmartScreen, pulsa *Más información →
+  Ejecutar de todas formas* (en Windows, Aula aún no está firmada).
+- **macOS** 13 o posterior (Apple Silicon e Intel): `Aula-<versión>-mac.dmg`. Arrastra Aula a *Aplicaciones* y
+  ábrela: va firmada con un Developer ID de Apple y notarizada.
+- **Linux** x64 y ARM64: la `.AppImage` (dale `chmod +x` y ábrela) o, en x64, el `.deb`
+  (`sudo apt install ./Aula-<versión>-linux-amd64.deb`).
+- **Android** 8 o posterior: `Aula-<versión>-android.apk`, una ventana a Aula funcionando en tu Mac o en
+  [tu propio servidor](docs/SERVER.md) (mira [Dispositivos](docs/DEVICES.md)).
+
+La primera vez, Aula te pregunta tu nombre, te ayuda a [elegir una IA](#elige-una-ia) y te da cursos de ejemplo para
+probarlo todo. Se actualiza sola (con el `.deb`, te avisa cuando sale una versión nueva). Paso a paso, cómo actualizar
+desde la 0.1.x, notas de Linux y qué hacer si algo falla: [docs/INSTALL.es.md](docs/INSTALL.es.md).
 
 > [!NOTE]
-> Aula está en acceso anticipado. Funciona, pero vas a encontrar fallos y detalles sin pulir, y las cosas cambiarán de
-> una versión a otra. Todavía no la uses como única preparación para un examen importante. Si algo falla,
-> [avísame](#informar-de-un-fallo-o-proponer-una-idea).
+> Aula está en acceso anticipado. Funciona, pero vas a encontrar fallos y detalles sin pulir, y las cosas cambian de una
+> versión a otra. Todavía no la uses como única preparación para un examen importante, y [avísame](#cómo-ayudar) si algo
+> falla.
 
-<p align="center">
-  <img src="docs/media/screenshots/home-light-es.png" width="1000" alt="La pantalla Hoy de Aula: un saludo con el plan y la meta del día, la racha, el próximo examen con su cuenta atrás y la nota estimada, el plan de hoy y un pequeño calendario de la semana">
-</p>
+**Desde el código** (Node.js 22.12 o posterior, y Git):
 
-## Descargar e instalar
+```bash
+git clone https://github.com/luumlabs/aula.git && cd aula
+npm install
+npm run dev
+```
 
-Descarga el archivo de tu sistema desde la [última versión](https://github.com/luumlabs/aula/releases/latest):
+El primer `npm run dev` descarga Electron y abre la app con recarga en caliente. ¿Sin clave de IA? Arráncala con
+`AULA_FAKE_AI=1 npm run dev` (en PowerShell, `$env:AULA_FAKE_AI=1; npm run dev`) y tendrás una simulada. Si además usas
+Aula a diario, apunta también `AULA_HOME` a una carpeta vacía, para que la versión de desarrollo tenga sus propios datos.
 
-| Sistema | Archivo | La primera vez |
-| --- | --- | --- |
-| macOS 13 o posterior (Apple Silicon e Intel) | `Aula-0.2.5-mac.dmg` | Abre el .dmg y arrastra Aula a *Aplicaciones*. Aula aún no está notarizada por Apple, así que la primera vez macOS te pide confirmarlo. En macOS 15 o posterior, intenta abrirla, ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa *Abrir igualmente*. En macOS 13 y 14, haz clic derecho en Aula y elige *Abrir*. |
-| Windows 10 y 11 (x64 y ARM, un solo instalador) | `Aula-Setup-0.2.5.exe` | Ejecuta el instalador (no pide permisos de administrador). Si aparece SmartScreen, pulsa *Más información → Ejecutar de todas formas*. Aula aún no está firmada. |
-| Linux x64 | `Aula-0.2.5-linux-x86_64.AppImage` o `Aula-0.2.5-linux-amd64.deb` | AppImage: hazla ejecutable (`chmod +x Aula-*.AppImage`) y ábrela. Debian o Ubuntu: `sudo apt install ./Aula-0.2.5-linux-amd64.deb`. |
-| Linux ARM64 | `Aula-0.2.5-linux-arm64.AppImage` | Hazla ejecutable (`chmod +x`) y ábrela. |
-| Android 8 o posterior (teléfonos y tabletas) | `Aula-0.2.5-android.apk` | Ábrela en el teléfono y permite instalar desde esa app cuando Android lo pregunte. Es una ventana a Aula en tu Mac o en [un servidor tuyo](docs/SERVER.md): mira [Dispositivos](docs/DEVICES.md). |
+## Elige una IA
 
-> **Si vienes de la 0.1.x:** instala la versión actual a mano esta única vez (descárgala aquí e instálala encima de tu
-> copia; tus cursos y ajustes se quedan). Aula 0.1.x dirá que la firma de la versión nueva no es válida: desde la 0.2.0
-> Aula va firmada con claves nuevas, porque las anteriores se perdieron. A partir de la 0.2.0, Aula vuelve a
-> actualizarse sola. En un
-> Mac, macOS vuelve a pedir una vez permiso para usar las claves guardadas de Aula.
+¿Ya pagas ChatGPT o Claude? Aula usa tu plan. Si no, puede instalarte una IA gratuita en tu ordenador que funciona sin
+conexión. Elige sola la mejor opción que encuentra, y puedes cambiarla cuando quieras en *Ajustes → Tu IA*. Sin ninguna
+IA puedes seguir estudiando los cursos de ejemplo y los que ya tengas.
 
-En Linux necesitas una distribución de 64 bits con glibc. Instala también GNOME Keyring o KWallet; si no, Aula tiene
-que guardar tus claves sin cifrar.
+- **Suscripción a Claude** (Pro o Max): la herramienta oficial `claude`, con la sesión iniciada. Incluido en tu plan.
+- **Suscripción a ChatGPT** (Plus o Pro): *Conectar con ChatGPT* en Aula (usa Codex, la herramienta oficial). Incluido
+  en tu plan.
+- **Un modelo en tu ordenador**: no hay que preparar nada. Aula te sugiere uno que quepa en tu RAM y descarga
+  `llama.cpp` y un modelo verificado. También detecta Ollama y LM Studio. Gratis y sin conexión.
+- **Una clave de API** de Anthropic, OpenAI, Google Gemini, OpenRouter, DeepSeek y más, o de cualquier servicio
+  compatible con OpenAI. Pagas al proveedor, con un límite diario si quieres.
 
-La primera vez que abres Aula te pregunta tu nombre, te ayuda a [elegir una IA](#elegir-una-ia) y, si quieres, conecta
-tu plataforma de estudio. Tu biblioteca empieza con dos cursos de ejemplo para que lo pruebes todo antes de crear los
-tuyos.
-
-**Actualizaciones.** Aula busca una versión nueva al arrancar y cada seis horas. La descarga en segundo plano,
-comprueba su firma y la instala al salir (o al pulsar *Reiniciar para actualizar* en la barra lateral). En macOS, deja Aula en
-*Aplicaciones* para que funcione; si una versión nueva no arranca, Aula vuelve a la anterior. La AppImage también se
-actualiza sola. El `.deb` no: Aula te avisa cuando sale una versión nueva, y
-descarga su `.deb` de las [versiones publicadas](https://github.com/luumlabs/aula/releases) e instálalo igual.
-
-<details>
-<summary><b>Si algo no funciona</b></summary>
-
-| Problema | Qué hacer |
-|---|---|
-| macOS no puede verificar al desarrollador, o no aparece *Abrir* | Mira la fila de macOS de arriba. En macOS 15 o posterior, *Abrir igualmente* solo aparece en *Privacidad y seguridad* después de intentar abrir Aula una vez. |
-| macOS dice que la app está dañada | Mueve Aula a *Aplicaciones* e inténtalo otra vez. Si sigue sin abrir, ejecuta `xattr -dr com.apple.quarantine /Applications/Aula.app` en el Terminal. |
-| macOS no instala una actualización | Comprueba que Aula está en *Aplicaciones* y no en *Descargas* ni abierta desde el .dmg. *Ajustes → Acerca de* explica qué pasó y te deja reintentarlo o descargar la actualización. |
-| La AppImage no arranca | Hazla ejecutable (`chmod +x`). Necesita FUSE 2: `sudo apt install libfuse2` (en Ubuntu 24.04 y posteriores, `libfuse2t64`). |
-| Ubuntu 23.10 o posterior, con la AppImage | Ubuntu restringe los espacios de nombres de usuario que necesita el aislamiento (*sandbox*) de Chromium, así que la AppImage arranca con ese aislamiento apagado. Aula funciona igual, pero las páginas que abre (tu plataforma de estudio, por ejemplo) quedan menos aisladas. En x64, mejor instala el `.deb`: mantiene el aislamiento porque instala el perfil de AppArmor que Ubuntu necesita. |
-| Aula no encuentra `claude` o `codex` | Instala la herramienta y ábrela una vez en un terminal para iniciar sesión. Después, *Ajustes → Tu IA* la encuentra. Para ChatGPT, *Conectar con ChatGPT* también puede descargar el Codex oficial por ti. |
-| Un curso se paró por un límite de uso | No se pierde nada. Ábrelo y pulsa *Reanudar* cuando se renueve tu límite, o quédate con lo que ya hay. |
-| *Ajustes → Acerca de* dice que tus claves no están cifradas | En Linux sin GNOME Keyring ni KWallet el sistema no puede cifrarlas. Instala uno y vuelve a iniciar sesión. |
-| Otra cosa | [Abre una incidencia](https://github.com/luumlabs/aula/issues/new/choose), en español o en inglés. |
-</details>
-
-## Elegir una IA
-
-Aula necesita un modelo de IA para escribir tus cursos y para hablar contigo. Elige sola el mejor que encuentra, y
-puedes cambiarlo cuando quieras en *Ajustes → Tu IA*. Sin IA puedes seguir estudiando los cursos de ejemplo y los que
-ya tengas.
-
-| Opción | Qué necesitas | Notas |
-| --- | --- | --- |
-| Suscripción a Claude (Pro o Max) | La herramienta oficial `claude`, con la sesión iniciada | Sin clave de API y sin coste extra. |
-| Suscripción a ChatGPT (Plus o Pro) | *Conectar con ChatGPT* en Aula | Usa Codex, la herramienta oficial de OpenAI. Aula puede descargarlo por ti y comprueba su SHA-256. |
-| Un modelo en tu ordenador | Nada. Aula mira cuánta RAM tiene tu ordenador y te sugiere un modelo que quepa | Un clic descarga el servidor oficial de `llama.cpp` y un modelo verificado (desde 1 GB hasta decenas de GB, según tu ordenador). Después es gratis y funciona sin conexión. También detecta Ollama y LM Studio. |
-| Una clave de API | Una clave de Anthropic, OpenAI, Google Gemini, OpenRouter, DeepSeek, Mistral, Groq, xAI, Xiaomi MiMo, OpenCode Zen o cualquier servicio compatible con OpenAI | Pagas directamente al proveedor. Aula te enseña lo que llevas gastado y puede pararse en un límite diario. Las claves se cifran con el llavero del sistema. |
-
-OpenCode también funciona, si está instalado y con la sesión iniciada.
-
-
-<p align="center">
-  <img src="docs/media/screenshots/settings-light-es.png" width="900" alt="Ajustes, Tu IA: Claude en uso con tu suscripción, un modelo gratis en este ordenador o una clave de API, y debajo tus plataformas y Aula siempre activa">
-</p>
+OpenCode también funciona, si está instalado y con la sesión iniciada. Más detalle:
+[docs/FEATURES.es.md](docs/FEATURES.es.md#tu-ia-en-detalle).
 
 <p align="center">
   <picture>
@@ -143,146 +166,16 @@ OpenCode también funciona, si está instalado y con la sesión iniciada.
   <sub>Los logos son marcas de sus dueños y solo sirven para identificar cada servicio (fuentes en <a href="THIRD_PARTY_NOTICES.md#ai-provider-logos">THIRD_PARTY_NOTICES.md</a>).</sub>
 </p>
 
-## Qué hace
+## Privacidad
 
-### Cursos
-
-Pulsa <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>N</kbd> y di qué quieres estudiar. Añade la fecha del examen si la hay, y los
-archivos que tengas: PDF, Word, PowerPoint, Excel, EPUB, páginas web, Markdown, archivos de texto o de código, enlaces,
-texto pegado, fotos de tus apuntes o de la pizarra (se leen con OCR) y grabaciones de audio o vídeo de una clase. Aula
-transcribe una grabación con los subtítulos que la acompañan o con el servicio de transcripción de una clave de API que
-hayas añadido, y cada cita la abre en el minuto en que se dijo. Aula también puede traer los materiales de tu
-plataforma de estudio.
-
-Después, un pequeño equipo de agentes monta el curso, y puedes verlos trabajar. Unos lectores leen tus materiales.
-Un planificador los convierte en un mapa de temas, dando más peso a lo que más pregunta el examen. Los autores escriben las
-lecciones, los ejercicios y las tarjetas, y un verificador vuelve a resolver cada ejercicio con respuesta comprobable
-sin mirar la solución. Cuando no
-coinciden, un árbitro decide y corrige la solución. Si tu IA llega a un límite de uso a mitad, el curso se guarda y
-pulsas *Reanudar* más tarde.
-
-Puedes seguir cambiando un curso cuando ya está hecho (*añade 10 ejercicios más difíciles de identidades*) y deshacer
-un cambio si no te convence.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/screenshots/create-light-es.png" alt="Curso nuevo: qué quieres estudiar, la fecha y el nivel del examen, tus materiales y el tamaño del curso"></td>
-    <td width="50%"><img src="docs/media/screenshots/course-light-es.png" alt="Un curso: la nota estimada con un cuadrado por tema, la cuenta atrás del examen, qué hacer ahora y el mapa del curso"></td>
-  </tr>
-</table>
-
-### Lecciones
-
-Puedes hacer una lección paso a paso (Aula explica, enseña un ejemplo y comprueba que lo has entendido antes de
-seguir), explorarla a tu aire o solo leerla. Las matemáticas se componen con KaTeX, también la notación química. Las
-lecciones pueden llevar gráficas con controles deslizantes, diagramas con etiquetas para practicar, moléculas en 3D
-con su geometría real, simulaciones, mapas, diagramas de flujo y diapositivas. Las imágenes vienen de Wikimedia Commons
-con su autor y su licencia, y Aula puede leerte cualquier lección en voz alta con las voces de tu sistema.
-
-<p align="center">
-  <img src="docs/media/screenshots/learn-light-es.png" width="900" alt="Una lección paso a paso: los ángulos de referencia explicados y después una pregunta para pensar antes de seguir leyendo">
-</p>
-
-### Práctica
-
-Aula corrige ella misma la mayoría de las respuestas, sin preguntar a la IA. Su motor matemático entiende fracciones,
-radicales, π y expresiones equivalentes, y hay 16 tipos de respuesta, desde opción múltiple y ecuaciones hasta
-etiquetar una figura o ajustar una reacción. Las respuestas abiertas se corrigen con una rúbrica. Cuando cometes un
-error típico, Aula lo reconoce y te explica por qué está mal. En los cursos de idiomas cuentan las tildes, así que
-*murio* no es *murió*. Lo que fallas va a un cuaderno de errores y vuelve a los 1, 3, 7, 16 y 35 días.
-
-Las tarjetas usan repaso espaciado con FSRS. Los simulacros copian la estructura de tu examen real (secciones, puntos,
-dificultad), van con cronómetro y terminan con un informe por tema y un botón para practicar lo que fallaste. La
-pantalla *Hoy* junta todo lo pendiente de tus cursos en un solo plan, empezando por lo que más sube tu nota.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/screenshots/cards-light-es.png" alt="Repasando una tarjeta"></td>
-    <td width="50%"><img src="docs/media/screenshots/exam-light-es.png" alt="Un simulacro en marcha: el cronómetro, las preguntas respondidas, la sección y un campo de respuesta con entrada matemática"></td>
-  </tr>
-</table>
-
-### Hablar con Aula
-
-<kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>2</kbd> abre un chat que conoce tus cursos, tu calendario y cómo vas. Dile *tengo un
-examen de inglés el lunes a las 10* y se ofrece a añadirlo a tu calendario y a montarte un curso. Ves cada paso según ocurre, y lo que vaya a cambiar algo espera a que lo apruebes. Puede ponerte cuestionarios y tarjetas en el propio chat,
-dibujar gráficas y fórmulas y citar tus materiales (pulsas una cita y el documento se abre en esa página).
-
-Cada ejercicio tiene además un tutor al lado. Ve el ejercicio y tu respuesta, y te da pistas sin soltarte la solución.
-
-<p align="center">
-  <img src="docs/media/screenshots/chat-light-es.png" width="900" alt="Un cuestionario rápido dentro del chat con Aula: una pregunta sobre dónde corta una parábola el eje x, respondida y corregida, con su explicación">
-</p>
-
-### Todo lo demás
-
-- **Calendario** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>3</kbd>): tus exámenes, las entregas de tu plataforma y tus propios
-  eventos en vista de mes, semana o agenda. Escribe los eventos con tus palabras (*laboratorio de física todos los
-  martes a las 4 hasta junio*), suscríbete a enlaces de calendario o importa y exporta archivos `.ics`. Cada examen
-  tiene un botón *Preparar este examen*.
-- **Herramientas** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>5</kbd>): calculadora, graficadora, tabla periódica, ayudas de
-  química, moléculas en 3D, conversor de unidades, temporizador Pomodoro, estadística, matrices, geometría,
-  simulaciones de física y una lista de fórmulas y constantes.
-- **Estadísticas**: tiempo de estudio, aciertos, un mapa de constancia de 12 semanas, dominio por tema, tu nota
-  estimada a lo largo del tiempo y dieciséis logros.
-- **Documentos**: convierte un curso en una guía de estudio, un resumen, una chuleta de una página, tarjetas para
-  imprimir, un examen de práctica o diapositivas, en PDF, Word o Markdown. Los PDF y las fotos se abren en un lector
-  donde puedes resaltar, tomar notas y preguntar por una página.
-- **Plataformas de estudio**: Canvas, Moodle, Blackboard, Google Classroom, Brightspace, Schoology, Microsoft Teams,
-  Sakai, itslearning, Open edX o cualquier web de clase. Inicias sesión una vez en el navegador de Aula y se queda
-  abierta. Aula solo lee: bloquea todo lo que entregaría un trabajo, empezaría un cuestionario, publicaría, borraría o
-  pagaría, y nunca escribe tu contraseña.
-- **Aula siempre activa** (opcional): con la ventana cerrada, Aula puede mandarte un resumen por la mañana, mirar tu
-  plataforma, recordarte las entregas y escribir un resumen semanal. Todo llega a *Novedades*, y se para hasta el día siguiente cuando gasta su presupuesto diario.
-- **Tu iPad y tu iPhone** (opcional, con Aula en un Mac): abre Aula desde tus dispositivos mientras tus cursos, tu IA y
-  tus datos se quedan en el Mac. En el iPad, la app entera; en el iPhone, Aula como tu asistente (lo que hizo, lo que
-  hay pendiente, el chat y el calendario). Los dispositivos llegan al Mac por tu red privada de Tailscale y se vinculan
-  una vez con un código. Desde ahí también puedes abrir el navegador de Aula en vivo: iniciar sesión en tu plataforma
-  estando fuera de casa, o hacer tú una tarea y pasársela a Aula para que la revise antes de enviarla. Un dispositivo
-  vinculado también abre Ajustes con la parte de uso diario (qué IA usar entre las que están listas en el Mac,
-  apariencia, idioma, *Aula siempre activa*, memoria); las claves, las plataformas y tus datos se gestionan en el Mac.
-  Más en [docs/DEVICES.md](docs/DEVICES.md). La app de Android funciona igual ([native/android](native/android/README.md)).
-- **Aula como servidor** (opcional): Aula sin ventana en un equipo siempre encendido (un servidor en casa, un NAS, un
-  contenedor Linux: `ghcr.io/luumlabs/aula-server`), y la usas solo desde tus dispositivos. El primero que vinculas es
-  su propietario y lleva desde ahí la IA, las plataformas y los dispositivos. Más en [docs/SERVER.md](docs/SERVER.md).
-- **Memoria**: Aula recuerda lo que le ayuda a enseñarte, por ejemplo cómo prefieres que te expliquen o qué te cuesta. Puedes
-  verlo, corregirlo, pausarlo o exportarlo todo en *Ajustes → Lo que Aula recuerda*.
-- **Buscar**: <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>K</kbd> encuentra pantallas, cursos y herramientas, y cualquier cosa
-  dentro de tus cursos.
-
-La interfaz está en español e inglés, y los cursos se pueden escribir en 12 idiomas. Tiene modo claro y oscuro, y las
-animaciones respetan el ajuste de *reducir movimiento* de tu sistema.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/screenshots/calendar-light-es.png" alt="El calendario en vista de mes"></td>
-    <td width="50%"><img src="docs/media/screenshots/stats-dark-es.png" alt="Estadísticas en modo oscuro: cifras de resumen, el mapa de constancia, minutos por día de la semana y aciertos por tema"></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/media/screenshots/tools-light-es.png" alt="Las herramientas: calculadora, graficadora, tabla periódica, química, moléculas en 3D, unidades, temporizador, estadística, matrices, geometría, física y fórmulas"></td>
-    <td width="50%"><img src="docs/media/screenshots/inbox-light-es.png" alt="Novedades: una tarea nueva encontrada en la plataforma, un aviso de entrega y el resumen de la mañana"></td>
-  </tr>
-</table>
+- Tus cursos, tu progreso, el calendario, los chats, los documentos, las notas y la memoria son archivos en tu
+  ordenador. Sin cuenta, sin anuncios, sin analíticas.
+- A la IA que elegiste solo va lo que necesita cada tarea, y con un modelo local no va nada. Las claves se cifran con el
+  llavero del sistema.
+- La política completa: [docs/PRIVACY.md](docs/PRIVACY.md#español).
 
 <details>
-<summary><b>Atajos de teclado</b></summary>
-
-<kbd>Ctrl</kbd> en Windows y Linux, <kbd>⌘</kbd> en macOS.
-
-| Atajo | Qué hace |
-| --- | --- |
-| <kbd>⌘</kbd> <kbd>K</kbd> | Buscar |
-| <kbd>⌘</kbd> <kbd>N</kbd> · <kbd>⌘</kbd> <kbd>O</kbd> | Curso nuevo · Importar un curso (`.aulapack`) |
-| <kbd>⌘</kbd> <kbd>1</kbd> … <kbd>7</kbd> | Hoy · Aula · Calendario · Estadísticas · Herramientas · Documentos · Novedades |
-| <kbd>⌘</kbd> <kbd>J</kbd> | Preguntar a Aula |
-| <kbd>⌘</kbd> <kbd>,</kbd> | Ajustes |
-| <kbd>⌘</kbd> <kbd>[</kbd> / <kbd>]</kbd> (macOS) · <kbd>Alt</kbd> <kbd>←</kbd> / <kbd>→</kbd> (Windows, Linux) | Atrás · Adelante |
-| Ejercicios | <kbd>Intro</kbd> comprobar · <kbd>A</kbd>–<kbd>Z</kbd> o <kbd>1</kbd>–<kbd>9</kbd> elegir una opción · <kbd>⌘</kbd> <kbd>Intro</kbd> entregar una respuesta abierta |
-| Tarjetas | <kbd>Espacio</kbd> girar · <kbd>1</kbd>–<kbd>4</kbd> valorar · <kbd>H</kbd> pista · <kbd>⌘</kbd> <kbd>Z</kbd> deshacer |
-| Simulacro | <kbd>Alt</kbd> <kbd>←</kbd> / <kbd>→</kbd> anterior / siguiente · <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>L</kbd> marcar |
-</details>
-
-## Privacidad
+<summary><b>Todo lo que puede salir de tu ordenador, y cuándo</b></summary>
 
 - Tus cursos, progreso, calendario, chats, documentos, notas y memoria se guardan en tu ordenador, en
   `~/Library/Application Support/Aula` (macOS), `%APPDATA%\Aula` (Windows) o `~/.config/Aula` (Linux). Puedes estudiar
@@ -307,28 +200,73 @@ animaciones respetan el ajuste de *reducir movimiento* de tu sistema.
 - *Ajustes → Privacidad y datos* abre tu carpeta de datos, lo exporta todo en un `.zip` (sin claves ni sesiones de tu
   plataforma) o borra todos tus datos.
 
-## Informar de un fallo o proponer una idea
+</details>
 
-Ahora mismo, los avisos de fallos son lo más útil que puedes mandar.
+## Cómo ayudar
 
-- Si algo falla, [abre un aviso de fallo](https://github.com/luumlabs/aula/issues/new?template=bug_report.yml). Cuenta
-  qué hiciste, qué esperabas y qué pasó, con tu sistema, la versión de Aula (*Ajustes → Acerca de*) y la IA que usas.
-  Una captura ayuda.
-- Si tienes una idea, [proponla aquí](https://github.com/luumlabs/aula/issues/new?template=idea.yml).
-- Las incidencias son públicas: no pegues nunca claves de API, contraseñas, enlaces privados de calendario ni nada
-  personal de tus cursos.
-- Los problemas de seguridad se avisan en privado. Mira [`SECURITY.md`](SECURITY.md).
+<a href="https://github.com/luumlabs/aula/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"><img src="https://img.shields.io/github/issues/luumlabs/aula/good%20first%20issue?style=flat-square&label=good%20first%20issues&color=B4502F" alt="Issues abiertos marcados good first issue"></a>
 
-## Compilar desde el código
+Aula se hace en abierto, y no hace falta ser experto para echar una mano.
 
-Necesitas **Node.js 22** (22.12 o posterior; también vale 20.19 o posterior) y Git.
+- **Elige un issue de los marcados [good first issue](https://github.com/luumlabs/aula/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).**
+  Son tareas pequeñas que dicen qué archivos tocar y cómo comprobarlo: un arreglo del conversor de unidades, fórmulas
+  nuevas, pruebas, una traducción. Comenta en el issue para que nadie más empiece el mismo.
+- **Cuéntame qué falla.** [Abre un aviso de fallo](https://github.com/luumlabs/aula/issues/new?template=bug_report.yml)
+  con lo que hiciste, lo que pasó, tu sistema, la versión de Aula (*Ajustes → Acerca de*) y tu IA. Los issues son
+  públicos: no pegues nunca claves, contraseñas, enlaces privados de calendario ni nada personal.
+- **Propón una idea** [aquí](https://github.com/luumlabs/aula/issues/new?template=idea.yml).
+- **Traduce.** La interfaz está en inglés y en español. Los issues con la etiqueta
+  [translation](https://github.com/luumlabs/aula/labels/translation) son una buena forma de empezar.
+- **Cuéntaselo a alguien que esté estudiando**, o compártela en el grupo de tu clase. Ayuda más de lo que parece.
+- **Apóyala** con [GitHub Sponsors](https://github.com/sponsors/luumlabs), cada mes o una sola vez. Aula es gratis y lo
+  seguirá siendo.
 
-```bash
-git clone https://github.com/luumlabs/aula.git
-cd aula
-npm install                 # .npmrc ya pone legacy-peer-deps
-npm run dev                 # la app con recarga en caliente
+Para trabajar en el código, [ejecútala desde el código fuente](#para-empezar): son tres comandos y, con
+`AULA_FAKE_AI=1`, tienes una IA simulada sin necesidad de clave. Después, empieza por [CONTRIBUTING.md](CONTRIBUTING.md)
+y [Cómo está hecha](#cómo-está-hecha). Los problemas de seguridad se avisan en privado: mira [SECURITY.md](SECURITY.md).
+
+## Comunidad
+
+Aula crece en público. Si quieres seguir el proyecto, ver cómo va o preguntar algo que no sea un fallo, estoy en Reddit
+como [u/astrolafi](https://www.reddit.com/user/astrolafi).
+
+## Cómo está hecha
+
+Aula es una app de Electron escrita en TypeScript y React. La misma app funciona sin ventana como servidor
+([`--server` o la imagen de Docker](docs/SERVER.md)), y las apps del móvil y la tableta son ventanas a ella.
+
+```mermaid
+flowchart LR
+  subgraph app["Aula · escritorio o --server"]
+    direction LR
+    ui["Interfaz<br/>React · src/renderer"]
+    preload["Puente preload<br/>src/preload"]
+    shell["Proceso principal<br/>src/main/electron"]
+    services["Servicios<br/>src/main/services"]
+    engine["Motor de estudio<br/>src/engine"]
+    ui -->|"IPC tipado"| preload --> shell --> services
+    ui -.-> engine
+    services -.-> engine
+  end
+  phones["iPhone · iPad · Android<br/>native/"] -->|"Tailscale"| shell
+  cli["Agentes CLI<br/>Claude Code · Codex · OpenCode"] -->|"stdio"| mcp["Puente MCP<br/>src/main/mcp"] --> services
+  services -->|"JSON"| data[("Tu carpeta de datos")]
+  services -->|"peticiones"| ai["Tu IA<br/>clave de API · llama.cpp · Ollama"]
+  services -->|"solo lectura"| lms["Plataformas de estudio<br/>Moodle · Canvas · Blackboard"]
 ```
+
+<details>
+<summary><b>Dónde está cada cosa, comandos y variables de entorno</b></summary>
+
+| Carpeta | Qué hay |
+| --- | --- |
+| `src/renderer` | La interfaz en React. Todo texto pasa por i18n (`i18n/locales/{en,es}`) |
+| `src/preload` | El único puente entre la interfaz y el proceso principal (`window.aula`), con `contextIsolation` y sandbox |
+| `src/main/electron` | El único código que importa Electron: ventanas, el IPC tipado, el llavero, actualizaciones, el servidor de dispositivos |
+| `src/main/services` | Node sin Electron: cursos, proveedores de IA, los agentes que crean los cursos, la tutora, importación, plataformas |
+| `src/engine` | TypeScript puro compartido por los dos lados: corrección, matemáticas exactas, FSRS, química, el validador de cursos |
+| `src/main/mcp` | El puente MCP con el que Claude Code, Codex y OpenCode usan las herramientas de Aula |
+| `native/` · `server/` | Las apps de iPhone/iPad y Android, el proceso auxiliar de Tailscale y Aula como servidor sin ventana (`--server`, Docker) |
 
 | Comando | Qué hace |
 | --- | --- |
@@ -338,8 +276,8 @@ npm run dev                 # la app con recarga en caliente
 | `npm run e2e` | Compila y pasa las pruebas de extremo a extremo con la app Electron real y una IA simulada (en Linux, ponle delante `xvfb-run -a`) |
 | `npm run dist:mac` · `dist:win` · `dist:linux` | Instaladores en `release/` |
 
-Variables de entorno útiles: `AULA_HOME` (otra carpeta de datos), `AULA_FAKE_AI=1` (una IA simulada, para pruebas) y
-`AULA_NO_UPDATES=1`. Cómo publicar una versión está en [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+Variables de entorno útiles: `AULA_HOME` (otra carpeta de datos), `AULA_FAKE_AI=1` (una IA simulada) y
+`AULA_NO_UPDATES=1`.
 
 La app está hecha con Electron 44, React 19, TypeScript y Tailwind CSS 4. El motor de estudio de `src/engine`
 (corrección, matemáticas exactas, FSRS, química, el validador de cursos) es TypeScript puro, sin Node, y lo usan tanto el proceso principal como la interfaz. Los servicios de Node de `src/main/services` se ocupan de los cursos, los
@@ -347,18 +285,11 @@ proveedores de IA, los agentes, el asistente, las automatizaciones, la importaci
 solo `src/main/electron` habla con Electron. La interfaz y el proceso principal se comunican por un único canal IPC con
 tipos, con `contextIsolation`, sandbox y una CSP estricta. Hay más notas técnicas en [`CLAUDE.md`](CLAUDE.md) (en inglés).
 
-Las *pull requests* son bienvenidas. Lee antes [`CONTRIBUTING.md`](CONTRIBUTING.md).
+</details>
 
-## Comunidad
-
-Aula crece en público. Si quieres seguir el proyecto, ver cómo va o preguntar algo que no sea un fallo, estoy en
-Reddit como [u/astrolafi](https://www.reddit.com/user/astrolafi).
-
-## Apoya a Aula
-
-Aula es gratis y lo seguirá siendo. Si te ayuda y quieres apoyar su desarrollo, puedes hacerlo con
-[GitHub Sponsors](https://github.com/sponsors/luumlabs), cada mes o una sola vez. Dar una
-estrella al repositorio, avisar de fallos y contárselo a alguien que esté estudiando también ayuda mucho.
+Antes de abrir una *pull request*, lee [CONTRIBUTING.md](CONTRIBUTING.md). Las reglas del código, los contratos de IPC y
+los formatos de datos están en [CLAUDE.md](CLAUDE.md) (en inglés), y cómo publicar una versión en
+[docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Gracias
 

@@ -1,7 +1,7 @@
 # Empaquetado de Aula (electron-builder). `npm run dist:mac|win|linux`.
-# Firma: la 0.2.5 conserva el certificado local para que las copias existentes puedan instalar el puente.
-# La posterior transición a Developer ID requiere cambiar esta configuración y verificar la notarización del ZIP;
-# no basta con que exista un certificado en el llavero. Ver docs/PUBLISHING.md → The macOS signing bridge.
+# Firma de macOS desde 0.2.6: Developer ID Application del equipo 87BM9KFJZW, hardened runtime, sello de tiempo seguro
+# de Apple y notarización grapada. scripts/release-local.sh fija la identidad por su SHA-1 y comprueba las credenciales
+# del notario antes de compilar; la 0.2.5 (certificado local) es el puente inmutable. docs/PUBLISHING.md → Signing.
 appId: com.luumlabs.aula
 productName: Aula
 copyright: Copyright © 2026 Luum Labs
@@ -69,13 +69,14 @@ mac:
   # de los tamaños pequeños.
   extendInfo:
     CFBundleIconName: Icon
-  # Sin certificado Developer ID: identity "-" y scripts/build/mac-sign.cjs firma con el certificado propio y estable
-  # «Aula Local Signing» (~/.aula-signing/) si está, o ad hoc si no (mismo requisito designado en todas las versiones: macOS
-  # no vuelve a pedir el llavero tras actualizar; A1-P1-5). Sin «hardened runtime» (sin certificado de Apple, la validación
-  # de bibliotecas podría impedir que la app arranque). Con Developer ID: quitar `identity` y `sign`, hardenedRuntime: true.
-  identity: "-"
-  sign: scripts/build/mac-sign.cjs
-  hardenedRuntime: false
+  # Developer ID. Sin `identity`: scripts/release-local.sh pasa -c.mac.identity=<SHA-1> de la única «Developer ID
+  # Application: … (87BM9KFJZW)» válida (un nombre podría acabar en «Apple Distribution» del mismo equipo). Nunca
+  # `identity: "-"`, null ni un `sign` propio: las copias 0.2.5 solo aceptan ese equipo (updates/mac-trust.ts).
+  # forceCodeSigning solo en mac (Windows sigue sin firmar): sin identidad falla en vez de salir sin firma. Sin
+  # `timestamp` = sello seguro de Apple. Notariza con APPLE_KEYCHAIN_PROFILE (el guion lo exporta y lo prueba antes).
+  # allow-jit en la app y en los helpers (Electron y el WASM del OCR lo necesitan con hardened runtime).
+  hardenedRuntime: true
+  forceCodeSigning: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
@@ -92,6 +93,7 @@ mac:
     - target: zip
       arch: [universal]
 dmg:
+  # sin firmar: un DMG firmado y sin notarizar es peor que uno sin firma; la app de dentro ya va notarizada y grapada
   sign: false
   artifactName: Aula-${version}-mac.${ext}
   contents:
@@ -133,5 +135,5 @@ publish:
   releaseType: draft
 # título y notas de la versión (inglés y español); al publicar otra versión, apuntar a sus notas
 releaseInfo:
-  releaseName: Aula 0.2.5
-  releaseNotesFile: docs/release-notes/0.2.5.md
+  releaseName: Aula 0.2.6
+  releaseNotesFile: docs/release-notes/0.2.6.md

@@ -69,8 +69,9 @@ export interface AppInfo {
   locale: string
   isPackaged: boolean
   electron: string
-  /** 'basic' = los secretos no tienen cifrado del sistema (Linux sin llavero): se avisa en Ajustes. */
-  secretProtection: 'os' | 'basic'
+  /** 'basic' = los secretos no tienen cifrado del sistema (Linux sin llavero): se avisa en Ajustes. 'unavailable' = macOS o
+   *  Windows sin llavero ahora mismo: no se guarda nada (nunca en claro) y lo explica el aviso de la barra lateral. */
+  secretProtection: 'os' | 'basic' | 'unavailable'
 }
 
 export const RPC_CHANNEL = 'aula:rpc'

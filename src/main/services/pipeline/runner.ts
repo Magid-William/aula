@@ -419,10 +419,20 @@ export class GenerationPipeline {
     })
   }
 
+  private planSummary(pack: Pack): string {
+    return tr(`${pack.skills.length} habilidades en ${pack.units.length} unidades`, `${pack.skills.length} skills in ${pack.units.length} units`)
+  }
+
   private async planStage(): Promise<void> {
-    if (this.state.stages.plan === 'done') {
-      const p = this.loadPack()
-      if (p.skills.length) { this.seedSkillStates(p); this.stage('plan', 'done', this.state.summaries.plan || tr('Plan ya hecho', 'Plan already done')); return }
+    // una creación empieza con el curso vacío: si ya hay habilidades, el planificador de esta ejecución guardó el plan
+    // (aunque se cortara después, en el simulacro o en `finish`). Volver a planificar al reanudar duplicaba temas con otros ids;
+    // lo que falte del simulacro lo completa la etapa transversal.
+    const saved = this.loadPack()
+    if (saved.skills.length) {
+      this.seedSkillStates(saved)
+      const kept = this.state.stages.plan === 'done' ? this.state.summaries.plan : undefined
+      this.stage('plan', 'done', kept || this.planSummary(saved))
+      return
     }
     if (usesTeam(this.state.request)) await this.readStep()
     this.stage('plan', 'running', tr('Leyendo tus materiales y diseñando el curso', 'Reading your materials and designing the course'))
@@ -438,7 +448,7 @@ export class GenerationPipeline {
     }
     const pack = this.loadPack()
     this.seedSkillStates(pack)
-    this.stage('plan', 'done', tr(`${pack.skills.length} habilidades en ${pack.units.length} unidades`, `${pack.skills.length} skills in ${pack.units.length} units`))
+    this.stage('plan', 'done', this.planSummary(pack))
   }
 
   /** Reunir materiales de la plataforma de estudio antes de planificar. */

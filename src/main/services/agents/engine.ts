@@ -34,6 +34,8 @@ export interface CLIFailure {
   message: string
   kind?: AgentErrorKind
   retryAfter?: number
+  /** Estado HTTP que dio la CLI (402 = sin saldo). */
+  status?: number
 }
 
 export type CLIConclusion = { type: 'finished'; result: AgentResult } | { type: 'failed'; failure: CLIFailure } | { type: 'noResult' }
@@ -249,8 +251,8 @@ export async function runCLI(invocation: CLIInvocation, parser: CLIEventParser, 
   if (timedOut && !sawTerminal) {
     const stall = parser.stallFailure?.()
     if (stall) {
-      const classified = classifier.classify(stall.message, stall.kind, stall.retryAfter)
-      if (classified.kind === 'rateLimited' || classified.kind === 'notLoggedIn') throw classified
+      const classified = classifier.classify(stall.message, stall.kind, stall.retryAfter, { status: stall.status })
+      if (classified.kind === 'rateLimited' || classified.kind === 'notLoggedIn' || classified.status === 402) throw classified
     }
     const took = humanDuration(options.timeoutMs / 1000)
     let message = tr(`${classifier.cliName} tardó más de ${took} y se detuvo.`, `${classifier.cliName} took longer than ${took} and was stopped.`)
@@ -265,7 +267,8 @@ export async function runCLI(invocation: CLIInvocation, parser: CLIEventParser, 
     return
   }
   if (conclusion.type === 'failed') {
-    throw classifier.classify(conclusion.failure.message, conclusion.failure.kind, conclusion.failure.retryAfter)
+    const f = conclusion.failure
+    throw classifier.classify(f.message, f.kind, f.retryAfter, { status: f.status })
   }
   throw noResultError(classifier, exit, stderrText, parser.unparsedSample)
 }

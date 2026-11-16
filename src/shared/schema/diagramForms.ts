@@ -1,6 +1,6 @@
 // Formas ya hechas de los diagramas (pirámide, embudo, Venn, mapa mental) y los matices del bloque «comparar» (filas clave o
 // iguales, modo analogía). Campos opcionales: una versión anterior de la app dibuja la forma con su `kind` de base (capas,
-// mapa conceptual o árbol) y lee la comparación como siempre.
+// mapa conceptual o árbol) y lee la comparación como siempre; si vuelve a guardar la habilidad, pierde estos campos.
 // Idea de las formas: Sketchy (https://github.com/ddkbs/sketchy), MIT © 2026 ddkbs: src/figures/types.ts TemplateKind.
 import type { DiagramKind } from './blocks'
 import { ownValue } from './coding'

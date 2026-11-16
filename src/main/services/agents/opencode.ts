@@ -62,7 +62,7 @@ export class OpenCodeEventParser implements CLIEventParser {
   private steps = 0
   private usage = emptyUsage()
   private lastReason?: string
-  private readonly errors: { message: string; kind?: AgentErrorKind }[] = []
+  private readonly errors: CLIFailure[] = []
   private readonly unparsed: string[] = []
 
   constructor(
@@ -178,20 +178,24 @@ export class OpenCodeEventParser implements CLIEventParser {
     const status = int(get(error, 'data', 'statusCode'))
     let kind: AgentErrorKind | undefined
     if (name === 'ProviderAuthError' || status === 401 || status === 403) kind = 'notLoggedIn'
+    else if (status === 402) kind = 'http' // sin saldo en el proveedor: `classify` lo da como `ai_quota`
     else if (status === 429) kind = 'rateLimited'
     else if (name === 'ContextOverflowError') kind = 'badResponse'
-    this.errors.push({ message, kind })
+    this.errors.push({ message, kind, status })
   }
 
   /** El último error que anunció OpenCode (sin sesión, 429…), si se quedó sin responder. */
   stallFailure(): CLIFailure | undefined {
-    const last = this.errors[this.errors.length - 1]
-    return last ? { message: last.message, kind: last.kind } : undefined
+    // como en conclude(): sin saldo (402) manda sobre el último error
+    const last = this.errors.find((e) => e.status === 402) ?? this.errors[this.errors.length - 1]
+    return last ? { message: last.message, kind: last.kind, status: last.status } : undefined
   }
 
   conclude(): CLIConclusion {
     if (this.errors.length > 0) {
-      return { type: 'failed', failure: { message: this.errors.map((e) => e.message).join('\n'), kind: this.errors[0].kind } }
+      // sin saldo (402) manda sobre el primer error: esperar o reintentar no lo arregla
+      const main = this.errors.find((e) => e.status === 402) ?? this.errors[0]
+      return { type: 'failed', failure: { message: this.errors.map((e) => e.message).join('\n'), kind: main.kind, status: main.status } }
     }
     if (!this.started || !this.lastReason || !this.lastReason.trim()) return { type: 'noResult' }
     let stopReason = 'stop'

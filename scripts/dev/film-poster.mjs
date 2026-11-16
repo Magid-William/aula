@@ -1,5 +1,5 @@
-// El póster de la película para el README (docs/media/film-poster.png, 1600×900): un fotograma del máster con la
-// insignia «Watch the film · m:ss». Se hace con el Electron del proyecto (sin dependencias):
+// El póster de la película (docs/media/film-poster.png, 1600×900; el README ya no lo usa): un fotograma del máster
+// con la insignia «Watch the film · m:ss». Se hace con el Electron del proyecto (sin dependencias):
 //   node scripts/video/render.ts scripts/video/montage/aula-v6-film.ts --reuse --stills 10.4      (el fotograma)
 //   npx electron scripts/dev/film-poster.mjs scripts/video/work/aula-v6-film/stills/aula-v6-film-10.40.png 2:12 [salida.png]
 import { app, BrowserWindow } from 'electron'

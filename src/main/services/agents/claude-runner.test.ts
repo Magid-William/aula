@@ -314,6 +314,24 @@ describe('ClaudeCodeRunner · errores', () => {
     expect(run.finished).toBeUndefined()
   })
 
+  it('sin saldo (clave de API): `billing_error` da `ai_quota`', async () => {
+    const lines = [E.initEvent(), E.assistant('m', [E.textBlock('Credit balance is too low')], 'billing_error'), E.result({ isError: true, text: 'Credit balance is too low' })]
+    const cli = new FakeCLI(makeTempDir(), { stdout: lines.join('\n') + '\n', exitCode: 1 })
+    const run = await collect(runner(cli).run(task()))
+    expect(agentError(run.error)).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    expect(run.finished).toBeUndefined()
+  })
+
+  it('tope de gasto de Anthropic (clave de API): `ai_quota` con su consejo, no un límite de uso que se espera', async () => {
+    const text = 'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC."}}'
+    const lines = [E.initEvent(), E.assistant('m', [E.textBlock(text)], 'invalid_request'), E.result({ isError: true, text })]
+    const cli = new FakeCLI(makeTempDir(), { stdout: lines.join('\n') + '\n', exitCode: 1 })
+    const run = await collect(runner(cli).run(task()))
+    expect(agentError(run.error)).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    expect(agentError(run.error)?.message).toContain('tope de gasto')
+    expect(run.finished).toBeUndefined()
+  })
+
   it('límite de uso con la espera en el mensaje', async () => {
     const lines = [E.initEvent(), E.assistant('m', [E.textBlock("You've hit your limit · try again in 2 hours 30 minutes")], 'rate_limit'), E.result({ isError: true, text: "You've hit your limit · try again in 2 hours 30 minutes" })]
     const cli = new FakeCLI(makeTempDir(), { stdout: lines.join('\n') + '\n', exitCode: 1 })

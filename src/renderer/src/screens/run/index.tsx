@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedNumber, AulaMark, Button, Card, Companion, ConfirmDialog, CourseIcon, EmptyState, Icon, PixelMedal, ProgressBar, ProviderLogo, SectionTitle, Spinner, TextField, cx, logoForText, pixelBurst, spring, toneForHue, useMarkPhase, toast, useTheme } from '@renderer/design'
+import { AnimatedNumber, AulaMark, Button, Card, Companion, ConfirmDialog, CourseIcon, EmptyState, Icon, PixelMedal, ProgressBar, ProviderLogo, SectionTitle, Spinner, TextField, cx, logoForText, pixelBurst, spring, toneForHue, useMarkPhase, useTheme } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import type { GenerationStage, RunView, SkillRunStatus } from '@shared/generation/types'
 import { GENERATION_STAGES } from '@shared/generation/types'
@@ -19,6 +19,7 @@ import { percentSuffix } from '@renderer/lib/format'
 import { LimitNotice, StudyReadyButton } from '../course/StudyWhileBuilding'
 import { demoRun } from './demo'
 import { doneSummary, readySkills, shownSkillStatus, type SummaryItem } from './summary'
+import { runStoppedAction, type StoppedAction } from './actions'
 
 function useRun(id: string): RunView | null | undefined {
   const [run, setRun] = useState<RunView | null | undefined>(undefined)
@@ -67,6 +68,8 @@ export default function RunScreen() {
   // el brillo de la etapa en marcha: también en reposo, pero no con la ventana sin ver (design/ambient.ts)
   const live = useAmbient('activity')
   const [confirmStop, setConfirmStop] = useState(false)
+  // «Reanudar» o «Quedarme con lo que hay» en curso: el botón gira y no se pide dos veces
+  const [busy, setBusy] = useState<StoppedAction | null>(null)
   useScreenTitle(run?.title ?? t('title'), null, [run?.title])
   if (run === undefined)
     return (
@@ -92,6 +95,12 @@ export default function RunScreen() {
   const stopped = run.state === 'limit' || run.state === 'failed' || run.state === 'paused'
   const studyNow = run.mode === 'create' && ready.size > 0 && (working || stopped)
   const quota = run.state === 'limit' && run.errorCode === 'ai_quota'
+  // si falla (sin proveedor, sin clave…), runStoppedAction lo avisa: el error no se pierde (R4)
+  const act = (kind: StoppedAction): void => {
+    if (busy) return
+    setBusy(kind)
+    void runStoppedAction(kind, run.id).finally(() => setBusy(null))
+  }
 
   return (
     <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-2 pb-24">
@@ -127,11 +136,13 @@ export default function RunScreen() {
               {studyNow && <StudyReadyButton packId={run.packId} ready={ready.size} size="md" />}
               {stopped ? (
                 <>
-                  <Button variant={studyNow ? 'secondary' : 'primary'} onClick={() => void api.invoke('generation.resume', { id: run.id })}>
+                  <Button variant={studyNow ? 'secondary' : 'primary'} loading={busy === 'resume'} disabled={!!busy} onClick={() => act('resume')}>
                     {t('resume')}
                   </Button>
                   {courseSkills !== 0 && (
-                    <Button onClick={() => void api.invoke('generation.keep', { id: run.id }).catch((e: unknown) => toast.error(t('keepFailed'), (e as Error).message))}>{t('keep')}</Button>
+                    <Button loading={busy === 'keep'} disabled={!!busy} onClick={() => act('keep')}>
+                      {t('keep')}
+                    </Button>
                   )}
                 </>
               ) : working ? (

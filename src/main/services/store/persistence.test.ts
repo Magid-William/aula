@@ -91,7 +91,7 @@ describe('claves desconocidas', () => {
     expect(keepUnknownKeys({ id: 'a' }, 'no es un objeto', roundTrip)).toEqual({ id: 'a' })
   })
 
-  it('abrir y guardar un curso de una versión más nueva no pierde lo que esta no entiende', () => {
+  it('abrir y guardar un curso de una versión más nueva conserva las claves de PRIMER NIVEL que esta no entiende', () => {
     const store = new Library(root).createPack(makePack({ id: 'nuevo', title: 'Nuevo' }))
     store.saveSkill(makeSkill({ id: 's1', title: 'Uno' }))
     store.updateProgress((p) => { p.xp = 5 })
@@ -108,6 +108,24 @@ describe('claves desconocidas', () => {
     expect((raw(store.progressPath) as Record<string, unknown>).futuroProgreso).toBeDefined()
     expect(store.loadPack().title).toBe('Cambiado')
     expect(store.loadProgress().xp).toBe(6)
+  })
+
+  // El límite que cuenta jsonFile.ts: si algún día se conservan las anidadas, cambia también ese comentario.
+  it('solo el primer nivel: lo nuevo dentro de un bloque lo pierde esta versión al reescribir la habilidad', () => {
+    const store = new Library(root).createPack(makePack({ id: 'nuevo', title: 'Nuevo' }))
+    store.saveSkill(makeSkill({ id: 's1', title: 'Uno' }))
+    const o = raw(store.skillPath('s1')) as Record<string, unknown>
+    o.futuraHabilidad = { versión: 9 }
+    o.lesson = [{ type: 'map', id: 'm1', title: 'UE', futuroMapa: [{ name: 'Francia' }] }]
+    writeFileSync(store.skillPath('s1'), JSON.stringify(o))
+    // solo leer no toca el archivo
+    expect(store.loadSkill('s1').lesson).toHaveLength(1)
+    expect(((raw(store.skillPath('s1')) as { lesson: Array<Record<string, unknown>> }).lesson[0]).futuroMapa).toBeDefined()
+    store.updateSkill('s1', (s) => { s.title = 'Uno bis' })
+    const after = raw(store.skillPath('s1')) as { futuraHabilidad?: unknown; lesson: Array<Record<string, unknown>> }
+    expect(after.futuraHabilidad).toEqual({ versión: 9 })
+    expect(after.lesson[0]).toMatchObject({ type: 'map', title: 'UE' })
+    expect(after.lesson[0].futuroMapa).toBeUndefined()
   })
 })
 
