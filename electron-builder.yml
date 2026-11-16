@@ -93,7 +93,8 @@ mac:
     - target: zip
       arch: [universal]
 dmg:
-  # sin firmar: un DMG firmado y sin notarizar es peor que uno sin firma; la app de dentro ya va notarizada y grapada
+  # sin firmar aquí: electron-builder lo firmaría sin notarizar. Lo firma, lo notariza y le grapa el ticket
+  # scripts/release-mac-dmg.mjs (release-local.sh), que también rehace su .blockmap y su entrada de latest-mac.yml
   sign: false
   artifactName: Aula-${version}-mac.${ext}
   contents:

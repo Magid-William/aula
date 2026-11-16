@@ -30,7 +30,7 @@ export function developerIdConfigProblems(config, readText = (path) => readFileS
   if (mac.timestamp !== undefined) problems.push(`mac.timestamp (${JSON.stringify(mac.timestamp)}): quítalo, sin él se usa el sello seguro de Apple`)
   if (mac.notarize === false) problems.push('mac.notarize: false se salta la notarización')
   if (mac.type !== undefined && mac.type !== 'distribution') problems.push(`mac.type (${JSON.stringify(mac.type)}): solo distribution`)
-  if (config.dmg?.sign === true) problems.push('dmg.sign: un DMG firmado y sin notarizar es peor que uno sin firma')
+  if (config.dmg?.sign === true) problems.push('dmg.sign: electron-builder lo firmaría sin notarizar; el DMG lo firma, notariza y grapa scripts/release-mac-dmg.mjs')
   for (const key of ['entitlements', 'entitlementsInherit']) {
     const path = mac[key]
     if (typeof path !== 'string' || !path) { problems.push(`mac.${key}: falta`); continue }

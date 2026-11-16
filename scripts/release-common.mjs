@@ -15,6 +15,8 @@ export const MANIFEST = join(ROOT, 'resources/updates/mac-bridge-0.2.5.json')
 export const LEGACY_PIN = '26061b07d114b31e63193681c2909e1343076926'
 export const DEVELOPER_TEAM = '87BM9KFJZW'
 export const BUNDLE_ID = 'com.luumlabs.aula'
+// 0.2.6 publicó el DMG sin firmar (la app de dentro sí, notarizada); desde aquí release-mac-dmg.mjs firma el DMG
+export const SIGNED_DMG_VERSION = '0.2.7'
 export const BRIDGE_FILES = [LEGACY_FEED, `Aula-${BRIDGE_VERSION}-mac.zip`, `Aula-${BRIDGE_VERSION}-mac.zip.blockmap`, `Aula-${BRIDGE_VERSION}-mac.dmg`, `Aula-${BRIDGE_VERSION}-mac.dmg.blockmap`]
 
 export function publicKeys(root = ROOT) {
@@ -85,12 +87,21 @@ export async function verifyMetadata(dir, name, { version, keys = publicKeys(), 
   return info
 }
 
-export function macMode(version) {
-  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`Versión estable no válida: ${version}`)
-  const parts = version.split('.').map(Number), bridge = BRIDGE_VERSION.split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    if (parts[i] > bridge[i]) return 'developer-id'
-    if (parts[i] < bridge[i]) return 'legacy'
+/** -1, 0 o 1 entre dos versiones estables «x.y.z». */
+export function compareVersions(a, b) {
+  const parse = (version) => {
+    if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`Versión estable no válida: ${version}`)
+    return version.split('.').map(Number)
   }
-  return 'bridge'
+  const x = parse(a), y = parse(b)
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1
+  return 0
 }
+
+export function macMode(version) {
+  const order = compareVersions(version, BRIDGE_VERSION)
+  return order > 0 ? 'developer-id' : order < 0 ? 'legacy' : 'bridge'
+}
+
+/** ¿El DMG mismo (no solo la app de dentro) va firmado con Developer ID, notarizado y grapado? Desde 0.2.7. */
+export const signedDmg = (version) => compareVersions(version, SIGNED_DMG_VERSION) >= 0

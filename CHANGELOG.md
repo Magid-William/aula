@@ -5,6 +5,10 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 
 ## [Unreleased]
 
+### Mac signing
+- **The Mac `.dmg` download is now signed and notarized by Apple too**, not just the app inside it, so macOS can check
+  the download itself before opening it, even offline.
+
 ## [0.2.6] - 2026-11-16
 
 ### New
