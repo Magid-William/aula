@@ -112,7 +112,7 @@ test('A4-P1-5 · en inglés la bandeja se llama «Inbox» (no «Updates»), filt
 test('A4-P1-6 · la píldora de las pestañas es una sola, va antes (debajo) de las etiquetas y acaba en la elegida', async () => {
   const { app, page } = await launch({ home: home() })
   await go(page, { name: 'course', id: C })
-  await page.getByRole('tab', { name: 'Practice', exact: true }).click()
+  await page.getByRole('tab', { name: 'Review', exact: true }).click()
   await page.waitForTimeout(600)
   const r = await js<{ pills: number; first: boolean; dx: number; dw: number }>(page, `(() => {
     const list = [...document.querySelectorAll('main [role="tablist"]')].find((l) => l.querySelector('[data-tab-pill]'))

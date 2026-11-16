@@ -18,6 +18,7 @@ import type { ChemCheck } from '@engine/chem/types'
 import { AnswerChecker } from './math-bridge'
 import { textMatchOptions as defaultTextOptions } from '@engine/math'
 import { L } from './messages'
+import { tr } from '@engine/math/core/i18n'
 import { EXACT_TEXT_OPTIONS, nearMissGrade } from './exact-text'
 import {
   answerInputIsEmpty, feedbackLine, invalidGrade, makeGrade, sanitizedGrade, withReview,
@@ -41,8 +42,8 @@ export function gradeAnswer(answer: Answer, input: AnswerInput, wrongs: readonly
   switch (a.kind) {
     case 'choice': if (input.kind === 'choice') return gradeChoice(a, input.ids, lang); break
     case 'truefalse': if (input.kind === 'bool') return a.value === input.value ? makeGrade('correct', 1) : makeGrade('incorrect', 0); break
-    case 'numeric': if (input.kind === 'text') return convert(AnswerChecker.checkNumeric(input.text, numericSpecOf(a)), input.text, wrongs); break
-    case 'expression': if (input.kind === 'text') return convert(AnswerChecker.checkExpression(input.text, expressionSpecOf(a)), input.text, wrongs); break
+    case 'numeric': if (input.kind === 'text') return exactFormNote(convert(AnswerChecker.checkNumeric(input.text, numericSpecOf(a)), input.text, wrongs), a.value, input.text, lang); break
+    case 'expression': if (input.kind === 'text') return exactFormNote(convert(AnswerChecker.checkExpression(input.text, expressionSpecOf(a)), input.text, wrongs), a.expected, input.text, lang); break
     case 'equation': if (input.kind === 'text') return convert(AnswerChecker.checkEquation(input.text, a.expected, a.variables ?? null), input.text, wrongs, true); break
     case 'set': if (input.kind === 'text') return convert(AnswerChecker.checkSet(input.text, a.expected, a.ordered), input.text, wrongs); break
     case 'interval': if (input.kind === 'text') return convert(AnswerChecker.checkInterval(input.text, a.expected), input.text, wrongs); break
@@ -161,6 +162,31 @@ export function convert(v: CheckVerdict, input: string, wrongs: readonly WrongAn
   }
   r.feedback = lines
   return r
+}
+
+/** ¿Lleva π? («pi», «3pi», «π» o «\\pi»; no «spin»). ¿Una raíz? («sqrt», «2sqrt(3)», «√»). ¿Es una fracción de enteros? */
+const hasPi = (s: string): boolean => /π|\\pi|(?<![a-z])pi(?![a-z])/i.test(s)
+const hasRoot = (s: string): boolean => /√|\\sqrt|(?<![a-z])sqrt(?![a-z])/i.test(s)
+const isFraction = (s: string): boolean => /^\s*[-−]?\s*\(?\s*\d+\s*\)?\s*\/\s*\(?\s*\d+\s*\)?\s*$/.test(s)
+const isInteger = (s: string): boolean => /^\s*[-−]?\s*\d+\s*$/.test(s)
+
+/**
+ * Cuando el corrector solo sabe decir «No es correcto.», al menos la forma que se espera (una pista concreta en vez de un
+ * «mal» sin más): «La respuesta exacta lleva π», «… lleva una raíz» o «… es una fracción», si la clave lo es y lo escrito no.
+ * No toca un error típico del autor ni un diagnóstico que ya diga algo.
+ */
+export function exactFormNote(r: GradeResult, expected: string, input: string, lang?: GradeLang): GradeResult {
+  const onlyOther = r.diagnosis.length === 1 && r.diagnosis[0] === 'other'
+  if (r.status !== 'incorrect' || r.matchedWrong || !onlyOther) return r
+  const form: [string, string, string] | null =
+    hasPi(expected) && !hasPi(input) ? ['exactPi', 'La respuesta exacta lleva π.', 'The exact answer has π in it.']
+    : hasRoot(expected) && !hasRoot(input) ? ['exactRoot', 'La respuesta exacta lleva una raíz.', 'The exact answer has a square root in it.']
+    : isFraction(expected) && isInteger(input) ? ['exactFraction', 'La respuesta exacta es una fracción.', 'The exact answer is a fraction.']
+    : null
+  if (!form) return r
+  const generic = tr('No es correcto.')
+  const note = feedbackLine('explanation', L(lang, form[1], form[2]))
+  return { ...r, diagnosis: [form[0]], feedback: [...r.feedback.filter((f) => f.markdown !== generic), note] }
 }
 
 /** ¿La respuesta es uno de los errores típicos del autor? (igual como texto o equivalente matemáticamente) */

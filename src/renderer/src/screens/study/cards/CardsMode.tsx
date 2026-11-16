@@ -9,7 +9,7 @@ import { cardIntervals, clozeText, dueCards, reviewCard, type DueCard } from '@e
 import type { Rating } from '@engine/learn'
 import { isLanguageCourse } from '@engine/grading'
 import { learnedSpeechLanguage } from '@engine/pipeline/learnedLanguage'
-import { Button, cx, EmptyState, PigmentMark, Icon, IconButton, Tooltip, useTheme } from '@renderer/design'
+import { Button, cx, EmptyState, Icon, IconButton, Tooltip, useTheme } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { navigate } from '@renderer/app/router'
 import { isTypingTarget } from '@renderer/exercises/normalize'
@@ -17,8 +17,9 @@ import { gradeLang, KeyCap } from '@renderer/exercises'
 import i18n from '@renderer/i18n'
 import { CapsuleProgress, GlassCapsule, StudyFrame, TopCapsule } from '../Chrome'
 import { updateProgress, useStudyStore, type CourseData } from '../data'
-import { exitTo, useInk } from '../kit'
+import { exitTo } from '../kit'
 import { SessionSummary } from '../Summary'
+import { usePublishTutorContext } from '../tutorStore'
 import { canSpeak, speakable, useSpeech } from '../speech'
 import { packAssetUrl } from '@renderer/lib/api'
 
@@ -44,7 +45,6 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
   const [undo, setUndo] = useState<{ progress: StudyProgress; queue: DueCard[]; index: number; tally: Tally; rating: Rating } | null>(null)
   const shownAt = useRef(Date.now())
   const speech = useSpeech()
-  const ink = useInk(data.pack)
   const progress = useStudyStore((s) => s.courses[packId]?.progress) ?? data.progress
   const lang = gradeLang(i18n.language)
   // la misma detección que la corrección (la meta del curso o, en los de antes, su nombre): «Deutsch A2» también es de idiomas
@@ -55,6 +55,8 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
   const done = !due && queue.length > 0
   const skillName = skillId ? data.skills.find((s) => s.id === skillId)?.title : undefined
   const intervals = useMemo(() => (due ? cardIntervals(progress, due.card.id, new Date(), lang) : null), [due, progress, lang])
+  // lo que se está repasando, para la puerta fija del tutor de la cápsula
+  usePublishTutorContext(due ? { courseID: packId, skillID: due.skillId, screen: 'cards' } : null)
 
   useEffect(() => {
     shownAt.current = Date.now()
@@ -174,6 +176,7 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
           icon="cards"
           label={label}
           onExit={onExit}
+          tutor
           trailing={
             undo ? (
               <Tooltip label={t('cards.undoHelp')} side="bottom">
@@ -216,7 +219,6 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
           card={card}
           flipped={flipped}
           onFlip={() => setFlipped((f) => !f)}
-          ink={ink}
           assetUrl={(a) => packAssetUrl(packId, a)}
         />
         <div className="flex items-center gap-2">
@@ -267,7 +269,7 @@ function RatingButton({ rating, interval, onClick }: { rating: Rating; interval:
 }
 
 /** La tarjeta: gira sobre su eje vertical con perspectiva; cara y reverso en serif de lectura. */
-export function FlipCard({ card, flipped, onFlip, ink, assetUrl }: { card: Flashcard; flipped: boolean; onFlip: () => void; ink: string; assetUrl: (a: string) => string }) {
+export function FlipCard({ card, flipped, onFlip, assetUrl }: { card: Flashcard; flipped: boolean; onFlip: () => void; assetUrl: (a: string) => string }) {
   const { t } = useTranslation('study')
   const { reducedMotion } = useTheme()
   const front = card.kind === 'cloze' ? clozeText(card.front, false) : card.front
@@ -304,13 +306,11 @@ export function FlipCard({ card, flipped, onFlip, ink, assetUrl }: { card: Flash
         style={{ boxShadow: 'var(--e3)' }}
       >
         <div className={cx(face, flipped && 'select-none')} {...hidden(flipped)}>
-          <PigmentMark color={ink} seed={card.id} />
           <span className="t-eyebrow">{t('cards.front')}</span>
           {figure}
           <div className="t-reading text-[22px] leading-[32px] text-text"><RichText text={front} /></div>
         </div>
         <div className={cx(face, !flipped && 'select-none')} {...hidden(!flipped)} style={{ transform: 'rotateY(180deg)' }}>
-          <PigmentMark color={ink} seed={card.id} />
           <span className="t-eyebrow">{t('cards.back')}</span>
           {card.kind === 'cloze' ? (
             <div className="t-reading text-[22px] leading-[32px] text-text"><RichText text={revealedFront} /></div>

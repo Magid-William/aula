@@ -1,22 +1,24 @@
 // Práctica: una sesión de 10 ejercicios adaptativa e intercalada (el siguiente se elige con el dominio ya actualizado:
-// si fallas, baja; si aciertas, sube hacia el nivel examen). La racha de aciertos a la primera enciende la llamita; las
-// acciones flotan abajo en una cápsula. Al terminar, el resumen con lo que subió el dominio y repetir los fallados.
+// si fallas, baja; si aciertas, sube hacia el nivel examen). Desde dos aciertos seguidos a la primera, la cápsula lo dice
+// («3 seguidas»); las acciones van pegadas debajo del ejercicio. Al terminar, el resumen con lo que subió el dominio y
+// repetir los fallados.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Block, Exercise } from '@shared/schema'
 import { buildPractice, refillPractice, skillMastery, type PracticeRequest } from '@engine/study'
-import { AnimatedNumber, Button, EmptyState, Icon, PixelFlame, Tooltip, cx, pixelBurst, useTheme } from '@renderer/design'
+import { AnimatedNumber, Button, EmptyState, Icon, InkBurst, Tooltip, cx, useTheme } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { fmtPercent } from '@renderer/lib/format'
 import { isDemo } from '@renderer/lib/demo'
-import { navigate } from '@renderer/app/router'
+import { navigate, useRoute } from '@renderer/app/router'
 import { ExerciseActions, ExerciseView, useExercise, type GradeResult, type RunState } from '@renderer/exercises'
 import { CapsuleProgress, GlassCapsule, StudyFrame, TopCapsule } from '../Chrome'
 import { updateProgress, useStudyStore, type CourseData } from '../data'
-import { askTutor, exerciseContext, exitTo, recordResult, useBlockCtx, useInk } from '../kit'
+import { askTutor, exerciseContext, exitTo, recordResult, tutorScreenOf, useBlockCtx, useInk } from '../kit'
 import { gradeOpenWithAI } from '../ai'
 import { SessionSummary } from '../Summary'
+import { usePublishTutorContext } from '../tutorStore'
 import { GALLERY_SKILL, galleryExercises } from './gallery'
 
 interface Outcome {
@@ -117,7 +119,6 @@ function PracticeSession({ data, queue0, request, label, onExit, masteryBefore, 
   const [streak, setStreak] = useState(0)
   const [best, setBest] = useState(0)
   const [finished, setFinished] = useState(false)
-  const flame = useRef<HTMLSpanElement>(null)
 
   const ex = queue[index]
   const onFirstResult = (r: GradeResult, run: RunState): void => {
@@ -127,7 +128,6 @@ function PracticeSession({ data, queue0, request, label, onExit, masteryBefore, 
     const s = firstTry ? streak + 1 : 0
     setStreak(s)
     setBest((b) => Math.max(b, s))
-    if (firstTry && s >= 3 && flame.current) pixelBurst(flame.current, { count: 10 })
     // sesión adaptativa: el siguiente con el dominio ya actualizado
     if (request && index + 1 < queue.length) {
       try {
@@ -155,7 +155,6 @@ function PracticeSession({ data, queue0, request, label, onExit, masteryBefore, 
       total={queue.length}
       label={label}
       streak={streak}
-      flameRef={flame}
       onExit={onExit}
       onFirstResult={onFirstResult}
       onContinue={onContinue}
@@ -164,14 +163,13 @@ function PracticeSession({ data, queue0, request, label, onExit, masteryBefore, 
   )
 }
 
-function PracticeExercise({ data, exercise, index, total, label, streak, flameRef, onExit, onFirstResult, onContinue, options }: {
+function PracticeExercise({ data, exercise, index, total, label, streak, onExit, onFirstResult, onContinue, options }: {
   data: CourseData
   exercise: Exercise
   index: number
   total: number
   label: React.ReactNode
   streak: number
-  flameRef: React.RefObject<HTMLSpanElement | null>
   onExit: () => void
   onFirstResult: (r: GradeResult, run: RunState) => void
   onContinue: () => void
@@ -183,6 +181,10 @@ function PracticeExercise({ data, exercise, index, total, label, streak, flameRe
   const ctx = useBlockCtx(data.pack, exercise.skill, {}, { exercise: (id) => (id === exercise.id && runRef.current ? exerciseContext(data.pack.id, exercise, runRef.current, 'practice') : undefined) })
   const c = useExercise(exercise, { mode: options.attemptMode === 'review' ? 'review' : 'practice', onFirstResult, onContinue, exactText: ctx.exactText, gradeOpen: (e, text) => gradeOpenWithAI(data.pack.id, e, text) })
   runRef.current = c.run
+  // lo que se está mirando, para la puerta fija del tutor de la cápsula (no al practicar lo fallado del simulacro: allí no hay
+  // tutor)
+  const tutor = !!tutorScreenOf(useRoute())
+  usePublishTutorContext(tutor ? exerciseContext(data.pack.id, exercise, c.run, 'practice') : null)
   const skill = data.skills.find((s) => s.id === exercise.skill)
   const alternate = useMemo(() => alternateFor(data, exercise), [data, exercise])
   const last = index + 1 >= total
@@ -191,7 +193,7 @@ function PracticeExercise({ data, exercise, index, total, label, streak, flameRe
       onExit={onExit}
       scrollKey={index}
       capsule={
-        <TopCapsule icon={options.icon ?? 'practice'} label={label} onExit={onExit} trailing={<StreakBadge streak={streak} flameRef={flameRef} />}>
+        <TopCapsule icon={options.icon ?? 'practice'} label={label} onExit={onExit} tutor={tutor} trailing={streak >= 2 ? <StreakBadge streak={streak} seed={`${exercise.id}:${index}`} /> : undefined}>
           <CapsuleProgress value={index + (c.finished ? 1 : 0)} total={total} label={t('common.nOfM', { n: index + 1, m: total })} />
         </TopCapsule>
       }
@@ -218,16 +220,17 @@ function PracticeExercise({ data, exercise, index, total, label, streak, flameRe
   )
 }
 
-/** Racha de aciertos a la primera: la llamita se enciende a partir de 2. */
-function StreakBadge({ streak, flameRef }: { streak: number; flameRef: React.RefObject<HTMLSpanElement | null> }) {
+/** Aciertos seguidos a la primera, en palabras («3 seguidas»), desde dos (un «0» en la cápsula no dice nada). Desde tres, unas
+ *  rayitas a tinta lo celebran. */
+function StreakBadge({ streak, seed }: { streak: number; seed: string }) {
   const { t } = useTranslation('study')
   const { reducedMotion } = useTheme()
   return (
     <Tooltip label={t('practice.streakHelp')} side="bottom">
-      <span ref={flameRef} className={cx('flex h-7 items-center gap-1 rounded-full px-2', streak >= 2 ? 'text-accent-text' : 'text-text3')}>
-        <PixelFlame size={14} lit={streak >= 2} />
-        <motion.span key={streak} className="pt-[3px] font-serif text-[17px] leading-none tabular" initial={reducedMotion ? false : { y: -6, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-          {streak}
+      <span className="relative flex h-7 items-center rounded-full px-2 t-ui font-medium text-accent-text">
+        {streak >= 3 && <InkBurst seed={`racha:${seed}`} size={40} delay={120} className="-left-1 top-1/2 -translate-y-1/2" />}
+        <motion.span key={streak} className="tabular" initial={reducedMotion ? false : { y: -4, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+          {t('practice.inARow', { count: streak })}
         </motion.span>
       </span>
     </Tooltip>
@@ -262,9 +265,8 @@ function PracticeSummary({ data, outcomes, best, label, onExit, masteryBefore, o
   return (
     <StudyFrame capsule={<TopCapsule icon={options.icon ?? 'practice'} label={label} onExit={onExit} />} onExit={onExit}>
       <SessionSummary
-          packId={data.pack.id}
-        medal={answered > 0 && first / Math.max(1, answered) >= 0.6}
-        icon={answered > 0 && first / Math.max(1, answered) < 0.6 ? <PixelFlame size={56} lit={best >= 2} /> : undefined}
+        packId={data.pack.id}
+        celebrate={answered > 0 && first / Math.max(1, answered) >= 0.6}
         title={answered ? (review ? t('mistakes.doneTitle') : t('practice.doneTitle')) : t('practice.noAnswersTitle')}
         body={answered ? (review ? (missed.length ? t('mistakes.doneMissed') : t('mistakes.doneClean')) : missed.length ? t('practice.doneMissed') : t('practice.doneClean')) : t('practice.noAnswersBody')}
         stats={answered ? [

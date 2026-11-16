@@ -31,7 +31,8 @@ test('crear un curso con texto pegado y pedirle cambios', async () => {
 
   // «Pedir cambios a Aula» abre el monitor en modo «aplicando cambios»
   await go(page, { name: 'course', id })
-  await page.getByRole('button', { name: /Ask Aula for changes/ }).click()
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Ask Aula for changes/ }).click()
   await page.getByRole('textbox', { name: /Ask Aula for changes/ }).fill('Añade un ejemplo resuelto paso a paso.')
   await page.getByRole('button', { name: 'Ask for changes', exact: true }).click()
   await expect(page.getByText(/Applying your changes|Changes applied/).first()).toBeVisible({ timeout: 30_000 })

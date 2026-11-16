@@ -12,7 +12,7 @@ import { finalCredit, hintsUsed, inputSummary, elapsedSeconds, type GradeResult,
 import type { TutorContext } from '@shared/assistant/types'
 import { useTutor } from './TutorPanel'
 import { updateProgress, useStudyStore, type SyncOp } from './data'
-import { activePlan } from './plan/session'
+import { leaveStep } from './plan/session'
 
 /** Desde qué pantalla se pregunta al tutor por una figura: todos los modos de estudio menos el simulacro (allí no hay tutor). */
 export function tutorScreenOf(route: ReturnType<typeof useRoute>): string | undefined {
@@ -100,11 +100,10 @@ export function recordTime(packId: string, seconds: number): void {
   updateProgress(packId, (p) => recordStudyTime(p, Math.min(seconds, 3 * 3600), new Date()), { kind: 'time', seconds: Math.min(seconds, 3 * 3600) })
 }
 
-/** Salir de un modo: al plan si se está siguiendo «Estudiar ahora»; si no, a la pestaña del curso. */
+/** Salir de un modo: a la agenda si se está siguiendo «Estudiar ahora», a Repasar si se sigue «Empezar el repaso» y, si no,
+ *  a la pestaña del curso. */
 export function exitTo(packId: string, tab?: CourseTab): void {
-  const plan = activePlan(packId)
-  if (plan && plan.current >= 0) navigate({ name: 'study', id: packId, mode: 'plan' }, { replace: true })
-  else navigate({ name: 'course', id: packId, tab }, { replace: true })
+  leaveStep(packId, tab)
 }
 
 /** Pedir a Aula otra explicación: el tutor del curso se abre al lado con el ejercicio y la respuesta como contexto. */
