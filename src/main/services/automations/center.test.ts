@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { makeInstant } from '@engine/calendar/time'
 import { emptyUsage, messageText, type ChatMessage, type ChatRequest } from '@shared/ai/types'
 import type { AssistantMessage } from '@shared/assistant/types'
-import { defaultProactiveSettings, defaultSchedule, routineID, visibleSwift, type AutomationNotice, type ProactiveSettings } from '@shared/automations'
+import { defaultProactiveSettings, defaultSchedule, previewLine, routineID, visibleSwift, type AutomationNotice, type ProactiveSettings } from '@shared/automations'
 import { AIError, type ChatModel } from '../ai'
 import { AutomationCenter } from './center'
 import type { AutomationEnvironment, AutomationPlatforms } from './env'
@@ -381,6 +381,8 @@ describe('«Aula siempre activa»', () => {
     await run(at(2026, 10, 12, 7, 45, 10))
     const morningMsg = env.chats.find((c) => c.message.origin?.title === 'Rutina de la mañana')!
     expect(morningMsg.message.text.startsWith('Hoy:')).toBe(true)
+    // la vista previa de la Bandeja (la primera línea) lleva el dato, no solo «Hoy:»
+    expect(previewLine(morningMsg.message.text)).toBe('Hoy: sin clases, entregas ni exámenes apuntados. Buen día para adelantar un repaso corto.')
     expect(morningMsg.message.notices[0]).toContain('Tu proveedor de IA no respondió')
     const st = await center.item(routineID('morningBrief'))
     expect(st?.retryAt).toBeUndefined()

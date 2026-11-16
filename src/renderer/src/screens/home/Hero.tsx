@@ -8,6 +8,7 @@ import type { HomeSummary } from '@shared/ipc/home'
 import { capitalize, fmtDate } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
 import { StreakLine } from './Streak'
+import { planLeft } from './derive'
 
 function greetingKey(): 'morning' | 'afternoon' | 'evening' {
   const h = new Date().getHours()
@@ -21,13 +22,12 @@ export type HeroMode = 'empty' | 'firstRun' | 'study'
 export function Hero({ data, mode }: { data: HomeSummary; mode: HeroMode }) {
   const { t } = useTranslation(['home', 'common'])
   const g = t(`common:greeting.${greetingKey()}`)
-  const pending = data.plan.filter((p) => !p.done)
-  const minutes = pending.reduce((a, p) => a + p.minutes, 0)
+  const left = planLeft(data.plan)
   // el curso por el que empieza la sesión: el del primer paso pendiente (o el primero de la lista)
-  const courseId = pending[0]?.courseId ?? data.plan[0]?.courseId ?? data.courses[0]?.id
+  const courseId = left.courseId ?? data.plan[0]?.courseId ?? data.courses[0]?.id
   const startPlan = () => courseId && navigate({ name: 'study', id: courseId, mode: 'plan', start: true })
   const scene = archLightFor(new Date().getHours())
-  const subtitle = mode === 'empty' ? t('subtitleEmpty') : mode === 'firstRun' ? t('firstRun.subtitle') : pending.length ? t('subtitle', { count: pending.length, minutes }) : t('subtitleDone')
+  const subtitle = mode === 'empty' ? t('subtitleEmpty') : mode === 'firstRun' ? t('firstRun.subtitle') : left.steps ? t('subtitle', { count: left.steps, minutes: left.minutes }) : t('subtitleDone')
 
   return (
     <Card enterAnim padded={false} className="relative h-full min-h-[280px] overflow-hidden">
@@ -72,9 +72,12 @@ export function Hero({ data, mode }: { data: HomeSummary; mode: HeroMode }) {
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                <Button variant="primary" size="lg" onClick={() => (courseId ? startPlan() : navigate({ name: 'create' }))}>
-                  {t('continue')}
-                </Button>
+                {/* con todo hecho no se ofrece empezar un plan vacío: queda la meta del día */}
+                {left.steps > 0 && (
+                  <Button variant="primary" size="lg" onClick={() => (courseId ? startPlan() : navigate({ name: 'create' }))}>
+                    {t('continue')}
+                  </Button>
+                )}
                 <GoalLine done={data.today.minutesDone} goal={data.today.minutesGoal} />
               </div>
             )}

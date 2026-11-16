@@ -5,17 +5,13 @@ import { useTranslation } from 'react-i18next'
 import { Card, Group, Row, SectionTitle, Icon, InkStrike, type IconName } from '@renderer/design'
 import type { HomePlanItem, PlanKind } from '@shared/ipc/home'
 import { startPlanItem } from './actions'
+import { mixesCourses, planLeft } from './derive'
 
 const KIND_ICON: Record<PlanKind, IconName> = { cards: 'cards', mistakes: 'mistakes', learn: 'learn', practice: 'practice', exam: 'exam', review: 'repeat' }
 
-/** ¿Mezcla el plan pasos de más de un curso? (entonces cada paso dice de cuál es) */
-export function mixesCourses(plan: readonly HomePlanItem[]): boolean {
-  return new Set(plan.map((p) => p.courseId)).size > 1
-}
-
 export function PlanCard({ plan }: { plan: HomePlanItem[] }) {
   const { t } = useTranslation('home')
-  const total = plan.filter((p) => !p.done).reduce((a, p) => a + p.minutes, 0)
+  const total = planLeft(plan).minutes
   const several = mixesCourses(plan)
   return (
     <Card enterAnim padded="lg" className="h-full">

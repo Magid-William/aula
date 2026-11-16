@@ -65,14 +65,19 @@ export function LevelsCard({ points }: { points: StatsLevelPoint[] }) {
             })}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4">
-            {MASTERY_LEVELS.map((l, i) => (
-              <div key={l} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-[3px]" style={levelLook(i)} />
-                <span className="t-footnote text-text2">
-                  {t(`levels.names.${l}`)} <span className="tabular text-text">· {shown?.counts[l] ?? 0}</span>
-                </span>
-              </div>
-            ))}
+            {MASTERY_LEVELS.map((l, i) => {
+              const n = shown?.counts[l] ?? 0
+              return (
+                <div key={l} className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-[3px]" style={levelLook(i)} />
+                  {/* la leyenda explica el color siempre; la cifra, solo si no es cero */}
+                  <span className="t-footnote text-text2">
+                    {t(`levels.names.${l}`)}
+                    {n > 0 && <span className="tabular text-text"> · {n}</span>}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </>
       )}

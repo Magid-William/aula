@@ -152,6 +152,21 @@ export function weeklyCard(): AssistantCard {
 
 const isAssessment = (e: RoutineEvent) => e.kind === 'exam' || e.kind === 'quiz'
 
+/** Las cifras del día en trozos («1 clase», «15 min de estudio»), sin ceros. */
+export function morningFacts(n: { classes: number; due: number; exams: number; minutes: number }): string[] {
+  return [
+    n.classes > 0 ? tr(`${n.classes} ${n.classes === 1 ? 'clase' : 'clases'}`, `${n.classes} ${n.classes === 1 ? 'class' : 'classes'}`) : null,
+    n.due > 0 ? tr(`${n.due} ${n.due === 1 ? 'entrega pronto' : 'entregas pronto'}`, `${n.due} ${n.due === 1 ? 'deadline' : 'deadlines'} soon`) : null,
+    n.exams > 0 ? tr(`${n.exams} ${n.exams === 1 ? 'examen cerca' : 'exámenes cerca'}`, `${n.exams} ${n.exams === 1 ? 'exam' : 'exams'} coming up`) : null,
+    n.minutes > 0 ? tr(`${n.minutes} min de estudio`, `${n.minutes} min of study`) : null
+  ].filter((x): x is string => !!x)
+}
+
+/** «Hoy: 1 clase, 1 entrega pronto y 15 min de estudio.» (o «Hoy: sin clases, entregas ni exámenes.»). */
+export function morningHeadline(facts: readonly string[]): string {
+  return facts.length ? tr('Hoy: ', 'Today: ') + list(facts) + '.' : tr('Hoy: sin clases, entregas ni exámenes apuntados.', 'Today: no classes, deadlines or exams.')
+}
+
 /** Resumen de la mañana con el calendario y el plan de cada curso. */
 export function morning(events: readonly RoutineEvent[], study: HomeSummary | null, now: number, tz: string): Composed {
   const lines: string[] = []
@@ -176,14 +191,14 @@ export function morning(events: readonly RoutineEvent[], study: HomeSummary | nu
     if (plan.length >= 3) break
   }
   if (plan.length) lines.push(tr('**Para hoy:** ', '**For today:** ') + plan.join(' · '))
-  if (!lines.length) lines.push(tr('Hoy no tienes clases, entregas ni exámenes apuntados. Buen día para adelantar un repaso corto.', 'No classes, deadlines or exams today. A good day to get ahead with a short review.'))
-  const text = tr('Hoy:', 'Today:') + '\n\n' + lines.map((l) => '- ' + l).join('\n')
-  const body = [
-    classes.length ? tr(`${classes.length} ${classes.length === 1 ? 'clase' : 'clases'}`, `${classes.length} ${classes.length === 1 ? 'class' : 'classes'}`) : null,
-    due.length ? tr(`${due.length} ${due.length === 1 ? 'entrega pronto' : 'entregas pronto'}`, `${due.length} due soon`) : null,
-    exams.length ? tr(`${exams.length} ${exams.length === 1 ? 'examen cerca' : 'exámenes cerca'}`, `${exams.length} ${exams.length === 1 ? 'exam' : 'exams'} coming up`) : null
-  ].filter((x): x is string => !!x)
-  return { text, cards: [morningCard()], noticeTitle: tr('Buenos días: tu plan de hoy', "Good morning: today's plan"), noticeBody: body.length ? capitalizeFirst(list(body)) : tr('Mira lo que toca estudiar hoy.', "See what's on for today."), urgent: false }
+  const minutes = (study?.plan ?? []).reduce((sum, p) => sum + (p.done ? 0 : Math.max(0, p.minutes)), 0)
+  const facts = morningFacts({ classes: classes.length, due: due.length, exams: exams.length, minutes })
+  // la primera línea ya dice los datos: es la vista previa de la Bandeja
+  const head = morningHeadline(facts)
+  const text = lines.length
+    ? head + '\n\n' + lines.map((l) => '- ' + l).join('\n')
+    : head + ' ' + tr('Buen día para adelantar un repaso corto.', 'A good day to get ahead with a short review.')
+  return { text, cards: [morningCard()], noticeTitle: tr('Buenos días: tu plan de hoy', "Good morning: today's plan"), noticeBody: facts.length ? capitalizeFirst(list(facts)) : tr('Mira lo que toca estudiar hoy.', "See what's on for today."), urgent: false }
 }
 
 /** Resumen semanal con el calendario y lo pendiente. */

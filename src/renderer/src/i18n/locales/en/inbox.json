@@ -22,7 +22,8 @@
     "unread": "Unread",
     "label": "Filter by type",
     "attention": "Needs you",
-    "show": "Show: {{filter}}"
+    "show": "Show: {{filter}}",
+    "selected": "selected"
   },
   "kinds": {
     "platform": "Platform",

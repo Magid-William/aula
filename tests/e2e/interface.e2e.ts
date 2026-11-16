@@ -27,6 +27,13 @@ test('A4-P1-1 · el curso de ejemplo se marca y su examen no cuenta en el resume
   await expect(nav.getByText('Example course').first()).toBeVisible()
   await expect(nav.getByText(/Exam in \d+ days/)).toHaveCount(0)
   await expect(page.locator('main').getByText('Example', { exact: true }).first()).toBeVisible()
+  // Hoy en el primer arranque: el saludo invita a crear tu curso (el único botón ladrillo) y el examen de ejemplo no sale
+  const main = page.locator('main')
+  await expect(main.getByText('This is an example course. When is your exam?')).toBeVisible()
+  await expect(main.getByRole('button', { name: 'Create my course' })).toBeVisible()
+  await expect(main.getByRole('button', { name: 'Or start with the example' })).toBeVisible()
+  expect(await js<number>(page, `[...document.querySelectorAll('main [data-variant="primary"]')].filter((b) => b.getClientRects().length > 0).length`)).toBe(1)
+  await expect(main.getByText(/^days? until$|Likely grade|Your grade appears/)).toHaveCount(0)
   await go(page, { name: 'calendar' })
   await expect(page.getByText(/No exams in the next two weeks/)).toBeVisible()
   await go(page, { name: 'course', id: C })
@@ -82,13 +89,23 @@ test('A4-P1-4 · una tarjeta que se pulsa es un botón y se abre con Intro', asy
   await app.close()
 })
 
-test('A4-P1-5 · en inglés la bandeja se llama «Inbox» (no «Updates», que son las actualizaciones)', async () => {
-  const { app, page } = await launch({ home: home() })
+test('A4-P1-5 · en inglés la bandeja se llama «Inbox» (no «Updates»), filtra con un menú y el resumen de la mañana se ve con sus datos', async () => {
+  const { app, page } = await launch({ home: home(), env: { AULA_SEED: 'demo' } })
   const nav = page.locator('nav[aria-label="Aula"]')
   await expect(nav.getByRole('button', { name: /^Inbox/ })).toBeVisible()
   await expect(nav.getByRole('button', { name: /^Updates/ })).toHaveCount(0)
   await go(page, { name: 'inbox' })
   await expect(page.getByRole('tab', { name: /^Inbox/ })).toBeVisible()
+  // la vista previa del resumen de la mañana es su primera línea: con las cifras, no un «Today:» suelto
+  await expect(page.getByText(/^Today: 1 class, 1 deadline soon,? and 15 min of study\.$/).first()).toBeVisible()
+  await expect(page.getByText('Today:', { exact: true })).toHaveCount(0)
+  // el filtro es un menú «Show: …» (no otra cinta) y el lector oye la opción elegida y la cifra aparte
+  await page.getByRole('button', { name: 'Show: All' }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu.getByRole('menuitem')).toHaveCount(3)
+  await expect(menu.getByRole('menuitem', { name: 'All, selected', exact: true })).toBeVisible()
+  await menu.getByRole('menuitem', { name: /^Unread, \d+$/ }).click()
+  await expect(page.getByRole('button', { name: 'Show: Unread' })).toBeVisible()
   await app.close()
 })
 

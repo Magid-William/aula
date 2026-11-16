@@ -5,7 +5,7 @@ import { tr } from '@shared/ai/i18n'
 import type { AssistantCard, AssistantMessage } from '@shared/assistant/types'
 import { defaultSchedule, inboxDedupeKey, previewLine, type Automation, type AutomationRun, type InboxEntry, type InboxKind } from '@shared/automations'
 import type { AutomationCenter } from './center'
-import { actionsCard, cardAction } from './routines'
+import { actionsCard, cardAction, morningFacts, morningHeadline } from './routines'
 import { capitalizeFirst, longDay, timeDisplay } from './texts'
 
 const HOUR = 3_600_000
@@ -57,7 +57,7 @@ export function seedDemoAutomations(center: AutomationCenter, now = Date.now()):
         cardAction('openCalendar', tr('Ver en el calendario', 'See in the calendar'))
       ], { detail: 'ENG 102' })], tr('Recordatorio', 'Reminder'), 'reminder'), { priority: 2, course: 'ENG 102', automationID: 'routine-deadlineReminders' }),
     entry('summary', tr('Buenos días: tu plan de hoy', "Good morning: today's plan"), message(
-      tr(`Hoy:\n\n- **Clases de hoy:** Trigonometría (${klass})\n- **Vence pronto:** «Ensayo de inglés» mañana a las ${due}\n- **Para hoy:** Trigonometría: repasar identidades (15 min)`, `Today:\n\n- **Today's classes:** Trigonometry (${klass})\n- **Due soon:** “English essay” tomorrow at ${due}\n- **For today:** Trigonometry: review identities (15 min)`),
+      morningHeadline(morningFacts({ classes: 1, due: 1, exams: 0, minutes: 15 })) + tr(`\n\n- **Clases de hoy:** Trigonometría (${klass})\n- **Vence pronto:** «Ensayo de inglés» mañana a las ${due}\n- **Para hoy:** Trigonometría: repasar identidades (15 min)`, `\n\n- **Today's classes:** Trigonometry (${klass})\n- **Due soon:** “English essay” tomorrow at ${due}\n- **For today:** Trigonometry: review identities (15 min)`),
       t(4), [actionsCard(tr('Tu día', 'Your day'), [cardAction('openToday', tr('Empezar el plan de hoy', "Start today's plan"), { prominent: true }), cardAction('openCalendar', tr('Ver el calendario', 'See the calendar'))])],
       tr('Rutina de la mañana', 'Morning routine'), 'routine'), { read: true, priority: 0, automationID: 'routine-morningBrief' }),
     entry('offer', tr('¿Preparo «Parcial de Química»?', 'Shall I prepare “Chemistry midterm”?'), message(

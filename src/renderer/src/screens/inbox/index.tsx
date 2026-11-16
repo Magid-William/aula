@@ -128,10 +128,12 @@ function Toolbar({ entries, unread }: { entries: InboxEntry[]; unread: number; p
   const current = main ? ui.filter : 'all'
   const counts: Record<'all' | 'unread' | 'attention', number> = { all: 0, unread, attention }
   const filterItems: MenuItem[] = (['all', 'unread', 'attention'] as const).map((f) => ({
+    // el lector oye «Sin leer, 3, seleccionado»: la cifra separada del nombre y la opción elegida dicha (no solo la marca)
     label: (
       <span className="flex w-full items-center justify-between gap-6">
-        <span>{t(`filters.${f}`)}</span>
-        {counts[f] > 0 && <span className="tabular text-text3">{counts[f]}</span>}
+        <span aria-hidden>{t(`filters.${f}`)}</span>
+        {counts[f] > 0 && <span aria-hidden className="tabular text-text3">{counts[f]}</span>}
+        <span className="sr-only">{[t(`filters.${f}`), counts[f] > 0 ? String(counts[f]) : '', f === current ? t('filters.selected') : ''].filter(Boolean).join(', ')}</span>
       </span>
     ),
     // la opción elegida, con su marca; las otras, con el mismo hueco para que no bailen

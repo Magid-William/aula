@@ -22,7 +22,8 @@
     "unread": "Sin leer",
     "label": "Filtrar por tipo",
     "attention": "Te necesita",
-    "show": "Mostrar: {{filter}}"
+    "show": "Mostrar: {{filter}}",
+    "selected": "seleccionado"
   },
   "kinds": {
     "platform": "Plataforma",

@@ -7,11 +7,6 @@ import type { HomeExam } from '@shared/ipc/home'
 import { capitalize, daysUntil, fmtDate, fmtPercent, fmtTime } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
 
-/** Los exámenes que cuentan en Hoy: los del estudiante (el del curso de ejemplo no es suyo), del más cercano al más lejano. */
-export function ownExams(exams: readonly HomeExam[], isSample: (courseId: string) => boolean): HomeExam[] {
-  return exams.filter((e) => !isSample(e.courseId) && daysUntil(e.date) >= 0).sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
-}
-
 export function ExamCard({ exams }: { exams: HomeExam[] }) {
   const { t } = useTranslation('home')
   const { dark } = useTheme()
