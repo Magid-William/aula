@@ -5,7 +5,7 @@ import { basename, dirname, join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { setAILocale } from '@shared/ai/i18n'
 import { functionName, negotiateVersion, normalizedInputSchema, parseArguments, sanitizeName, toolOutputFromResult, toolResult } from '../../mcp/protocol'
-import { AgentError, CLIErrorClassifier, clip, humanDuration, isAuthFailure, isNetworkFailure, isRateLimit, parseRateLimit, rateLimitPhrase, unsupportedFlag } from './errors'
+import { AgentError, CLIErrorClassifier, clip, humanDuration, isAuthFailure, isNetworkFailure, isQuotaExhausted, isRateLimit, parseRateLimit, rateLimitPhrase, unsupportedFlag } from './errors'
 import { AgentSandbox, SHARED_WORK_NAME, sharedEmptyWorkDirectory } from './sandbox'
 import { cleanupTempDirs, makeTempDir } from './__fixtures__/support'
 
@@ -143,6 +143,46 @@ describe('CLIErrorClassifier', () => {
     expect(claude.classify('boom', 'badResponse').kind).toBe('badResponse')
     expect(CLIErrorClassifier.codex.classify('Not logged in').message).toBe(CLIErrorClassifier.codex.notLoggedIn.message)
     expect(CLIErrorClassifier.openCode.notLoggedIn.message).toContain('opencode auth login')
+  })
+
+  it('sin saldo (402 o frases de saldo): `ai_quota`, para la creación en vez de fallar tema a tema', () => {
+    // Claude Code con clave de API: `billing_error` llega como «http» con el texto de Anthropic
+    const credit = CLIErrorClassifier.claude.classify('Credit balance is too low', 'http')
+    expect(credit).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    expect(credit.message).toContain('no tiene saldo suficiente')
+    expect(credit.message).toContain('Detalle de Claude Code: Credit balance is too low')
+    // OpenCode: el estado HTTP manda aunque el texto no diga nada
+    expect(CLIErrorClassifier.openCode.classify('Payment issue', 'http', undefined, { status: 402 }).code).toBe('ai_quota')
+    // Moonshot da el saldo agotado como 429: esperar no lo arregla
+    expect(CLIErrorClassifier.openCode.classify('Your account is suspended due to insufficient balance', 'rateLimited').code).toBe('ai_quota')
+    expect(CLIErrorClassifier.codex.classify('Quota exceeded. Check your plan and billing details.').code).toBe('ai_quota')
+    for (const t of ['Your credit balance is too low to access the Anthropic API.', 'Insufficient Balance', 'Insufficient credits. Add more using https://openrouter.ai/credits',
+      'insufficient_balance', 'Payment Required', 'API Error: 402 {"error":"x"}', 'billing_error']) expect(isQuotaExhausted(t), t).toBe(true)
+    // los límites que se renuevan solos siguen siendo límites (no piden recargar)
+    for (const t of ["You've hit your limit · resets 3pm", 'insufficient credentials', 'Rate limit reached. Upgrade at https://console.groq.com/settings/billing',
+      'You exceeded your current quota, please check your plan and billing details. Please retry in 39s.', 'error at line 4021']) expect(isQuotaExhausted(t), t).toBe(false)
+    expect(CLIErrorClassifier.openCode.classify('You exceeded your current quota, please check your plan and billing details.', 'rateLimited').kind).toBe('rateLimited')
+    expect(new AgentError('http', 'x').code).toBe('ai_http')
+  })
+
+  it('un 402 cuenta solo pegado a «status», «http», «code» o «error»: un número de línea no', () => {
+    for (const t of ['HTTP 402', 'status: 402', 'status code 402', 'Request failed with status code 402', '{"statusCode":402}', 'error code=402', 'Error 402',
+      '402 Payment Required']) expect(isQuotaExhausted(t), t).toBe(true)
+    for (const t of ['Error: line 402', 'SyntaxError: line 402', 'SyntaxError: Unexpected token at line 402, column 7', 'error at line 402',
+      'code at line 402', 'status 1402', 'HTTP 4020', 'decode 402 bytes', 'opcode 402', 'unicode 402']) expect(isQuotaExhausted(t), t).toBe(false)
+    expect(CLIErrorClassifier.claude.classify('SyntaxError: line 402').code).toBe('ai_error')
+  })
+
+  it('el tope de gasto de Anthropic (Claude Code con clave de API) es `ai_quota`, con su propio consejo, no un límite que se espera', () => {
+    const text = 'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC."}}'
+    expect(isQuotaExhausted(text)).toBe(true)
+    // «usage limit» también es una frase de límite: el tope de gasto va antes
+    const error = CLIErrorClassifier.claude.classify(text, 'badResponse')
+    expect(error).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    expect(error.message).toContain('tope de gasto')
+    expect(error.message).not.toContain('Recárgala')
+    expect(error.message).toContain('2026-12-01')
+    expect(CLIErrorClassifier.claude.classify('You have reached your specified workspace API usage limits.').code).toBe('ai_quota')
   })
 
   it('los mensajes largos conservan el principio y el final', () => {

@@ -41,6 +41,7 @@
   },
   "cancel": "Stop",
   "resume": "Resume",
+  "resumeFailed": "Couldn’t resume the creation",
   "keep": "Keep what’s there",
   "keepFailed": "Couldn’t finish with what’s there",
   "done": "Your course is ready",

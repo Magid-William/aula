@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { ChatMessage } from '@shared/ai/types'
 import { AIError } from '../ai/errors'
 import type { AgentTool } from '../ai/model'
-import { AgentError } from './errors'
+import { AgentError, CLIErrorClassifier } from './errors'
 import {
   aulaMCPHelperLaunch,
   aulaMCPServerSpec,
@@ -148,6 +148,16 @@ describe('createCLIChatModel', () => {
     expect(err).toBeInstanceOf(AIError)
     expect(err.kind).toBe('rateLimited')
     expect(err.retryAfter).toBe(3600)
+  })
+
+  it('sin saldo, el estado 402 y el código `ai_quota` llegan a la capa de IA (la creación se para en vez de fallar tema a tema)', async () => {
+    const fake = fakeRunner(() => {
+      throw CLIErrorClassifier.claude.classify('Credit balance is too low', 'http')
+    })
+    const err = await createCLIChatModel(config, { runner: fake.runner }).runAgent!({ system: '', messages: [user('a')], prompt: '', tools: [], maxSteps: 1, timeoutSec: 5 }, {}).catch((e) => e)
+    expect(err).toBeInstanceOf(AIError)
+    expect(err).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    expect(err.message).toContain('Credit balance is too low')
   })
 
   it('cancelar es un AIError «cancelled»', async () => {

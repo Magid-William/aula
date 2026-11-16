@@ -1,7 +1,9 @@
 // Lectura y escritura de los JSON del curso: claves ordenadas, legibles y escritura atómica (como `AtomicFile` de Swift).
 // Los archivos importantes guardan su versión anterior (`.<nombre>.bak`) y se leen con ella si el principal está dañado.
-// Al reescribir, las claves de primer nivel que esta versión no conoce (las escribió una versión más nueva de Aula u otro
-// programa) se conservan: abrir y guardar un curso nunca pierde datos que no entiende.
+// Al reescribir, las claves de PRIMER NIVEL que esta versión no conoce (las escribió una versión más nueva de Aula u otro
+// programa) se conservan. Las anidadas no: un campo nuevo dentro de un bloque (p. ej. `countries` de un mapa) lo pierde la
+// versión que no lo conoce cuando reescribe ese archivo al cambiar algo de la habilidad; solo leerlo no lo toca. Así le pasa a
+// Aula 0.2.4 con los campos de la 0.2.5, y a esta con los de una versión futura.
 import { existsSync, readFileSync } from 'node:fs'
 import { isJSONObject, parseJSON, stringifyJSON } from '@engine/base/json'
 import { readWithBackup, writeFileAtomic, type AtomicWriteOptions, type BackupRead } from '../fs'
@@ -38,6 +40,7 @@ export function readDecodedWithBackup<T>(file: string, decode: (raw: unknown) =>
 /**
  * `encoded` más las claves de primer nivel de `previous` que esta versión no conoce. Una clave es desconocida si estaba en el
  * archivo y desaparece al leerlo y volver a escribirlo (`roundTrip`); las que sí conoce y ya no están se quitaron a propósito.
+ * Solo el primer nivel: dentro de una clave conocida manda `encoded` (lo anidado que no conoce se pierde).
  */
 export function keepUnknownKeys(encoded: unknown, previous: unknown, roundTrip: (raw: unknown) => unknown): unknown {
   if (!isJSONObject(encoded) || !isJSONObject(previous)) return encoded

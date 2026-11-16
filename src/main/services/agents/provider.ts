@@ -186,7 +186,8 @@ export function conversationPrompt(messages: ChatMessage[], prompt?: string): { 
 
 function toAIError(err: unknown): unknown {
   if (err instanceof AIError) return err
-  if (err instanceof AgentError) return new AIError(err.kind, err.message, { retryAfter: err.retryAfter })
+  // el estado y el código viajan: con `ai_quota` (sin saldo) la creación se para en vez de fallar tema a tema
+  if (err instanceof AgentError) return new AIError(err.kind, err.message, { retryAfter: err.retryAfter, status: err.status, code: err.code === 'ai_quota' ? 'ai_quota' : undefined })
   return err
 }
 

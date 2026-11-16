@@ -60,6 +60,14 @@ function badArgs(es: string, en: string): AulaError {
   return new AulaError('invalid_args', tr(es, en))
 }
 
+function courseGone(): AulaError {
+  return new AulaError('not_found', tr('Ese curso ya no existe.', "That course doesn't exist anymore."))
+}
+
+function courseBusy(): AulaError {
+  return new AulaError('generation_busy', tr('Aula ya está trabajando en este curso: espera a que termine o detenlo.', 'Aula is already working on this course: wait for it to finish or stop it.'))
+}
+
 function text(v: unknown, max = MAX_TEXT): string | undefined {
   if (v === undefined || v === null) return undefined
   if (typeof v !== 'string') throw badArgs('Hay un campo de texto no válido.', 'A text field is not valid.')
@@ -153,6 +161,11 @@ export class GenerationService {
   private readonly queue: string[] = []
   /** runID → curso (para encontrar las ejecuciones guardadas sin recorrer todos los cursos cada vez). */
   private readonly where = new Map<string, string>()
+  /** Cursos que se están borrando (cuántos borrados a la vez): no empieza nada nuevo en ellos. */
+  private readonly removing = new Map<string, number>()
+  /** Cuántas veces se empezó a borrar cada curso. Uno nuevo con el mismo título recibe el mismo id: lo que esperaba (a la IA,
+   * a los materiales) con el número de antes ya no sigue en él. */
+  private readonly epochs = new Map<string, number>()
   readonly drafts: DraftStore
   private readonly maxRuns: number
   private readonly throttleMs: number
@@ -189,16 +202,20 @@ export class GenerationService {
     const probe = this.buildCreateRequest('probe', req, language)
     const agents = await this.agentsFor(probe)
     const store = this.library.createPack(makePack({ id: '', title: req.title, subject, language, icon: CourseIconCatalog.resolve('', subject, req.title), hue: hueFor(req.title) }))
+    // en el mismo paso (sin esperas entre medias): identifica ESTE curso aunque luego se borre y se cree otro con su id
+    const epoch = this.epochOf(store.id)
     // la fecha Y la hora del examen que eligió el estudiante quedan ya en el curso: el plan suele mandar solo el día y no la pisa
     // (antes 9:00 acababa en 8:00: J2-12)
     if (req.examDate) {
       const date = req.examDate
       try { store.updatePack((p) => { p.exam = { ...(p.exam ?? { title: CourseLanguages.examTitle(CourseLanguages.of(language)) }), date } }) } catch (err) { log.warn('[generation] fecha del examen', err) }
     }
-    if (draftId && hasMaterials) {
-      await this.drafts.idle(draftId)
-      this.drafts.moveToPack(draftId, store, { only: req.materialIds, official: req.officialIds })
-    }
+    const fromDraft = !!draftId && hasMaterials
+    if (fromDraft) await this.drafts.idle(draftId)
+    // mientras se leían (un PDF grande: minutos) el curso ya estaba en la biblioteca y lo pudieron borrar (y crear otro con el
+    // mismo título): entonces no se mueve nada (los materiales siguen en el borrador) ni se lanza el equipo
+    const target = this.claim(store.id, epoch)
+    if (fromDraft) this.drafts.moveToPack(draftId, target, { only: req.materialIds, official: req.officialIds })
     const request = this.buildCreateRequest(store.id, req, language)
     const pipeline = this.makePipeline(request, agents)
     if (req.eventId) {
@@ -247,11 +264,13 @@ export class GenerationService {
   attachMaterials(packId: unknown, draftId: unknown): { moved: number } {
     if (typeof packId !== 'string' || !packId) throw badArgs('Falta el curso.', 'The course is missing.')
     if (!this.drafts.isDraftID(draftId)) throw badArgs('Borrador no válido.', 'Invalid draft.')
-    const store = this.library.openPack(packId)
+    const epoch = this.epochOf(packId)
+    const store = this.liveStore(packId, epoch)
     if (!store) throw new AulaError('not_found', tr('Ese curso no existe.', "That course doesn't exist."))
     const moved = this.drafts.moveToPack(draftId, store).length
     void this.drafts.idle(draftId).then(() => {
-      const again = this.library.openPack(packId)
+      // solo si sigue siendo este curso (no uno nuevo con el mismo título creado entretanto)
+      const again = this.liveStore(packId, epoch)
       if (again) this.drafts.moveToPack(draftId, again)
     }).catch((err) => log.warn('[generation] materiales del curso', err))
     return { moved }
@@ -259,14 +278,15 @@ export class GenerationService {
 
   async extend(packId: unknown, instructionRaw: unknown, skillRaw?: unknown): Promise<{ runId: string }> {
     if (typeof packId !== 'string' || !packId) throw badArgs('Falta el curso.', 'The course is missing.')
-    const store = this.library.openPack(packId)
+    const epoch = this.epochOf(packId)
+    const store = this.liveStore(packId, epoch)
     if (!store) throw new AulaError('not_found', tr('Ese curso no existe.', "That course doesn't exist."))
     const instruction = text(instructionRaw, 4000)
     if (!instruction) throw badArgs('Escribe qué quieres cambiar.', 'Write what you want to change.')
     const skill = text(skillRaw, 200)
     const pack = store.loadPack()
     if (skill && !pack.skills.some((s) => s.id === skill)) throw new AulaError('not_found', tr('Esa habilidad no existe en el curso.', "That skill doesn't exist in the course."))
-    if (this.activeOn(packId)) throw new AulaError('generation_busy', tr('Aula ya está trabajando en este curso: espera a que termine o detenlo.', 'Aula is already working on this course: wait for it to finish or stop it.'))
+    if (this.activeOn(packId)) throw courseBusy()
     const previous = GenerationPipeline.previousRuns(store)
     // una creación a medias (en pausa, límite, error) es la última ejecución: una ampliación pasaría a serlo y la escondería
     // (sin «Reanudar» ni «Quedarme con lo que hay» en ninguna parte)
@@ -289,10 +309,12 @@ export class GenerationService {
     const agents = await this.agentsFor(request)
     // «Materiales» del curso: los que se añadieron al borrador pasan ahora al curso
     const draft = draftInInstruction(instruction)
-    if (draft && this.drafts.isDraftID(draft)) {
-      await this.drafts.idle(draft)
-      this.drafts.moveToPack(draft, store)
-    }
+    const fromDraft = !!draft && this.drafts.isDraftID(draft)
+    if (fromDraft) await this.drafts.idle(draft)
+    // lo pudieron borrar (y crear otro con el mismo título) mientras se preparaba la IA o se leían los materiales (que entonces
+    // siguen en el borrador), o pedir otro cambio a la vez
+    const target = this.claim(packId, epoch)
+    if (fromDraft) this.drafts.moveToPack(draft, target)
     const pipeline = this.makePipeline(request, agents)
     if (practice) {
       pipeline.annotate((s) => { s.aula2.practiceRequest = practice.id })
@@ -457,6 +479,48 @@ export class GenerationService {
     a.pipeline.cancel()
   }
 
+  /** Detiene las ejecuciones de un curso (en marcha o esperando turno) y espera a que terminen: antes de borrarlo, para que
+   * el equipo no siga gastando ni vuelva a crear `Packs/<id>/runs` (que heredaría un curso nuevo con el mismo título). */
+  async cancelPack(packId: string): Promise<void> {
+    const mine = [...this.active.values()].filter((a) => a.packId === packId)
+    for (const a of mine) this.cancel(a.pipeline.runID)
+    await Promise.all(mine.map((a) => a.done?.catch(() => undefined)))
+  }
+
+  /** Borra un curso (`remove`) después de detener lo que lo escribe; mientras tanto (la papelera tarda) nada nuevo empieza en él. */
+  async removePack(packId: string, remove: () => Promise<void>): Promise<void> {
+    this.epochs.set(packId, this.epochOf(packId) + 1)
+    this.removing.set(packId, (this.removing.get(packId) ?? 0) + 1)
+    try {
+      await this.cancelPack(packId)
+      await remove()
+    } finally {
+      const n = (this.removing.get(packId) ?? 1) - 1
+      if (n > 0) this.removing.set(packId, n)
+      else this.removing.delete(packId)
+    }
+  }
+
+  private epochOf(packId: string): number {
+    return this.epochs.get(packId) ?? 0
+  }
+
+  /** El curso, si sigue ahí, no se está borrando y es el mismo que se abrió (`epoch`, tomado justo al abrirlo o crearlo): tras
+   * esperar a la IA o a los materiales lo pudieron borrar, e incluso crear otro con el mismo título (y el mismo id). */
+  private liveStore(packId: string, epoch: number): PackStore | undefined {
+    if (this.removing.has(packId) || this.epochOf(packId) !== epoch) return undefined
+    return this.library.openPack(packId)
+  }
+
+  /** Justo antes de lanzar (sin esperas hasta `launch`): sigue siendo ese curso y nadie trabaja ya en él (dos peticiones a la
+   * vez no lanzan dos equipos sobre el mismo curso). */
+  private claim(packId: string, epoch: number): PackStore {
+    const store = this.liveStore(packId, epoch)
+    if (!store) throw courseGone()
+    if (this.activeOn(packId)) throw courseBusy()
+    return store
+  }
+
   async resume(id: unknown): Promise<void> {
     if (typeof id !== 'string') throw badArgs('Falta la ejecución.', 'The run is missing.')
     if (this.active.has(id)) return
@@ -464,11 +528,17 @@ export class GenerationService {
     if (!r) throw new AulaError('not_found', tr('No encuentro esa ejecución.', "I can't find that run."))
     const st = inferredRunState(r.state, false)
     if (st === 'done') return
-    if (this.activeOn(r.store.id)) throw new AulaError('generation_busy', tr('Aula ya está trabajando en este curso.', 'Aula is already working on this course.'))
+    const packId = r.store.id
+    const epoch = this.epochOf(packId)
+    if (this.removing.has(packId)) throw courseGone()
+    if (this.activeOn(packId)) throw new AulaError('generation_busy', tr('Aula ya está trabajando en este curso.', 'Aula is already working on this course.'))
     const request = { ...r.state.request, maxParallel: this.maxParallel() }
     const agents = await this.agentsFor(request)
+    // otra llamada (un doble clic) ya la reanudó mientras se preparaba la IA
+    if (this.active.has(id)) return
+    this.claim(packId, epoch)
     const pipeline = this.makePipeline(request, agents, id)
-    this.launch(pipeline, r.store.id)
+    this.launch(pipeline, packId)
   }
 
   /** «Quedarme con lo que hay»: el curso pasa a ser normal con lo que ya está escrito. */
