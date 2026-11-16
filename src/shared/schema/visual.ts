@@ -736,8 +736,9 @@ export interface MapBlock {
   routes: MapRoute[]
   /**
    * Países coloreados por su nombre (o con un valor cada uno: mapa de coropletas). Aula 0.2.4 y anteriores no leen
-   * `countries`, `region` ni `unit`: ven el título, el pie y el mapa sin países. No hay copia para ellas: cualquier clave que
-   * leen (marcadores, regiones, lat/lon/span, pie) la pintaría también esta versión.
+   * `countries`, `region` ni `unit`: ven el título, el pie y el mapa sin países, y si vuelven a guardar la habilidad los
+   * pierden (un mapa solo de países queda vacío; ver store/jsonFile.ts). No hay copia para ellas: cualquier clave que leen
+   * (marcadores, regiones, lat/lon/span, pie) la pintaría también esta versión.
    */
   countries: MapCountry[]
   /** Encuadre con nombre («europe», «africa»…), un país o «oeste,sur,este,norte». */

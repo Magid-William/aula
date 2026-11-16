@@ -122,6 +122,7 @@ describe('OpenCodeEventParser', () => {
     expect(failure(O.error('ProviderAuthError', 'No auth for anthropic'))?.kind).toBe('notLoggedIn')
     expect(failure(O.error('APIError', 'Unauthorized', 401))?.kind).toBe('notLoggedIn')
     expect(failure(O.error('APIError', 'Too many requests', 429))?.kind).toBe('rateLimited')
+    expect(failure(O.error('APIError', 'Insufficient Balance', 402))).toMatchObject({ kind: 'http', status: 402 })
     expect(failure(O.error('ContextOverflowError', 'demasiado largo'))?.kind).toBe('badResponse')
     expect(failure(O.error('UnknownError', 'algo raro'))?.kind).toBeUndefined()
     expect(failure(O.error('UnknownError', 'algo raro'))?.message).toBe('algo raro')
@@ -131,6 +132,14 @@ describe('OpenCodeEventParser', () => {
     expect(run([O.stepStart, O.text('hola'), O.error('MessageAbortedError', 'abortado'), O.stepFinish()]).conclusion.type).toBe('finished')
     const c = run([O.error('UnknownError', 'uno'), O.error('UnknownError', 'dos')]).conclusion
     expect(c.type === 'failed' ? c.failure.message : '').toBe('uno\ndos')
+  })
+
+  it('entre varios errores, el 402 (sin saldo) manda sobre el primero', () => {
+    const c = run([O.stepStart, O.error('APIError', 'Too many requests', 429), O.error('APIError', 'Insufficient Balance', 402)]).conclusion
+    expect(c.type).toBe('failed')
+    const f = c.type === 'failed' ? c.failure : undefined
+    expect(f).toMatchObject({ kind: 'http', status: 402, message: 'Too many requests\nInsufficient Balance' })
+    expect(CLIErrorClassifier.openCode.classify(f?.message ?? '', f?.kind, f?.retryAfter, { status: f?.status }).code).toBe('ai_quota')
   })
 
   it('un error antes de cualquier paso falla', () => {
@@ -392,6 +401,13 @@ describe('OpenCodeRunner', () => {
     expect(agentError(r.error)?.message).toContain('opencode auth login')
   })
 
+  it('sin saldo desde un APIError 402: `ai_quota` (para la creación hasta recargar)', async () => {
+    const cli = new FakeCLI(makeTempDir(), { stdout: [O.stepStart, O.error('APIError', 'Insufficient Balance', 402)].join('\n') + '\n', exitCode: 1 })
+    const r = await collect(runner(cli).run(task()))
+    expect(agentError(r.error)).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    expect(agentError(r.error)?.message).toContain('Detalle de OpenCode: Insufficient Balance')
+  })
+
   it('límite de uso desde un APIError', async () => {
     const cli = new FakeCLI(makeTempDir(), { stdout: [O.stepStart, O.error('APIError', 'Rate limit exceeded, retry after 90 seconds', 429)].join('\n') + '\n', exitCode: 1 })
     const r = await collect(runner(cli).run(task()))
@@ -427,6 +443,15 @@ done`
     const started = Date.now()
     const r = await collect(runner(cli).run(task({ timeout: 0.7 })))
     expect(agentError(r.error)?.kind).toBe('timeout')
+    expect(Date.now() - started).toBeLessThan(8000)
+  })
+
+  posixIt('plazo agotado tras un APIError 402 sin evento final: `ai_quota`, no un plazo agotado', async () => {
+    const cli = new FakeCLI(makeTempDir(), { stdout: [O.stepStart, O.error('APIError', 'Insufficient Balance', 402), O.error('APIError', 'Stream closed')].join('\n') + '\n', after: 'sleep 300' })
+    const started = Date.now()
+    // plazo con margen: el 402 tiene que haberse leído antes de que venza
+    const r = await collect(runner(cli).run(task({ timeout: 2.5 })))
+    expect(agentError(r.error)).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
     expect(Date.now() - started).toBeLessThan(8000)
   })
 

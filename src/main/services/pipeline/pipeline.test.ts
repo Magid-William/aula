@@ -8,6 +8,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { decodeRequest, encodeRunState, decodeRunState, languageName, makeRequest, materialsMap, MAX_AGENTS, readingGroups, runProgress, usesTeam, type GenerationRequest, type GenerationStage } from '@engine/pipeline'
 import { makePack } from '@shared/schema'
 import { AIError } from '../ai'
+import { CLIErrorClassifier } from '../agents/errors'
+import { createCLIChatModel } from '../agents/provider'
+import type { AgentEvent } from '../agents/types'
 import { BudgetError } from '../costs'
 import { Library, type PackStore } from '../store'
 import { loadDigests } from '../tools'
@@ -567,6 +570,34 @@ describe('flujo clásico', () => {
     expect(s.aula2.errorCode).toBe('ai_quota')
   })
 
+  it('un agente CLI sin saldo (Claude Code con clave de API) también para la ejecución: no la da por terminada sin un tema', async () => {
+    // el error tal como sale del adaptador de las CLIs (clasificador → `toAIError`)
+    const cli = createCLIChatModel({ id: 'claude-cli', kind: 'claude-cli', label: 'Claude' }, {
+      runner: () => ({
+        config: { id: 'claude-cli', kind: 'claude', displayName: 'Claude Code', model: '' },
+        async *run(): AsyncGenerator<AgentEvent> { throw CLIErrorClassifier.claude.classify('Credit balance is too low', 'http') }
+      })
+    })
+    const authors: string[] = []
+    const agents = scriptedAgents(async (task, call) => {
+      switch (task.role) {
+        case 'planner': await call('set_course_plan', Fixture.plan); return 'ok'
+        case 'author':
+          authors.push(Fixture.skillID(task))
+          if (Fixture.skillID(task) === 'resta') return (await cli.runAgent!({ system: '', messages: [], prompt: 'resta', tools: [], maxSteps: 1, timeoutSec: 5 }, {})).text
+          return Fixture.author(task, call, false)
+        default: return ''
+      }
+    })
+    const s = await new GenerationPipeline({ library: lib, request: request({ verify: false, parallel: 1 }), agents }).run()
+    expect(s.aula2.state).toBe('limit')
+    expect(s.aula2.errorCode).toBe('ai_quota')
+    expect(s.failure).toContain('Credit balance is too low')
+    expect(authors).toEqual(['suma', 'resta'])
+    expect(s.skills.find((k) => k.id === 'resta')?.status).not.toBe('failed')
+    expect(s.stages.crossCutting).toBe('pending')
+  })
+
   it('sin red el plan falla tras UN reintento rápido, y el monitor dijo por qué esperaba', async () => {
     let calls = 0
     const waits: string[] = []
@@ -640,6 +671,46 @@ describe('flujo clásico', () => {
     expect(s.aula2.state).toBe('paused')
     expect(s.cancelled).toBe(true)
     expect(roles).toEqual(['planner'])
+  })
+
+  it.each([
+    ['un 402 tras guardar el plan', 'limit', 'failed'],
+    ['«Detener» tras guardar el plan', 'paused', 'running']
+  ] as const)('%s: al reanudar no se vuelve a planificar ni se duplican los temas', async (_label, state, planStage) => {
+    // la 1.ª vez el planificador guarda el plan y se corta antes de terminar (en el simulacro)
+    let pipe: GenerationPipeline | undefined
+    const first = scriptedAgents(async (task, call) => {
+      if (task.role !== 'planner') return ''
+      await call('set_course_plan', Fixture.plan)
+      if (state === 'limit') throw new AIError('http', 'DeepSeek indica que no tienes saldo suficiente (402).', { status: 402, providerMessage: 'Insufficient Balance' })
+      pipe?.cancel()
+      await call('set_exam_blueprint', Fixture.blueprint)
+      return 'ok'
+    })
+    pipe = new GenerationPipeline({ library: lib, request: request({ verify: false, parallel: 1 }), agents: first })
+    const s1 = await pipe.run()
+    expect(s1.aula2.state).toBe(state)
+    expect(s1.stages.plan).toBe(planStage)
+    expect(store.loadPack().skills.map((s) => s.id)).toEqual(['suma', 'resta'])
+
+    // al reanudar (otro arranque), un planificador con otros ids duplicaría el temario
+    const replanned = { ...Fixture.plan, units: Fixture.plan.units.map((u) => ({ ...u, skills: u.skills.map((k) => ({ ...k, id: `${k.id}-enteros`, prerequisites: [] })) })) }
+    const calls: string[] = []
+    const second = scriptedAgents(async (task, call) => {
+      switch (task.role) {
+        case 'planner': calls.push('plan'); await call('set_course_plan', replanned); return 'ok'
+        case 'author': calls.push('author:' + Fixture.skillID(task)); return Fixture.author(task, call, false)
+        case 'crossCutting': return Fixture.crossCutting(call)
+        default: return ''
+      }
+    })
+    const s2 = await new GenerationPipeline({ library: lib, request: request({ verify: false, parallel: 1 }), agents: second, resumeRunID: s1.runID }).run()
+    expect(s2.aula2.state, s2.failure).toBe('done')
+    expect(calls).toEqual(['author:suma', 'author:resta'])
+    expect(store.loadPack().skills.map((s) => s.id)).toEqual(['suma', 'resta'])
+    expect(s2.skills.map((k) => k.id)).toEqual(['suma', 'resta'])
+    expect(s2.stages.plan).toBe('done')
+    expect(s2.summaries.plan).toBe('2 habilidades en 1 unidades')
   })
 })
 

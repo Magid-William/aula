@@ -18,6 +18,7 @@ import {
 } from '@main/services/store'
 import { emit, handle, type RpcContext } from '../rpc'
 import { tr } from '@shared/ai/i18n'
+import { generationService } from './generation'
 
 const PACK_EXTENSIONS = ['aulapack', 'zip']
 
@@ -83,7 +84,11 @@ export function register(): void {
   handle('courses.delete', async (args) => {
     const id = packIdArg(args)
     requireStore(id)
-    await guardAsync(() => getLibrary().deletePack(id, (dir) => shell.trashItem(dir)))
+    const remove = (): Promise<void> => guardAsync(() => getLibrary().deletePack(id, (dir) => shell.trashItem(dir)))
+    // primero se detiene el equipo que lo está escribiendo (si no, sigue gastando y vuelve a crear la carpeta del curso) y,
+    // mientras va a la papelera, no empieza otro
+    const g = generationService()
+    await (g ? g.removePack(id, remove) : remove())
   })
 
   handle('courses.export', async (args, ctx) => {

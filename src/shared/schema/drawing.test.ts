@@ -154,4 +154,27 @@ describe('dibujo: lo que ve una versión antigua (0.2.4) de un curso nuevo', () 
     // un color escrito gana a un estilo «paper»
     expect(decodeDrawItem({ kind: 'rect', fill: 'blue', fillStyle: 'paper' })).toEqual({ kind: 'rect', fill: 'blue' })
   })
+
+  // Lo que dice el comentario de drawing.ts: si algún tipo gana copia para la antigua, cambia también ese comentario.
+  it('measure, brace, axes y grid no llevan copia: la antigua los lee como «line» y, si guarda, quedan en línea', () => {
+    const fresh: DrawItem[] = [
+      { kind: 'measure', x1: 0, y1: 0, x2: 40, y2: 0, offset: 12, label: '4 cm' },
+      { kind: 'brace', x1: 0, y1: 0, x2: 0, y2: 40, depth: 6 },
+      { kind: 'axes', x: 10, y: 90, w: 80, h: 70, step: 10, xLabel: 't' },
+      { kind: 'grid', x: 0, y: 0, w: 100, h: 100, step: 20 }
+    ]
+    expect(fresh.map((it) => save(it).kind)).toEqual(['measure', 'brace', 'axes', 'grid'])
+    // la antigua pinta measure y brace como una línea entre sus extremos
+    expect(drawItemShape(oldRead(save(fresh[0]))).paths[0].d).toBe('M0 0L40 0')
+    // al guardar, la 0.2.4 escribe lo que leyó (su codificador solo conoce sus claves): la nueva ve líneas
+    expect(fresh.map((it) => decodeDrawItem(oldRead(save(it))))).toEqual([
+      { kind: 'line', x1: 0, y1: 0, x2: 40, y2: 0, label: '4 cm' },
+      { kind: 'line', x1: 0, y1: 0, x2: 0, y2: 40 },
+      { kind: 'line', x: 10, y: 90, w: 80, h: 70 },
+      { kind: 'line', x: 0, y: 0, w: 100, h: 100 }
+    ])
+    // un objeto se pinta como su etiqueta, pero un guardado de la antigua pierde `object`: queda en texto
+    const car = save({ kind: 'object', object: 'car', x: 1, y: 2, label: 'Coche' })
+    expect(decodeDrawItem(oldRead(car))).toEqual({ kind: 'text', x: 1, y: 2, label: 'Coche' })
+  })
 })

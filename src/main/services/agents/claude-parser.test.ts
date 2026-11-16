@@ -306,6 +306,17 @@ describe('ClaudeStreamParser · errores', () => {
     const f = failed(run([E.initEvent(), E.assistant('m', [E.textBlock('Invalid API key · Fix external API key')], 'authentication_failed')]).conclusion)
     expect(f.kind).toBe('notLoggedIn')
   })
+
+  it('sin saldo (billing_error) es un 402: `ai_quota`, no un error genérico', () => {
+    const o = run([E.initEvent(), E.assistant('m', [E.textBlock('Credit balance is too low')], 'billing_error'), E.result({ isError: true, text: 'Credit balance is too low' })])
+    expect(texts(o.events)).toBe('')
+    const f = failed(o.conclusion)
+    expect(f).toMatchObject({ kind: 'http', status: 402 })
+    const error = CLIErrorClassifier.claude.classify(f.message, f.kind, f.retryAfter, { status: f.status })
+    expect(error).toMatchObject({ kind: 'http', status: 402, code: 'ai_quota' })
+    // sin result también
+    expect(failed(run([E.initEvent(), E.assistant('m', [E.textBlock('Credit balance is too low')], 'billing_error')]).conclusion).status).toBe(402)
+  })
 })
 
 describe('ClaudeStreamParser · seguridad', () => {

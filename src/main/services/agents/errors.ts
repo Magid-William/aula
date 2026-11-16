@@ -50,11 +50,14 @@ export class AgentError extends AulaError {
   readonly kind: AgentErrorKind
   /** Segundos hasta que se restablece un límite de uso. */
   readonly retryAfter?: number
-  constructor(kind: AgentErrorKind, message: string, retryAfter?: number) {
-    super(codeForKind(kind), message, retryAfter !== undefined ? { retryAfter } : undefined)
+  /** Estado HTTP que dio la CLI, si se sabe (402 = sin saldo: código `ai_quota`). */
+  readonly status?: number
+  constructor(kind: AgentErrorKind, message: string, retryAfter?: number, status?: number) {
+    super(status === 402 ? 'ai_quota' : codeForKind(kind), message, retryAfter !== undefined ? { retryAfter } : undefined)
     this.name = 'AgentError'
     this.kind = kind
     this.retryAfter = retryAfter
+    this.status = status
   }
 }
 
@@ -84,6 +87,11 @@ export interface RateLimitInfo {
 export interface ClockOptions {
   now?: number
   timeZone?: string
+}
+
+/** Opciones de `classify`: el reloj y el estado HTTP que dio la CLI, si lo dio. */
+export interface ClassifyOptions extends ClockOptions {
+  status?: number
 }
 
 /** «Se restablece en 2 h 10 min (hacia las 15:00).» Vacía si no se sabe cuándo. */
@@ -139,6 +147,32 @@ export function isRateLimit(text: string): boolean {
   ]
   if (phrases.some((p) => lower.includes(p))) return true
   return /(status|error|http|code)\D{0,8}429|429\s+too many/i.test(lower)
+}
+
+// Tope de gasto que puso la persona en Anthropic (como `spendLimit` en ai/http/providerErrors.ts)
+const SPEND_LIMIT = /reached your specified (?:[\w-]+ )?api usage limit/
+
+// Frases concretas: «quota» a secas también lo dicen límites que se renuevan solos (Gemini por minuto)
+const QUOTA_EXHAUSTED = [
+  /credit balance (?:is )?too low/, // Anthropic / Claude Code con clave de API
+  /\bbilling_error\b/, // Claude Code (campo `error` del flujo)
+  /insufficient[ _](?:account[ _])?(?:balance|credits?\b|funds)/, // DeepSeek, OpenRouter, Moonshot…
+  /\bpayment required\b/,
+  /quota exceeded\.\s*check your plan and billing/, // Codex con clave de API (`insufficient_quota`)
+  SPEND_LIMIT,
+  // el 402 pegado a «status», «http», «code» o «error» («HTTP 402», «status code: 402», `"statusCode":402`); «line 402» no cuenta
+  /\b(?:status(?:[\s_]?[cC]ode)?|error|http|code)[\s:="'(]{0,4}402(?!\d)/
+]
+
+/** Sin saldo en la cuenta: no se arregla esperando, hay que recargar o cambiar de proveedor. */
+export function isQuotaExhausted(text: string): boolean {
+  const lower = text.toLowerCase()
+  return QUOTA_EXHAUSTED.some((re) => re.test(lower))
+}
+
+/** La cuenta llegó al tope de gasto que puso la persona (no es falta de saldo: hay que subir el tope). */
+export function isSpendLimit(text: string): boolean {
+  return SPEND_LIMIT.test(text.toLowerCase())
 }
 
 /** Si el texto dice que la CLI no conoce un flag, devuelve ese flag (`--tools`…). */
@@ -455,11 +489,29 @@ export class CLIErrorClassifier {
     const sentences = [tr(`Has alcanzado el límite de uso de tu suscripción de ${this.cliName}.`, `You’ve reached the usage limit of your ${this.cliName} subscription.`)]
     if (reset) sentences.push(reset)
     sentences.push(tr(`Espera o elige otro proveedor en ${settingsPath('ai', 'es')}.`, `Wait, or choose another provider in ${settingsPath('ai', 'en')}.`))
-    if (detail) {
-      const clipped = Array.from(detail).slice(0, 300).join('')
-      sentences.push(tr(`Detalle de ${this.cliName}: ${clipped}`, `Details from ${this.cliName}: ${clipped}`))
-    }
+    if (detail) sentences.push(this.#cliDetail(detail))
     return new AgentError('rateLimited', sentences.join(' '), rl.retryAfter)
+  }
+
+  /** Sin saldo (402) o con el tope de gasto alcanzado: qué pasa, qué hacer y el detalle de la CLI. El código `ai_quota` para la creación hasta recargar. */
+  quotaExhausted(raw: string): AgentError {
+    const detail = raw.trim()
+    const sentences = isSpendLimit(detail)
+      ? [
+          tr(`${this.cliName} indica que la cuenta ha llegado al tope de gasto que le pusiste.`, `${this.cliName} says the account has reached the spend limit you set.`),
+          tr(`Súbelo en la consola del proveedor o elige otro proveedor en ${settingsPath('ai', 'es')}.`, `Raise it in the provider’s console or choose another provider in ${settingsPath('ai', 'en')}.`)
+        ]
+      : [
+          tr(`${this.cliName} indica que la cuenta no tiene saldo suficiente.`, `${this.cliName} says the account doesn’t have enough credit.`),
+          tr(`Recárgala en el panel del proveedor o elige otro proveedor en ${settingsPath('ai', 'es')}.`, `Top it up in the provider’s dashboard or choose another provider in ${settingsPath('ai', 'en')}.`)
+        ]
+    if (detail) sentences.push(this.#cliDetail(detail))
+    return new AgentError('http', sentences.join(' '), undefined, 402)
+  }
+
+  #cliDetail(detail: string): string {
+    const clipped = Array.from(detail).slice(0, 300).join('')
+    return tr(`Detalle de ${this.cliName}: ${clipped}`, `Details from ${this.cliName}: ${clipped}`)
   }
 
   unsupportedFlag(flag: string): AgentError {
@@ -470,9 +522,11 @@ export class CLIErrorClassifier {
   }
 
   /** Convierte un texto de error (de stderr o del flujo de eventos) en el `AgentError` más útil. */
-  classify(text: string, hint?: AgentErrorKind, retryAfter?: number, opts: ClockOptions = {}): AgentError {
+  classify(text: string, hint?: AgentErrorKind, retryAfter?: number, opts: ClassifyOptions = {}): AgentError {
     const message = text.trim()
     if (hint === 'notLoggedIn' || isAuthFailure(message)) return this.notLoggedIn
+    // sin saldo antes que el límite: algunos proveedores lo dan como 429, pero esperar no lo arregla
+    if (opts.status === 402 || isQuotaExhausted(message)) return this.quotaExhausted(message)
     if (hint === 'rateLimited' || isRateLimit(message)) {
       // el dato estructurado de la CLI (p. ej. `resetsAt`) es más fiable que interpretar el texto
       const now = opts.now ?? Date.now()

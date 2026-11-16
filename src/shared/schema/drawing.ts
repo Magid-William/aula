@@ -1,7 +1,10 @@
 // Partes nuevas del dibujo vectorial (`drawing`): elementos con nombre, marcas de geometría, objetos hechos, curvas suaves,
-// rayado, movimiento (deslizadores y reloj) y pasos. Todo opcional: un curso antiguo se lee y se guarda igual que antes, y
-// una versión antigua de la app ignora estas claves (ve el dibujo en reposo). Lo que una versión antigua no sabe pintar se
-// guarda además de una forma que entiende (ver `withOldVersionFallbacks`).
+// rayado, movimiento (deslizadores y reloj) y pasos. Todo opcional: un curso antiguo se lee y se guarda igual que antes.
+// Una versión antigua (0.2.4) no lee estas claves (ve el dibujo en reposo) y lee como «line» los tipos que no conoce:
+// measure y brace salen como una línea entre sus extremos; axes y grid (sin x1…y2), como un punto en la esquina del lienzo
+// (0,0). Solo los ángulos de tres puntos, los objetos y el papel llevan además una forma que entiende (`withOldVersionFallbacks`).
+// Si esa versión vuelve a guardar la habilidad, pierde casi todo lo nuevo y deja esos tipos en «line» (ver store/jsonFile.ts);
+// los ángulos de tres puntos se salvan, porque conserva su `points`.
 import type { JSONObject } from '@engine/base/json'
 import { bool, enumOf, flexNum, flexStr, isObj, list, nested, num, pickKeys, prune, str, strictNumbers, vFlexNum, type Obj } from './coding'
 import type { DrawItem } from './common'
@@ -132,6 +135,8 @@ const round2 = (n: number): number => Math.round(n * 100) / 100 + 0
  *   tiene) en lugar de una línea y la etiqueta en la esquina; la nueva ve `object` y lo dibuja.
  * - un relleno de papel (no rayado) va en `fillStyle: "paper"`, sin `fill`: la antigua lo deja sin relleno en lugar de una
  *   aguada ladrillo, que se leería como algo destacado.
+ * measure, brace, axes y grid no llevan copia (la antigua los lee como «line»). Esto es solo para que la antigua PINTE: si
+ * ella guarda, escribe lo que leyó (el objeto queda en texto, sin `object`) y casi todo lo nuevo se pierde.
  */
 export function withOldVersionFallbacks(v: DrawItem, out: JSONObject): JSONObject {
   if (v.kind === 'angle' || v.kind === 'rightAngle') {
