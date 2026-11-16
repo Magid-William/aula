@@ -14,7 +14,9 @@
 #     (the upstream Makefile's `CC=$(PWD)/...` breaks on spaces),
 #   * the framework's bundle id is com.luumlabs.aula.TailscaleKit (not Tailscale's
 #     io.tailscale.Tailscale), and every framework in the xcframework carries its own
-#     privacy manifest (tailscalekit/PrivacyInfo.xcprivacy), as the App Store asks.
+#     privacy manifest (tailscalekit/PrivacyInfo.xcprivacy), as the App Store asks, and
+#   * the license notices the app shows (Aula/Licenses.json) are written again from
+#     the Go modules that go into the framework (scripts/licenses.mjs).
 #
 # Env overrides:
 #   LIBTAILSCALE_REF   git commit/tag to build (default: pinned commit below)
@@ -107,6 +109,9 @@ for fw in "$OUT"/*/TailscaleKit.framework; do
     exit 1
   fi
 done
+
+echo "::: License notices (Aula/Licenses.json)"
+node "$HERE/scripts/licenses.mjs"
 
 echo "::: Done"
 for f in "$OUT"/*/TailscaleKit.framework/TailscaleKit; do

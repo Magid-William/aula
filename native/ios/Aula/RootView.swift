@@ -65,14 +65,16 @@ struct ConnectView: View {
                 Button(Texts.signOut) { model.askingSignOut = true }
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 8)
             } else {
                 // quien llega sin Aula en el Mac: dónde se descarga
                 Button(Texts.macLink) { model.showingMacInfo = true }
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(Color.accentColor)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 8)
             }
+            LegalLinks(model: model)
+                .padding(.bottom, 12)
         }
         .sheet(isPresented: Binding(get: { model.showingMacInfo }, set: { model.showingMacInfo = $0 })) {
             MacInfo { model.showingMacInfo = false }
@@ -235,6 +237,27 @@ struct MacInfo: View {
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color("Paper").ignoresSafeArea())
+    }
+}
+
+/// La política de privacidad (en la web) y las licencias (en la app), discretas al pie de las pantallas de espera.
+private struct LegalLinks: View {
+    let model: AppModel
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(Texts.privacyLink) { openURL(Legal.privacy) }
+            Text("·").accessibilityHidden(true)
+            Button(Texts.licensesLink) { model.showingLicenses = true }
+        }
+        .buttonStyle(.plain)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(minHeight: 28)
+        .sheet(isPresented: Binding(get: { model.showingLicenses }, set: { model.showingLicenses = $0 })) {
+            LicensesView { model.showingLicenses = false }
+        }
     }
 }
 

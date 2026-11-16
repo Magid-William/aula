@@ -42,6 +42,8 @@ final class AppModel {
     var askingSignOut = false
     /// Se está enseñando dónde descargar Aula para Mac.
     var showingMacInfo = false
+    /// Se están enseñando las licencias.
+    var showingLicenses = false
     /// La página de inicio de sesión de Tailscale, abierta dentro de la app. Se cierra sola cuando el nodo conecta.
     var signInPage: URL?
     /// La demostración está abierta (la interfaz la sirve la propia app, sin Mac).

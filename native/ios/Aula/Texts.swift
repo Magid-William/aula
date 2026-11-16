@@ -43,6 +43,14 @@ enum Texts {
     static var macAddress: String { "github.com/luumlabs/aula" }
     static var done: String { t("Hecho", "Done") }
 
+    // Lo legal: la política de privacidad y las licencias, a mano en todas las pantallas de espera
+    static var privacyLink: String { t("Política de privacidad", "Privacy policy") }
+    static var licensesLink: String { t("Licencias", "Licenses") }
+    static var licensesTitle: String { t("Licencias", "Licenses") }
+    static var licensesIntro: String { t("Aula es software libre de Luum Labs, con la licencia GNU AGPL v3 y sin ninguna garantía: puedes conseguir su código y compartirlo con esa misma licencia. La app lleva dentro el componente de Tailscale (TailscaleKit) y el código de Go que usa; aquí están sus licencias.", "Aula is free software by Luum Labs, under the GNU AGPL v3 and with no warranty: you can get its source code and share it under the same license. The app also carries Tailscale’s component (TailscaleKit) and the Go code it uses; here are their licenses.") }
+    static var licensesSource: String { t("El código de Aula", "Aula’s source code") }
+    static var licensesMissing: String { t("Esta copia de la app no trae los avisos de licencia. Están en github.com/luumlabs/aula.", "This copy of the app doesn’t carry the license notices. They are at github.com/luumlabs/aula.") }
+
     // La demostración
     static var demoAction: String { t("Probar con un curso de ejemplo", "Try it with an example course") }
     static var demoBar: String { t("Demostración · nada se guarda", "Demo · nothing is saved") }
