@@ -9,7 +9,7 @@ import { useTheme } from './theme'
 import './inkArt.css'
 
 export type ArchLightScene = 'dawn' | 'noon' | 'dusk' | 'night'
-export type InkSpotName = 'books' | 'cards' | 'pencil' | 'flask' | 'calendar' | 'lamp'
+export type InkSpotName = 'books' | 'cards' | 'pencil' | 'flask' | 'calendar' | 'lamp' | 'hourglass'
 
 /** La luz del arco a una hora del día (0–23). */
 export function archLightFor(hour: number): ArchLightScene {
@@ -330,10 +330,40 @@ const SPOTS: Record<InkSpotName, Drawing> = {
         <L d="M20 176 Q90 172 130 175 T226 174" o={0.8} i={0} />
       </>
     )
+  },
+  // el reloj de arena a medio caer (un simulacro: aún no hay ninguno)
+  hourglass: {
+    wash: <ellipse cx="120" cy="150" rx="84" ry="36" fill="var(--wc-glow)" opacity="0.45" />,
+    fill: (
+      <>
+        <path d="M98 45 C98 78 114 92 117 102 C114 112 98 126 98 159 L142 159 C142 126 126 112 123 102 C126 92 142 78 142 45 Z" fill="var(--wc-sky-noon)" opacity="0.3" />
+        <rect x="74" y="35" width="92" height="10" fill="var(--wc-brick)" opacity="0.8" />
+        <rect x="74" y="160" width="92" height="10" fill="var(--wc-brick)" opacity="0.8" />
+        <path d="M104 72 Q120 76 136 72 C132 86 124 95 120 101 C116 95 108 86 104 72 Z" fill="var(--wc-sun)" opacity="0.85" />
+        <path d="M100 159 Q120 132 140 159 Z" fill="var(--wc-sun)" opacity="0.85" />
+        <ellipse cx="120" cy="175" rx="90" ry="6" fill="var(--wc-sand)" opacity="0.9" />
+      </>
+    ),
+    ink: (
+      <>
+        <L d="M72 34 L168 33 L168 44 L72 45 Z" i={0} />
+        <L d="M72 160 L168 159 L168 170 L72 171 Z" i={1} />
+        <L d="M82 45 L82 160 M158 44 L158 159" o={0.7} i={2} />
+        <L d="M98 45 C98 78 114 92 117 102 C114 112 98 126 98 159" i={3} />
+        <L d="M142 45 C142 78 126 92 123 102 C126 112 142 126 142 159" i={3} />
+        <L d="M104 72 Q120 76 136 72" o={0.7} i={4} />
+        <L d="M120 104 L120 146" o={0.5} i={5} />
+        <L d="M102 158 Q120 134 138 158" o={0.7} i={5} />
+        <L d="M20 177 Q90 173 130 176 T226 175" o={0.8} i={1} />
+      </>
+    )
   }
 }
 
-const SEEDS: Record<InkSpotName, number> = { books: 6, cards: 9, pencil: 12, flask: 15, calendar: 18, lamp: 21 }
+/** Los objetos que hay (para listarlos y probarlos). */
+export const INK_SPOT_NAMES = Object.keys(SPOTS) as InkSpotName[]
+
+const SEEDS: Record<InkSpotName, number> = { books: 6, cards: 9, pencil: 12, flask: 15, calendar: 18, lamp: 21, hourglass: 24 }
 
 /** El arco de Aula con la luz dentro: amanece, es mediodía, atardece o es de noche. Con `live`, se mueve despacio
  *  mientras el ratón está encima (con «Reducir movimiento», se queda quieto). */

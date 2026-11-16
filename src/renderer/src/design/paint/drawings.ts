@@ -264,6 +264,19 @@ export function strikeInk(w: number, h: number, seed: string | number): InkDrawi
   })
 }
 
+/**
+ * Filete a pluma seca (un corte de sección, un subrayado fino al pasar el ratón): una línea casi recta que se posa fina,
+ * aprieta un poco y se levanta seca, con huecos de papel hacia el final.
+ */
+export function ruleInk(w: number, h: number, seed: string | number, line = 1.2): InkDrawing {
+  return cached(`r:${seed}:${w}x${h}:${line}`, () => {
+    const { rng, noise } = tools(seed)
+    const path = handLine(1, w - 1, h * 0.5, rng, Math.min(0.012, 6 / Math.max(60, w)), 0.006)
+    const pressure = (t: number) => (0.35 + 0.65 * Math.min(1, t / 0.12)) * (t > 0.7 ? Math.max(0.25, 1 - (t - 0.7) * 2.2) : 1) * (1 + 0.12 * Math.sin(t * 7 + 1))
+    return drawing(w, h, [inkStroke(path, { tool: 'pen', width: line, pressure, dryness: 0.55, speed: 1100, minMs: 240, maxMs: 560 }, noise, rng)])
+  })
+}
+
 /** Visto bueno a mano: un trazo corto que baja y otro largo que sube, de una vez. */
 export function checkInk(size: number, seed: string | number): InkDrawing {
   return cached(`k:${seed}:${size}`, () => {

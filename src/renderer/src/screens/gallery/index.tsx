@@ -1,5 +1,5 @@
 // Galería del sistema de diseño (solo para desarrollo y capturas: window.__aula.navigate({ name: 'gallery' })).
-import { Card, Companion, COMPANION_IDS, PixelSky, PixelMedal, PixelCheck, PixelFlame, Spinner, AulaMark, CourseIcon, Button, SegmentedTabs, ProgressBar, ProgressRing, Chip, pixelBurst, SectionTitle, Group, Row, Icon, BrushUnderline, InkRing, DrawnTile, DrawnBorder, InkStrike, InkCheck, InkBurst, PencilRays, InkArrow, CoverBand, ArchLight, InkSpot, EmptyState } from '@renderer/design'
+import { Card, Companion, COMPANION_IDS, PixelSky, PixelMedal, PixelCheck, PixelFlame, Spinner, AulaMark, CourseIcon, Button, SegmentedTabs, ProgressBar, ProgressRing, Chip, pixelBurst, SectionTitle, Group, Row, Icon, BrushUnderline, InkRing, DrawnTile, DrawnBorder, InkStrike, InkCheck, InkBurst, PencilRays, InkArrow, CoverBand, ArchLight, InkSpot, INK_SPOT_NAMES, EmptyState } from '@renderer/design'
 import { ICON_IDS } from '@renderer/design/pixel/resolve'
 import { useState } from 'react'
 import { ActivityPreview } from '../chat/ActivityPreview'
@@ -14,7 +14,7 @@ export default function Gallery() {
           {(['dawn', 'noon', 'dusk', 'night'] as const).map((scene) => <ArchLight key={scene} live scene={scene} className="h-[150px] w-[180px]" />)}
         </div>
         <div className="flex flex-wrap items-end gap-4 mt-4">
-          {(['books', 'cards', 'pencil', 'flask', 'calendar', 'lamp'] as const).map((name) => <InkSpot key={name} name={name} className="h-[120px] w-[144px]" />)}
+          {INK_SPOT_NAMES.map((name) => <InkSpot key={name} name={name} className="h-[120px] w-[144px]" />)}
         </div>
         <div className="grid grid-cols-3 mt-2">
           <EmptyState art="cards" title="Nada que repasar" body="Las tarjetas vuelven cuando toca." className="py-6" />

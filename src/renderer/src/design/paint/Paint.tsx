@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { cx } from '../cx'
 import { paintKey, peekPaint, requestPaint } from './cache'
 import { Ink } from './Ink'
-import { arrowInk, borderInk, burstInk, checkInk, coverLineInk, raysInk, ringInk, strikeInk, tileInk, underlineInk, type InkDrawing } from './drawings'
+import { arrowInk, borderInk, burstInk, checkInk, coverLineInk, raysInk, ringInk, ruleInk, strikeInk, tileInk, underlineInk, type InkDrawing } from './drawings'
 import type { Pt } from './brush'
 import { seedOf } from './random'
 import type { PaintKind, PaintSpec } from './recipes'
@@ -175,6 +175,14 @@ export function InkStrike({ seed, color = 'var(--pigment-brick)', alpha = 0.85, 
       <InkBox make={(b) => strikeInk(b.w, b.h, seed)} deps={[seed]} color={color} alpha={alpha} drawKey={`strike:${seed}`} delay={150} className="ink-strike__line" />
     </span>
   )
+}
+
+/**
+ * Filete a pluma seca que ocupa el ancho de su caja: para un corte de sección (nunca en cada fila) o, montado al pasar el
+ * ratón, como subrayado fino. Sin `drawKey` se dibuja cada vez que aparece.
+ */
+export function InkRule({ seed, color = 'var(--graphite)', alpha = 0.8, line = 1.2, drawKey, delay = 0, className, style }: { seed: string | number; color?: string; alpha?: number; line?: number; drawKey?: string; delay?: number; className?: string; style?: CSSProperties }) {
+  return <InkBox make={(b) => ruleInk(b.w, b.h, seed, line)} deps={[seed, line]} color={color} alpha={alpha} drawKey={drawKey} delay={delay} className={cx('ink-rule', className)} style={style} />
 }
 
 /** Visto bueno a mano (tamaño fijo). */

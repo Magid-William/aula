@@ -3,12 +3,30 @@
 import { createContext, useContext } from 'react'
 import { create } from 'zustand'
 
-export type CourseTab = 'overview' | 'learn' | 'practice' | 'cards' | 'exam' | 'mistakes' | 'materials' | 'reference'
+/** Las cinco vistas del curso: Resumen, Aprender, Repasar, Simulacro y Materiales. */
+export type CourseView = 'overview' | 'learn' | 'review' | 'exam' | 'materials'
+/** Ids de antes de juntar las pestañas: siguen funcionando como alias (atajos, ⌘K, enlaces de Aula, scripts, pruebas). */
+export type LegacyCourseTab = 'practice' | 'cards' | 'mistakes' | 'reference'
+export type CourseTab = CourseView | LegacyCourseTab
+
+export const COURSE_VIEWS: readonly CourseView[] = ['overview', 'learn', 'review', 'exam', 'materials']
+
+/** Dónde acaba un id viejo: Práctica, Tarjetas y Errores son secciones de Repasar; Referencia, el apéndice de Aprender. */
+const LEGACY_TABS: Record<LegacyCourseTab, CourseView> = { practice: 'review', cards: 'review', mistakes: 'review', reference: 'learn' }
+
+/** La vista que se pinta para una pestaña (nueva o vieja) y, si era un alias, la sección a la que hay que llevar la vista.
+ *  Lo desconocido (una dirección escrita a mano) va al Resumen. */
+export function canonicalTab(tab?: string): { view: CourseView; focus?: LegacyCourseTab } {
+  if (tab && Object.hasOwn(LEGACY_TABS, tab)) return { view: LEGACY_TABS[tab as LegacyCourseTab], focus: tab as LegacyCourseTab }
+  return { view: (COURSE_VIEWS as readonly string[]).includes(tab ?? '') ? (tab as CourseView) : 'overview' }
+}
 
 export type Route =
   | { name: 'home' }
   | { name: 'course'; id: string; tab?: CourseTab; skill?: string }
-  | { name: 'study'; id: string; mode: 'learn' | 'practice' | 'cards' | 'exam' | 'mistakes' | 'plan'; skill?: string }
+  /** `start`: entrar directamente en el primer paso (la sesión guiada de «Empezar el plan» y «Estudiar ahora»). No se guarda
+   *  en la dirección: al recargar no vuelve a arrancar. */
+  | { name: 'study'; id: string; mode: 'learn' | 'practice' | 'cards' | 'exam' | 'mistakes' | 'plan'; skill?: string; start?: boolean }
   | { name: 'calendar'; date?: string; view?: 'agenda' | 'week' | 'month' }
   | { name: 'chat'; conversation?: string; prompt?: string }
   | { name: 'create'; prefill?: { title?: string; examDate?: string; topics?: string; eventId?: string; fromPlatform?: boolean } }

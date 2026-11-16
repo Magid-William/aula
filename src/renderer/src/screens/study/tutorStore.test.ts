@@ -63,3 +63,27 @@ describe('tutor (A3-P1-1)', () => {
     expect(useTutor.getState().open).toBe(true)
   })
 })
+
+describe('lo que se está mirando (el botón fijo del tutor)', () => {
+  beforeEach(() => useTutor.setState({ published: null, publisher: null }))
+
+  it('la pantalla que se va no borra lo que ya publicó la siguiente', () => {
+    const before = Symbol('antes')
+    const after = Symbol('después')
+    useTutor.getState().publish({ ...ctx, screen: 'learn' }, before)
+    useTutor.getState().publish(ctx, after)
+    useTutor.getState().unpublish(before)
+    expect(useTutor.getState().published).toEqual(ctx)
+    useTutor.getState().unpublish(after)
+    expect(useTutor.getState().published).toBeNull()
+  })
+
+  it('abrir con lo publicado no lleva pregunta: sale el vacío con las preguntas rápidas', () => {
+    useTutor.getState().publish(ctx, Symbol('modo'))
+    const { published, show } = useTutor.getState()
+    if (published) show(published)
+    expect(useTutor.getState().open).toBe(true)
+    expect(useTutor.getState().prompt).toBeNull()
+    expect(tutorVisibleFor(useTutor.getState(), routeKey(practice))).toBe(true)
+  })
+})

@@ -44,6 +44,7 @@
     "Summarize my chemistry notes"
   ],
   "tutorTitle": "Your tutor",
+  "tutorAsk": "Ask the tutor",
   "tutorEmpty": "Ask me anything about this topic: we’ll work through it together, step by step.",
   "tutorQuick": [
     "Explain it another way",

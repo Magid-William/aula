@@ -44,6 +44,7 @@
     "Hazme un resumen de mis apuntes de química"
   ],
   "tutorTitle": "Tu tutor",
+  "tutorAsk": "Preguntar al tutor",
   "tutorEmpty": "Pregúntame lo que quieras de este tema: lo vemos juntos, paso a paso.",
   "tutorQuick": [
     "Explícamelo de otra forma",

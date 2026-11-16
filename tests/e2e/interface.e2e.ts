@@ -262,6 +262,31 @@ test('A4-P2-17 · con texto al 130 % la cápsula de la lección no se monta y la
   await app.close()
 })
 
+test('A4-P2-17b · el tamaño del texto escala la tipografía de verdad (al 130 %, el texto mide 1,3 veces)', async () => {
+  const measure = async (textScale: number) => {
+    const { app, page } = await launch({ home: home({ textScale }) })
+    await go(page, { name: 'course', id: C })
+    await expect(page.locator('main [role="tablist"]').first()).toBeVisible()
+    const px = await js<{ body: number; caption: number; real: number }>(page, `(() => {
+      const probe = (cls) => { const el = document.createElement('p'); el.className = cls; document.body.append(el); const v = parseFloat(getComputedStyle(el).fontSize); el.remove(); return v }
+      const real = document.querySelector('main .t-ui, main .t-callout, main .t-body')
+      return { body: probe('t-body'), caption: probe('t-caption'), real: real ? parseFloat(getComputedStyle(real).fontSize) : 0 }
+    })()`)
+    await app.close()
+    return px
+  }
+  const normal = await measure(1)
+  const big = await measure(1.3)
+  expect(normal.body).toBeCloseTo(15, 1)
+  // la letra más pequeña se lee: 12 px
+  expect(normal.caption).toBeCloseTo(12, 1)
+  expect(big.body / normal.body).toBeCloseTo(1.3, 2)
+  expect(big.caption / normal.caption).toBeCloseTo(1.3, 2)
+  // y lo que se ve en pantalla crece con ella
+  expect(normal.real).toBeGreaterThan(0)
+  expect(big.real / normal.real).toBeCloseTo(1.3, 2)
+})
+
 test('A5-P1-2 · el temporizador avisa con la ventana fuera de la vista (lo decide el proceso principal)', async () => {
   const { app, page } = await launch({ home: home(), env: { AULA_HIDDEN: '1' } })
   // sin enseñar avisos de verdad en la pantalla: se apuntan

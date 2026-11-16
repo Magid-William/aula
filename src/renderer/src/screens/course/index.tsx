@@ -28,7 +28,9 @@ export default function CourseScreen() {
   const { t } = useTranslation(['course', 'common'])
   const route = useRoute()
   const id = route.name === 'course' ? route.id : ''
-  const tab: CourseTab = route.name === 'course' && route.tab ? route.tab : 'overview'
+  const asked: CourseTab = route.name === 'course' && route.tab ? route.tab : 'overview'
+  // provisional: mientras no exista la pestaña Repasar, «review» abre Práctica (su primera sección)
+  const tab: CourseTab = asked === 'review' ? 'practice' : asked
   const { pack, loading, missing } = useCoursePack(id)
   const ov = useOverview(pack)
   const lastRun = useCourseRun(id)
