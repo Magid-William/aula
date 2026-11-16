@@ -9,7 +9,7 @@ enum Texts {
     static var signInTitle: String { t("Conecta con tu Aula", "Connect to your Aula") }
     static var signInBody: String { t("Aula vive en tu Mac o en tu servidor. Para llegar a ella desde aquí, inicia sesión en Tailscale con la misma cuenta que usaste allí. Solo se hace una vez.", "Aula lives on your Mac or your server. To reach it from here, sign in to Tailscale with the same account you used there. You only do this once.") }
     static var signInAction: String { t("Iniciar sesión en Tailscale", "Sign in to Tailscale") }
-    static var signInAfter: String { t("Cuando termines, vuelve a Aula: sigue sola.", "When you’re done, come back to Aula: it carries on by itself.") }
+    static var signInAfter: String { t("Cuando termines, la página se cierra sola y Aula sigue.", "When you’re done, the page closes by itself and Aula carries on.") }
     static var approvalTitle: String { t("Falta aprobar este dispositivo", "This device needs approval") }
     static var approvalBody: String { t("Tu red de Tailscale pide aprobar los dispositivos nuevos. Quien la administra puede hacerlo en su panel; en cuanto lo haga, Aula sigue sola.", "Your Tailscale network asks for new devices to be approved. Whoever manages it can do so in the admin panel; Aula carries on by itself once they do.") }
     static var lookingTitle: String { t("No encuentro tu Aula", "I can’t find your Aula") }

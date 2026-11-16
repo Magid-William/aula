@@ -77,6 +77,14 @@ struct ConnectView: View {
         .sheet(isPresented: Binding(get: { model.showingMacInfo }, set: { model.showingMacInfo = $0 })) {
             MacInfo { model.showingMacInfo = false }
         }
+        #if canImport(UIKit)
+        .sheet(isPresented: Binding(get: { model.signInPage != nil }, set: { if !$0 { model.signInPage = nil } })) {
+            if let page = model.signInPage {
+                SafariView(url: page) { model.signInPage = nil }
+                    .ignoresSafeArea()
+            }
+        }
+        #endif
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: art)
@@ -86,6 +94,15 @@ struct ConnectView: View {
         } message: {
             Text(Texts.signOutConfirm)
         }
+    }
+
+    /// Inicia sesión en Tailscale en una hoja dentro de la app (en macOS, en el navegador).
+    private func signIn(_ url: URL) {
+        #if canImport(UIKit)
+        model.signInPage = url
+        #else
+        openURL(url)
+        #endif
     }
 
     /// Con sesión de Tailscale iniciada (todo lo que no sea arrancar o pedirla) se puede cerrar.
@@ -123,7 +140,7 @@ struct ConnectView: View {
             .padding(.top, 10)
         case .signIn(let url):
             Message(title: Texts.signInTitle, text: Texts.signInBody, footnote: Texts.signInAfter) {
-                Button(Texts.signInAction) { openURL(url) }.buttonStyle(BrickButton())
+                Button(Texts.signInAction) { signIn(url) }.buttonStyle(BrickButton())
             }
         case .waitingApproval:
             Message(title: Texts.approvalTitle, text: Texts.approvalBody, footnote: nil) { ProgressView() }
