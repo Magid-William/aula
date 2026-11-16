@@ -1,12 +1,13 @@
-// Dominio por semana: barras apiladas de un solo tono («Dominado» abajo, «Sin ver» arriba) que crecen al aparecer; al
-// señalar una semana, la leyenda cuenta los temas de ese momento (hoy si no se señala ninguna).
-import { useState } from 'react'
+// Dominio por semana: barras apiladas en aguada de grafito («Dominado» abajo, el más oscuro; «Sin ver» arriba, vacío y solo
+// con su contorno) que crecen al aparecer; al señalar una semana, la leyenda cuenta los temas de ese momento (hoy si no se
+// señala ninguna). Son los datos de todos tus cursos juntos: sin ladrillo.
+import { useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { Card, SectionTitle, cx } from '@renderer/design'
 import { fmtDate } from '@renderer/lib/format'
 import { MASTERY_LEVELS, type MasteryLevelName, type StatsLevelPoint } from '@shared/ipc/stats'
-import { keyToDate } from './derive'
+import { keyToDate, washFor } from './derive'
 
 const STACK: MasteryLevelName[] = ['mastered', 'solid', 'practicing', 'learning', 'unseen']
 const HEIGHT = 176
@@ -55,7 +56,7 @@ export function LevelsCard({ points }: { points: StatsLevelPoint[] }) {
                     transition={{ type: 'spring', stiffness: 260, damping: 26, delay: 0.15 + i * 0.04 }}
                   >
                     {STACK.map((l) =>
-                      p.counts[l] > 0 ? <div key={l} style={{ flexGrow: p.counts[l], background: `var(--level-${MASTERY_LEVELS.indexOf(l)})` }} className="w-full min-h-[3px] border-t-[1.5px] border-surface first:border-t-0" /> : null
+                      p.counts[l] > 0 ? <div key={l} style={{ flexGrow: p.counts[l], ...levelLook(MASTERY_LEVELS.indexOf(l)) }} className="w-full min-h-[3px] border-t-[1.5px] border-surface first:border-t-0" /> : null
                     )}
                   </motion.div>
                   <div className={cx('mt-1.5 h-[3px] w-3 mx-auto rounded-full transition-colors', active ? 'bg-text2' : 'bg-transparent')} />
@@ -66,7 +67,7 @@ export function LevelsCard({ points }: { points: StatsLevelPoint[] }) {
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4">
             {MASTERY_LEVELS.map((l, i) => (
               <div key={l} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: `var(--level-${i})` }} />
+                <span className="h-2.5 w-2.5 rounded-[3px]" style={levelLook(i)} />
                 <span className="t-footnote text-text2">
                   {t(`levels.names.${l}`)} <span className="tabular text-text">· {shown?.counts[l] ?? 0}</span>
                 </span>
@@ -77,4 +78,10 @@ export function LevelsCard({ points }: { points: StatsLevelPoint[] }) {
       )}
     </Card>
   )
+}
+
+/** El color de un nivel de dominio: aguada de grafito, más oscura cuanto más dominado; «Sin ver», sin color y con contorno. */
+function levelLook(level: number): CSSProperties {
+  const wash = washFor(level)
+  return wash ? { background: wash } : { background: 'var(--fill1)', boxShadow: 'inset 0 0 0 1px var(--rule)' }
 }

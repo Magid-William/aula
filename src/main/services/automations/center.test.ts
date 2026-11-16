@@ -380,7 +380,7 @@ describe('«Aula siempre activa»', () => {
     await center.setProactive({ ...quietOff(), morningBrief: true })
     await run(at(2026, 10, 12, 7, 45, 10))
     const morningMsg = env.chats.find((c) => c.message.origin?.title === 'Rutina de la mañana')!
-    expect(morningMsg.message.text.startsWith('¡Buenos días!')).toBe(true)
+    expect(morningMsg.message.text.startsWith('Hoy:')).toBe(true)
     expect(morningMsg.message.notices[0]).toContain('Tu proveedor de IA no respondió')
     const st = await center.item(routineID('morningBrief'))
     expect(st?.retryAt).toBeUndefined()

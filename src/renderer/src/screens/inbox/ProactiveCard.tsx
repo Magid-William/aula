@@ -1,10 +1,10 @@
 // «Aula siempre activa» en «Novedades» (ProactiveViews.swift): la marca de Aula con su estado (el sol sale y se pone mientras
 // revisa), el interruptor, lo que necesita al estudiante con su arreglo, las rutinas con su hora y lo usado hoy. Debajo, lo
-// próximo que hará, en una tarjeta que flota despacio.
+// próximo que hará, en otra tarjeta (quieta: solo flotan el examen, la semana y el calendario).
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { AulaMark, Button, Card, Floating, Icon, Menu, ProgressBar, SectionTitle, Switch, cx } from '@renderer/design'
+import { AulaMark, Button, Card, Icon, Menu, ProgressBar, SectionTitle, Switch, cx } from '@renderer/design'
 import { useSettings } from '@renderer/lib/settings'
 import { api } from '@renderer/lib/api'
 import { settingsElsewhere } from '@renderer/lib/device'
@@ -178,7 +178,7 @@ function HealthRow({ issue }: { issue: AutomationHealthIssue }) {
   )
 }
 
-/** Lo próximo que hará Aula (las rutinas en los próximos días), en una tarjeta que flota. */
+/** Lo próximo que hará Aula (las rutinas en los próximos días). */
 export function UpNextCard({ snapshot: s }: { snapshot: AutomationsSnapshot }) {
   const { t } = useTranslation('inbox')
   const settings = useSettings((x) => x.settings)
@@ -186,28 +186,24 @@ export function UpNextCard({ snapshot: s }: { snapshot: AutomationsSnapshot }) {
   const items = s.preview.filter((x) => enabled || LIGHT_ROUTINES.includes(x.routine)).slice(0, 4)
   if (!items.length && !enabled) return null
   return (
-    <Floating amplitude={2.5} duration={9} phase={0.3}>
-      <Card padded="lg" elevation={2}>
-        <SectionTitle title={t('proactive.upNext')} />
-        {items.length === 0 ? (
-          <p className="t-callout text-text3 py-1">{t('proactive.upNextEmpty')}</p>
-        ) : (
-          <div className="flex flex-col mt-1">
-            {items.map((x, i) => (
-              <motion.div key={x.routine + x.date} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: 0.15 + i * 0.05 }} className="flex items-center gap-3 py-2">
-                {/* lo que hará Aula, en una loseta con la luz del sol (antes, una raya a la izquierda) */}
-                <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-sun/12 text-sun">
-                  <Icon name={ROUTINE_ICONS[x.routine]} size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="t-callout truncate">{x.detail || t(`routines.${x.routine}`)}</div>
-                  <div className="t-ui text-text3">{whenText(t as never, x.date)}</div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </Floating>
+    <Card padded="lg">
+      <SectionTitle title={t('proactive.upNext')} />
+      {items.length === 0 ? (
+        <p className="t-callout text-text3 py-1">{t('proactive.upNextEmpty')}</p>
+      ) : (
+        <div className="flex flex-col mt-1">
+          {items.map((x, i) => (
+            <motion.div key={x.routine + x.date} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: 0.15 + i * 0.05 }} className="flex items-center gap-3 py-2">
+              {/* lo que hará Aula: el glifo de la rutina a tinta, sin loseta */}
+              <Icon name={ROUTINE_ICONS[x.routine]} size={17} className="shrink-0 text-text2" />
+              <div className="min-w-0 flex-1">
+                <div className="t-callout truncate">{x.detail || t(`routines.${x.routine}`)}</div>
+                <div className="t-ui text-text3">{whenText(t as never, x.date)}</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }

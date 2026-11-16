@@ -61,10 +61,9 @@ export function reminder(e: RoutineEvent, slot: AutomationSlot, course: PackSumm
   let title: string
   if (e.kind === 'assignment') {
     text = tr(`**${capitalizeFirst(whenText)}** vence la entrega ${what}.`, `**${capitalizeFirst(whenText)}** the assignment ${what} is due.`)
-    if (!soon) text += ' ' + tr('¿La preparamos juntos? Te ayudo a entender lo que piden y a organizarla paso a paso.', "Shall we prepare it together? I'll help you understand what they ask and plan it step by step.")
     text += '\n\n' + integrityNote()
     title = soon ? tr(`Entrega ${inTime(left)}: ${e.title}`, `Due ${inTime(left)}: ${e.title}`) : tr(`Entrega ${when(start, e.allDay, now, tz)}: ${e.title}`, `Due ${when(start, e.allDay, now, tz)}: ${e.title}`)
-    actions.push(cardAction('ask', tr('¿Lo hacemos juntos?', 'Shall we do it together?'), {
+    actions.push(cardAction('ask', tr('Ayúdame a organizarla', 'Help me plan it'), {
       symbol: 'users', prominent: true,
       value: tr(`Ayúdame a preparar la entrega «${e.title}»: explícame qué piden y hagamos un plan paso a paso (sin hacerla por mí).`, `Help me prepare the assignment “${e.title}”: explain what they ask and let's make a step-by-step plan (without doing it for me).`)
     }))
@@ -94,7 +93,7 @@ export function reminder(e: RoutineEvent, slot: AutomationSlot, course: PackSumm
   const body = soon
     ? tr(`Es ${whenText}. ¡Tú puedes!`, `It's ${whenText}. You can do it!`)
     : e.kind === 'assignment'
-      ? tr('¿La preparamos juntos? Abre Aula y te ayudo paso a paso.', "Shall we prepare it together? Open Aula and I'll help you step by step.")
+      ? tr('Ábrela en Aula para organizarla paso a paso.', 'Open it in Aula to plan it step by step.')
       : tr('Un simulacro corto hoy te va a venir genial.', 'A short practice exam today will help a lot.')
   return { text, cards: [card], noticeTitle: title, noticeBody: (where ? where + ' · ' : '') + body, urgent: soon }
 }
@@ -178,7 +177,7 @@ export function morning(events: readonly RoutineEvent[], study: HomeSummary | nu
   }
   if (plan.length) lines.push(tr('**Para hoy:** ', '**For today:** ') + plan.join(' · '))
   if (!lines.length) lines.push(tr('Hoy no tienes clases, entregas ni exámenes apuntados. Buen día para adelantar un repaso corto.', 'No classes, deadlines or exams today. A good day to get ahead with a short review.'))
-  const text = tr('¡Buenos días! Esto es lo de hoy:', "Good morning! Here's today:") + '\n\n' + lines.map((l) => '- ' + l).join('\n')
+  const text = tr('Hoy:', 'Today:') + '\n\n' + lines.map((l) => '- ' + l).join('\n')
   const body = [
     classes.length ? tr(`${classes.length} ${classes.length === 1 ? 'clase' : 'clases'}`, `${classes.length} ${classes.length === 1 ? 'class' : 'classes'}`) : null,
     due.length ? tr(`${due.length} ${due.length === 1 ? 'entrega pronto' : 'entregas pronto'}`, `${due.length} due soon`) : null,

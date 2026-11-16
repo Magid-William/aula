@@ -45,19 +45,19 @@ export function seedDemoAutomations(center: AutomationCenter, now = Date.now()):
     entry('platform', tr(`1 asignación nueva: «${task}»`, `1 new assignment: “${task}”`), message(
       tr(`Hay una **tarea nueva** en MATH 101: «${task}». Vence el **jueves a las ${due}** y cubre las identidades pitagóricas y las de ángulo doble.\n\nSi quieres, la organizamos juntos paso a paso.`, `There's a **new assignment** in MATH 101: “${task}”. It's due **Thursday at ${due}** and covers the Pythagorean and double-angle identities.\n\nIf you want, we can organize it together step by step.`),
       t(1.2), [actionsCard(tr(`1 asignación nueva: «${task}»`, `1 new assignment: “${task}”`), [
-        cardAction('ask', tr('¿Lo vemos juntos?', 'Shall we look at it together?'), { prominent: true, value: tr(`Cuéntame qué piden en «${task}» y ayúdame a organizarme.`, `Tell me what “${task}” asks and help me get organized.`) }),
+        cardAction('ask', tr('Ayúdame a organizarla', 'Help me plan it'), { prominent: true, value: tr(`Cuéntame qué piden en «${task}» y ayúdame a organizarme.`, `Tell me what “${task}” asks and help me get organized.`) }),
         cardAction('openURL', tr('Abrir en la plataforma', 'Open on the platform'), { value: 'https://canvas.example.edu/courses/7/assignments/4' }),
         cardAction('openAutomation', tr('Ver la automatización', 'See the automation'), { value: canvas.id })
       ], { facts: [{ label: tr('Asignación', 'Assignment'), value: task + tr(` · el jueves a las ${due}`, ` · Thursday at ${due}`) }] })],
       tr('Automatización: Revisar Canvas', 'Automation: Check Canvas'), 'automation'), { priority: 2, course: 'MATH 101', automationID: canvas.id }),
     entry('reminder', tr(`Entrega mañana a las ${due}: Ensayo de inglés`, `Due tomorrow at ${due}: English essay`), message(
-      tr(`**Mañana a las ${due}** vence la entrega «Ensayo de inglés» (ENG 102). ¿La preparamos juntos? Te ayudo a entender lo que piden y a organizarla paso a paso.\n\n_Te ayudo a entenderla y a organizarte; la entrega la escribes y la envías tú._`, `**Tomorrow at ${due}** the assignment “English essay” (ENG 102) is due. Shall we prepare it together?\n\n_I help you understand it and get organized; you write and submit it yourself._`),
+      tr(`**Mañana a las ${due}** vence la entrega «Ensayo de inglés» (ENG 102).\n\n_Te ayudo a entenderla y a organizarte; la entrega la escribes y la envías tú._`, `**Tomorrow at ${due}** the assignment “English essay” (ENG 102) is due.\n\n_I help you understand it and get organized; you write and submit it yourself._`),
       t(2.5), [actionsCard(tr('Ensayo de inglés', 'English essay'), [
-        cardAction('ask', tr('¿Lo hacemos juntos?', 'Shall we do it together?'), { prominent: true, value: tr('Ayúdame a preparar el ensayo de inglés.', 'Help me prepare the English essay.') }),
+        cardAction('ask', tr('Ayúdame a organizarla', 'Help me plan it'), { prominent: true, value: tr('Ayúdame a preparar el ensayo de inglés.', 'Help me prepare the English essay.') }),
         cardAction('openCalendar', tr('Ver en el calendario', 'See in the calendar'))
       ], { detail: 'ENG 102' })], tr('Recordatorio', 'Reminder'), 'reminder'), { priority: 2, course: 'ENG 102', automationID: 'routine-deadlineReminders' }),
     entry('summary', tr('Buenos días: tu plan de hoy', "Good morning: today's plan"), message(
-      tr(`¡Buenos días! Esto es lo de hoy:\n\n- **Clases de hoy:** Trigonometría (${klass})\n- **Vence pronto:** «Ensayo de inglés» mañana a las ${due}\n- **Para hoy:** Trigonometría: repasar identidades (15 min)`, `Good morning! Here's today:\n\n- **Today's classes:** Trigonometry (${klass})\n- **Due soon:** “English essay” tomorrow at ${due}\n- **For today:** Trigonometry: review identities (15 min)`),
+      tr(`Hoy:\n\n- **Clases de hoy:** Trigonometría (${klass})\n- **Vence pronto:** «Ensayo de inglés» mañana a las ${due}\n- **Para hoy:** Trigonometría: repasar identidades (15 min)`, `Today:\n\n- **Today's classes:** Trigonometry (${klass})\n- **Due soon:** “English essay” tomorrow at ${due}\n- **For today:** Trigonometry: review identities (15 min)`),
       t(4), [actionsCard(tr('Tu día', 'Your day'), [cardAction('openToday', tr('Empezar el plan de hoy', "Start today's plan"), { prominent: true }), cardAction('openCalendar', tr('Ver el calendario', 'See the calendar'))])],
       tr('Rutina de la mañana', 'Morning routine'), 'routine'), { read: true, priority: 0, automationID: 'routine-morningBrief' }),
     entry('offer', tr('¿Preparo «Parcial de Química»?', 'Shall I prepare “Chemistry midterm”?'), message(

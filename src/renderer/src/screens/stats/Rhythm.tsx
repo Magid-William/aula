@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { Card, SectionTitle, Icon, StaggerItem, Stagger, cx, type IconName } from '@renderer/design'
 import { capitalize, fmtDate, fmtMinutes, weekdayLetters } from '@renderer/lib/format'
 import type { StatsDay } from '@shared/ipc/stats'
-import { heatLevel, keyToDate, rhythm } from './derive'
+import { heatLevel, keyToDate, rhythm, washFor } from './derive'
 
 /** Píxeles de la columna más alta. */
 const STACK = 8
@@ -46,7 +46,7 @@ export function RhythmCard({ days }: { days: StatsDay[] }) {
   )
 }
 
-/** Minutos por día de la semana como columnas de píxeles (cada píxel con el color del calor de su altura). */
+/** Minutos por día de la semana como columnas de píxeles (cada píxel con la aguada de grafito de su altura). */
 function WeekdayPixels({ byWeekday, best, label }: { byWeekday: number[]; best: number | null; label: string }) {
   const letters = weekdayLetters()
   const max = Math.max(...byWeekday)
@@ -64,7 +64,7 @@ function WeekdayPixels({ byWeekday, best, label }: { byWeekday: number[]; best: 
                   <motion.span
                     key={k}
                     className="dab block h-[11px] w-[15px] rounded-[3px]"
-                    style={{ background: `var(--heat-${pixelLevel(k)})` }}
+                    style={{ background: washFor(pixelLevel(k)) ?? undefined }}
                     initial={{ opacity: 0, y: -14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ type: 'spring', stiffness: 600, damping: 24, delay: 0.35 + wd * 0.05 + k * 0.045 }}

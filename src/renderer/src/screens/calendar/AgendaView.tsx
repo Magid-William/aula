@@ -1,4 +1,5 @@
-// Agenda: los próximos días como lista, con los exámenes destacados y su cuenta atrás. Tocar un evento abre su hoja.
+// Agenda: los próximos días como lista, con los exámenes destacados y su cuenta atrás; el color del curso, en un punto.
+// Tocar un evento abre su hoja.
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { addDays, isSameDay, startOfDay } from 'date-fns'
@@ -49,8 +50,6 @@ export function AgendaView({ events }: { events: CalEvent[] }) {
                     key={e.id}
                     interactive
                     padded="sm"
-                    mark={color(e, dark)}
-                    markSize="sm"
                     className="pl-5 cursor-pointer outline-none focus-visible:shadow-[0_0_0_3px_var(--accent-wash)]"
                     role="button"
                     tabIndex={0}
@@ -67,9 +66,13 @@ export function AgendaView({ events }: { events: CalEvent[] }) {
                       {course ? <CourseIcon icon={course.icon} hue={course.hue} size={34} radius={10} title={course.title} /> : <span className="grid place-items-center w-[34px] h-[34px] rounded-[10px] bg-tile text-text2"><Icon name={KIND_ICON[e.kind]} size={17} /></span>}
                       <div className="min-w-0 flex-1">
                         <div className={cx(big ? 't-headline' : 't-callout', e.done && 'line-through text-text3')}>{e.title}</div>
-                        <div className="t-ui text-text3">
-                          {e.allDay ? t('allDayShort') : fmtTime(e.start)} · {t(`kinds.${e.kind}`)}
-                          {e.course ? ` · ${e.course}` : ''}
+                        <div className="flex items-center gap-1.5 t-ui text-text2">
+                          {/* el color del curso, en un punto (sin muestra de pigmento: va con texto al lado) */}
+                          <span aria-hidden className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: color(e, dark) }} />
+                          <span className="min-w-0">
+                            {e.allDay ? t('allDayShort') : fmtTime(e.start)} · {t(`kinds.${e.kind}`)}
+                            {e.course ? ` · ${e.course}` : ''}
+                          </span>
                         </div>
                       </div>
                       {big && n > 1 && (

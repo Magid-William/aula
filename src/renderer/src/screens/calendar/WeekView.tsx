@@ -1,5 +1,5 @@
-// Vista de semana: rejilla de horas con los eventos como bloques del tono de su curso y la línea de «ahora» en ladrillo.
-// Tocar un evento abre su hoja; tocar la cabecera de un día lo elige.
+// Vista de semana: rejilla de horas con los eventos como bloques del tono de su curso (con el título entero si el bloque es
+// alto) y la línea de «ahora» en ladrillo. Tocar un evento abre su hoja; tocar la cabecera de un día lo elige.
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
@@ -61,7 +61,7 @@ export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date;
                 )}
               </button>
               {allDay.map((e) => (
-                <button key={e.id} onClick={() => openEventSheet(e.id, e.view)} title={e.title} className="w-[90%] truncate rounded-[6px] px-1.5 t-caption text-text text-left hover:brightness-95" style={{ background: `color-mix(in oklab, ${color(e, dark)} 16%, transparent)` }}>
+                <button key={e.id} onClick={() => openEventSheet(e.id, e.view)} title={e.title} className="w-[90%] min-h-[calc(24rem/15)] truncate rounded-[6px] px-1.5 py-[calc(4rem/15)] t-caption leading-[calc(16rem/15)] text-text text-left hover:brightness-95" style={{ background: `color-mix(in oklab, ${color(e, dark)} 16%, transparent)` }}>
                   {e.title}
                 </button>
               ))}
@@ -106,11 +106,12 @@ export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date;
                       animate={{ opacity: 1, scaleY: 1 }}
                       transition={{ duration: 0.3, delay: 0.1 + di * 0.03 + i * 0.02 }}
                       whileHover={{ scale: 1.02 }}
-                      className="absolute left-1 right-1 origin-top overflow-hidden rounded-[10px] px-2 py-1 text-left"
+                      className="absolute left-1 right-1 origin-top overflow-hidden rounded-[10px] px-1.5 py-1 text-left"
                       style={{ top, height, background: eventFill(c, dark) }}
                     >
-                      <div className={cx('t-ui font-semibold truncate', e.done && 'line-through opacity-60')}>{e.title}</div>
-                      {height > 34 && <div className="t-caption truncate">{fmtTime(e.start)}</div>}
+                      {/* el título entero (en dos líneas si el bloque es alto) y, si cabe, la hora */}
+                      <div className={cx('text-[calc(12rem/15)] leading-[calc(15rem/15)] font-semibold text-text', height > 44 ? 'line-clamp-2 break-words' : 'truncate', e.done && 'line-through opacity-60')}>{e.title}</div>
+                      {height > 60 && <div className="t-caption truncate">{fmtTime(e.start)}</div>}
                     </motion.button>
                   )
                 })}
