@@ -22,7 +22,9 @@
     "cell": "{{date}}: {{minutes}}",
     "cellNone": "{{date}}: sin estudio",
     "cellExercises_one": "{{date}}: {{minutes}} · {{count}} ejercicio",
-    "cellExercises_other": "{{date}}: {{minutes}} · {{count}} ejercicios"
+    "cellExercises_other": "{{date}}: {{minutes}} · {{count}} ejercicios",
+    "cellOnlyExercises_one": "{{date}}: {{count}} ejercicio",
+    "cellOnlyExercises_other": "{{date}}: {{count}} ejercicios"
   },
   "rhythm": {
     "title": "Tu ritmo",

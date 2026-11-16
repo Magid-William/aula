@@ -1,7 +1,7 @@
 // Las reglas del diseño, en la app de verdad (demo en inglés): en cada pantalla, como mucho un botón ladrillo a la vista; el
 // pigmento solo para el examen (una muestra como mucho, y solo en el curso o en el simulacro); sin la gota flotante de Aula; y
-// nunca un cero enseñado como dato («0 min», «0 flashcards»…). Las mismas pantallas que `english.e2e.ts`. (Las páginas se leen
-// con cadenas: este proyecto de pruebas no carga los tipos del DOM.)
+// nunca un cero enseñado como dato («0 min», «0 flashcards»…), tampoco tras un ejercicio de un momento. Las mismas pantallas
+// que `english.e2e.ts`. (Las páginas se leen con cadenas: este proyecto de pruebas no carga los tipos del DOM.)
 import { test, expect, type Page } from 'playwright/test'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -80,6 +80,23 @@ test('en cada pantalla: un botón ladrillo como mucho, pigmento solo para el exa
     if (seen.pigments > (pigmentHere ? 1 : 0)) found.push(`${name}: ${seen.pigments} muestras de pigmento`)
     if (seen.orbs) found.push(`${name}: la gota de Aula`)
     for (const z of seen.zeros) found.push(`${name}: un cero, «${z.slice(0, 80)}»`)
+  }
+  // un ejercicio respondido en un momento (menos de un minuto de estudio): Hoy y Estadísticas siguen sin enseñar «0 min»
+  await go(page, { name: 'study', id: C, mode: 'practice' })
+  await page.waitForTimeout(900)
+  const field = page.locator('main input:visible').first()
+  if (await field.count()) {
+    await field.click()
+    await page.keyboard.type('12345')
+  } else await page.getByRole('radio').first().click()
+  await page.getByRole('button', { name: /^Check/ }).click()
+  await expect(page.getByRole('button', { name: /^(Try again|Continue|Next)/ }).first()).toBeVisible()
+  // el ratón, fuera de la cuadrícula de la constancia: su línea de abajo dice entonces el día de hoy
+  await page.mouse.move(130, 640)
+  for (const [name, route] of [['home', { name: 'home' }], ['stats', { name: 'stats' }]] as const) {
+    await go(page, route)
+    await page.waitForTimeout(900)
+    for (const z of (await look(page)).zeros) found.push(`${name} (tras un ejercicio): un cero, «${z.slice(0, 80)}»`)
   }
   expect(found).toEqual([])
   expect(errors).toEqual([])

@@ -91,8 +91,10 @@ function Swatch({ level, className }: { level: number; className?: string }) {
 
 function cellLabel(t: (k: string, o?: Record<string, unknown>) => string, d: StatsDay): string {
   const date = capitalize(fmtDate(keyToDate(d.date), { weekday: 'long', day: 'numeric', month: 'long' }))
-  // un día sin estudio no dice «0 min»
-  if (!(d.minutes > 0) && !(d.attempts > 0)) return t('heat.cellNone', { date })
+  // un día sin estudio no dice «0 min»; con ejercicios en menos de medio minuto, solo los ejercicios
+  const hasMinutes = Math.round(d.minutes) >= 1
+  if (!hasMinutes && !(d.attempts > 0)) return t('heat.cellNone', { date })
+  if (!hasMinutes) return t('heat.cellOnlyExercises', { date, count: d.attempts })
   const minutes = fmtMinutes(d.minutes)
   return d.attempts > 0 ? t('heat.cellExercises', { date, minutes, count: d.attempts }) : t('heat.cell', { date, minutes })
 }
