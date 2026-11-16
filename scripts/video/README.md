@@ -286,7 +286,7 @@ AULA_VIDEO_NO_WORLDS=1 node scripts/video/render.ts scripts/video/montage/aula-v
 node scripts/video/sound-v3/render.ts $W/aula-v6-film/cuesheet.json $W/aula-v6-film/soundtrack.wav
 AULA_VIDEO_NO_WORLDS=1 AULA_VIDEO_FPS=30 node scripts/video/render.ts scripts/video/montage/aula-v6-film.ts --reuse --draft   # borrador
 AULA_VIDEO_NO_WORLDS=1 node scripts/video/render.ts scripts/video/montage/aula-v6-film.ts --reuse --stills 10.4              # final (~8 min)
-npx electron scripts/dev/film-poster.mjs $W/aula-v6-film/stills/aula-v6-film-10.40.png 2:12                                  # el póster del README
+npx electron scripts/dev/film-poster.mjs $W/aula-v6-film/stills/aula-v6-film-10.40.png 2:12                                  # el póster (docs/media/film-poster.png)
 ```
 
 - Las fechas del mundo salen del día en que se graba: la toma de la mañana pasa de mes en el calendario solo si el examen

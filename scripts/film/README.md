@@ -2,9 +2,9 @@
 
 > *Developer notes, in Spanish like the code comments. The film itself is in English.*
 
-«Nine days.» es el corto de animación del README (1 min 50 s): un estudiante perdido en una tormenta de apuntes, nueve
-días antes de un examen, encuentra un arco encendido, lo cruza, sube una escalera de hojas mientras el sol cuenta los
-días y llega listo. Acaba con veinte pantallas de la app de verdad.
+«Nine days.» es el corto de animación de Aula, enlazado desde `docs/FEATURES*.md` (1 min 50 s): un estudiante perdido
+en una tormenta de apuntes, nueve días antes de un examen, encuentra un arco encendido, lo cruza, sube una escalera de
+hojas mientras el sol cuenta los días y llega listo. Acaba con veinte pantallas de la app de verdad.
 
 Está **pintado con código**, fotograma a fotograma, en un lienzo de una ventana oculta de Electron: tinta y acuarela
 sobre papel, cámara con profundidad, grano de película y un cuadro panorámico que se abre cuando se derrama el color.
@@ -37,11 +37,11 @@ node scripts/film/render.ts --fps 12 --silent    # borrador rápido
 Todo es determinista: el mismo fotograma sale igual siempre (no se usa `Math.random` ni el reloj).
 
 **Publicarlo.** Los MP4 van como archivos de la versión v0.1.0 de GitHub, sustituyendo a los anteriores (nunca como una
-versión nueva, ver `docs/PUBLISHING.md`), y el póster del README sale de un fotograma:
+versión nueva, ver `docs/PUBLISHING.md`), y el póster (`docs/media/film-poster.png`) sale de un fotograma:
 
 ```sh
 node scripts/film/render.ts --name Aula-film --bitrate 9000000        # el máster
-node scripts/film/render.ts --name Aula-film-web --bitrate 1800000 --grain 0.4   # el del README: 27 MB como mucho (lo comprueba public-docs.test.ts)
+node scripts/film/render.ts --name Aula-film-web --bitrate 1800000 --grain 0.4   # el que enlaza docs/FEATURES*.md: 27 MB como mucho (lo comprueba public-docs.test.ts)
 gh release upload v0.1.0 scripts/film/work/Aula-film.mp4 scripts/film/work/Aula-film-web.mp4 --clobber
 node scripts/film/render.ts --stills 28.2
 npx electron scripts/dev/film-poster.mjs scripts/film/work/stills/aula-short-film-28.20.png 1:50
