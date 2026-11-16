@@ -24,19 +24,19 @@ struct LicensedComponent: Decodable, Identifiable, Hashable {
     static func == (a: Self, b: Self) -> Bool { a.id == b.id }
     func hash(into h: inout Hasher) { h.combine(id) }
 
-    /// Los que trae esta copia de la app (ninguno si le falta Licenses.json).
-    static func bundled() -> [LicensedComponent] {
+    /// Los que trae esta copia de la app (ninguno si le falta Licenses.json). Se leen una vez.
+    static let bundled: [LicensedComponent] = {
         struct Catalog: Decodable { let components: [LicensedComponent] }
         guard let url = Bundle.main.url(forResource: "Licenses", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let catalog = try? JSONDecoder().decode(Catalog.self, from: data) else { return [] }
         return catalog.components
-    }
+    }()
 }
 
 struct LicensesView: View {
     let close: () -> Void
-    @State private var components = LicensedComponent.bundled()
+    private let components = LicensedComponent.bundled
     @Environment(\.openURL) private var openURL
 
     var body: some View {
