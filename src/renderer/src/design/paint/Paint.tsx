@@ -192,8 +192,8 @@ export function InkCheck({ seed, size = 18, color = 'var(--success)', className 
 }
 
 /** Rayitas de alegría alrededor de algo que se celebra (un logro): se dibujan una tras otra al aparecer. */
-export function InkBurst({ seed, size, color = 'var(--pigment-brick)', delay = 380, className }: { seed: string | number; size: number; color?: string; delay?: number; className?: string }) {
-  const drawing = useMemo(() => burstInk(size, size, seed), [size, seed])
+export function InkBurst({ seed, size, color = 'var(--pigment-brick)', delay = 380, className, count = 6, arc }: { seed: string | number; size: number; color?: string; delay?: number; className?: string; count?: number; /** Abanico (radianes); por defecto, arriba y a los lados. */ arc?: readonly [number, number] }) {
+  const drawing = useMemo(() => burstInk(size, size, seed, count, arc), [size, seed, count, arc])
   return <Ink drawing={drawing} color={color} drawKey={`burst:${seed}`} delay={delay} className={cx('ink-fixed', className)} style={{ width: size, height: size }} />
 }
 

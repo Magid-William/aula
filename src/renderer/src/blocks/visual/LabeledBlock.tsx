@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Icon, PixelCheck, ProgressBar, SegmentedTabs, cx, pixelBurst, spring, useTheme } from '@renderer/design'
+import { Button, Celebrate, Icon, PixelCheck, ProgressBar, SegmentedTabs, cx, spring, useTheme } from '@renderer/design'
 import type { BlockOf } from '@shared/schema/blocks'
 import { effectiveAspect, FigureGeometry, type FigurePart } from '@shared/schema/visual'
 import { RichText } from '@renderer/lib/RichText'
@@ -808,13 +808,14 @@ function LocatePanel({ target, index, total, results, feedback, onSkip, onRetryM
   onSkip: () => void; onRetryMissed: () => void; onAgain: () => void; onFinish: (right: number, total: number) => void
 }) {
   const { t } = useTranslation('visual')
-  const ref = useRef<HTMLDivElement>(null)
+  const [cheer, setCheer] = useState<number | null>(null)
   const right = Object.values(results).filter(Boolean).length
   const done = !target && total > 0
   useEffect(() => {
     if (!done) return
     onFinish(right, total)
-    if (right === total && ref.current) pixelBurst(ref.current, { count: 18 })
+    // todas bien: se celebra a tinta junto al ✓
+    if (right === total) setCheer(Date.now())
   }, [done]) // eslint-disable-line react-hooks/exhaustive-deps
   if (target) {
     return (
@@ -847,8 +848,8 @@ function LocatePanel({ target, index, total, results, feedback, onSkip, onRetryM
   if (!done) return null
   const perfect = right === total
   return (
-    <div ref={ref} className={cx('flex items-center gap-2.5 flex-wrap rounded-[14px] px-3.5 py-2.5', perfect ? 'bg-success-soft' : 'bg-fill1')}>
-      {perfect ? <PixelCheck size={18} /> : <Icon name="flag" size={16} className="text-text2" />}
+    <div className={cx('flex items-center gap-2.5 flex-wrap rounded-[14px] px-3.5 py-2.5', perfect ? 'bg-success-soft' : 'bg-fill1')}>
+      {perfect ? <Celebrate at={cheer}><PixelCheck size={18} /></Celebrate> : <Icon name="flag" size={16} className="text-text2" />}
       <span className="t-callout font-semibold">
         {t('labeled.score', { right, total })}
       </span>
@@ -870,11 +871,11 @@ function DragPanel({ chips, placed, picked, checked, total, right, onChipDown, o
   onChipDown: (e: RPointerEvent<HTMLButtonElement>, name: string) => void; onCheck: () => void; onFix: () => void; onAgain: () => void
 }) {
   const { t } = useTranslation('visual')
-  const ref = useRef<HTMLDivElement>(null)
+  const [cheer, setCheer] = useState<number | null>(null)
   const used = new Set(Object.values(placed).map((v) => v.toLowerCase()))
   const count = Object.keys(placed).length
   useEffect(() => {
-    if (checked && right === total && total > 0 && ref.current) pixelBurst(ref.current, { count: 18 })
+    if (checked && right === total && total > 0) setCheer(Date.now())
   }, [checked]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="flex flex-col gap-2.5">
@@ -902,10 +903,10 @@ function DragPanel({ chips, placed, picked, checked, total, right, onChipDown, o
           <p className="t-footnote text-text3 m-0">{t('labeled.dragHint')}</p>
         </>
       )}
-      <div ref={ref} className={cx('flex items-center gap-2.5 flex-wrap rounded-[14px] px-3.5 py-2.5', checked && right === total ? 'bg-success-soft' : 'bg-fill1')}>
+      <div className={cx('flex items-center gap-2.5 flex-wrap rounded-[14px] px-3.5 py-2.5', checked && right === total ? 'bg-success-soft' : 'bg-fill1')}>
         {checked ? (
           <>
-            {right === total ? <PixelCheck size={18} /> : <Icon name="flag" size={16} className="text-text2" />}
+            {right === total ? <Celebrate at={cheer}><PixelCheck size={18} /></Celebrate> : <Icon name="flag" size={16} className="text-text2" />}
             <span className="t-callout font-semibold">{t('labeled.inPlace', { right, total })}</span>
             <span className="flex-1" />
             {right < total && (

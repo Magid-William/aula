@@ -79,7 +79,9 @@ texto» cambia la raíz y todo crece con él; lo nuevo, también en `rem`.
 - Movimiento (bucles siempre en CSS/WAAPI de transform y opacity, nunca un bucle de motion en JavaScript): `Stagger`/`StaggerItem`, `Floating` (`useFloat`), `Reveal`, `LiveDot`, `AnimatedNumber`, `ProgressRing`, `ProgressBar`.
   Muelles `spring.snappy` (controles), `spring.smooth` (paneles), `spring.bouncy` (solo interruptor, diálogo, aviso).
 - Capas: `Dialog`, `Drawer`, `ConfirmDialog`, `toast.*` (el mismo aviso no se apila), `Tooltip`, `Menu` y `Select` (abren hacia arriba
-  si no caben debajo: `placePopover`), `TextField` (`flex-1`, `w-*`… van al envoltorio), `TextArea`, `Switch`, `Slider`, `EmptyState`.
+  si no caben debajo: `placePopover`), `TextField` (`flex-1`, `w-*`… van al envoltorio), `TextArea`, `DateField` (la fecha escrita en el
+  idioma de la interfaz, nunca «mm/dd/yyyy»; al pulsar, el calendario del sistema), `Switch`, `Slider`, `EmptyState`. El foco de un campo
+  es un anillo de 2 px con `--focus` (se ve sobre el papel).
   Toda capa modal atrapa Tab (`useTabTrap`: ya lo llevan `Dialog`, `Drawer`, ⌘K y la bienvenida); Esc cierra primero el menú o
   la lista abiertos y nada más. `Tooltip` se mide y no se sale de la ventana (`placeTooltip`). Una `Card` con `onClick` es un
   botón (Intro y Espacio). `SegmentedTabs` no usa `layoutId` (motion lo guarda para siempre): la píldora se mide.
@@ -143,7 +145,8 @@ grano de papel muy suave, algo fuera de registro de su línea. Minimalista y ama
   respuesta es su marca de bien o mal, no pigmento.)
 - **Flotar** (`Floating`, `Card floating`) solo los exámenes y la semana de Hoy, la tarjeta del examen del curso, el mes y la
   semana del calendario, y las herramientas fijadas.
-- **Celebrar**: un acierto o terminar algo, `InkBurst` (rayitas a tinta). Las gotas de `pixelBurst`, solo en logros de verdad
+- **Celebrar**: un acierto o terminar algo, `InkBurst` (rayitas a tinta; `Celebrate at={cuándo}` las dibuja alrededor de la marca
+  de un acierto y se van). Las gotas de `pixelBurst`, solo en logros de verdad
   (el aviso de logro, el informe del simulacro, el resumen de una sesión); nunca en las acciones de todos los días.
 
 ## Pantallas

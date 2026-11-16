@@ -46,15 +46,17 @@ export function TableBlockView({ block, ctx }: BlockProps<BlockOf<'table'>>) {
   const ink = inkColor(ctx.hue, dark)
   // en una tabla larga, filas alternas apenas teñidas: el ojo no se pierde al cruzarla
   const zebra = rows.length > 5
+  // en la lección, como en un libro: sobre el papel, con un filete arriba, otro bajo la cabecera y otro al final (sin caja)
+  const book = ctx.mode === 'lesson' && !ctx.exerciseId
   return (
     <div>
-      <div className={cx('blk-table overflow-x-auto bg-surface border-[0.5px] border-line', chat ? 'rounded-[12px]' : 'rounded-[16px]')}>
+      <div className={cx('blk-table overflow-x-auto', book ? 'border-y-[1.5px] border-rule' : 'bg-surface border-[0.5px] border-line', !book && (chat ? 'rounded-[12px]' : 'rounded-[16px]'))}>
         <table className={cx('w-full border-collapse', chat ? 't-callout' : 'text-[15px] leading-[22px]')}>
           {headers.length > 0 && (
             <thead>
-              <tr style={{ background: `color-mix(in oklab, ${ink} 7%, transparent)` }}>
+              <tr style={book ? undefined : { background: `color-mix(in oklab, ${ink} 7%, transparent)` }}>
                 {Array.from({ length: cols }, (_, c) => (
-                  <th key={c} scope="col" className={cx(cell, 'font-serif text-[15.5px] font-medium text-text whitespace-nowrap', alignClass(aligns[c]))} style={{ borderBottom: `1.5px solid color-mix(in oklab, ${ink} 62%, transparent)` }}>
+                  <th key={c} scope="col" className={cx(cell, 'font-serif text-[15.5px] font-medium text-text whitespace-nowrap', book && 'first:pl-1', alignClass(aligns[c]))} style={{ borderBottom: book ? '1px solid var(--rule)' : `1.5px solid color-mix(in oklab, ${ink} 62%, transparent)` }}>
                     <Inline text={displayFractions(headers[c] ?? '')} />
                   </th>
                 ))}
@@ -78,7 +80,7 @@ export function TableBlockView({ block, ctx }: BlockProps<BlockOf<'table'>>) {
                     const head = block.firstColumnIsHeader && c === 0
                     const Tag = head ? 'th' : 'td'
                     return (
-                      <Tag key={c} scope={head ? 'row' : undefined} className={cx(cell, 'align-middle text-text', on && c === 0 && 'font-semibold', head && 'font-semibold', alignClass(aligns[c]))} style={on && c === 0 ? { color: ink } : undefined}>
+                      <Tag key={c} scope={head ? 'row' : undefined} className={cx(cell, 'align-middle text-text', book && 'first:pl-1', on && c === 0 && 'font-semibold', head && 'font-semibold', alignClass(aligns[c]))} style={on && c === 0 ? { color: ink } : undefined}>
                         <Inline text={displayFractions(r[c] ?? '')} />
                       </Tag>
                     )
@@ -89,7 +91,7 @@ export function TableBlockView({ block, ctx }: BlockProps<BlockOf<'table'>>) {
           </tbody>
         </table>
       </div>
-      <Caption text={block.caption} className="mt-2 px-1" />
+      <Caption text={block.caption} className={cx('mt-2 px-1', book && 'blk-table-caption')} />
     </div>
   )
 }
