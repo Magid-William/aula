@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { ChartRenderSceneV1 } from '../../src/shared/figuresChart'
 import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { CHART_FIXTURES, type ChartFixture } from './chart-fixtures'
+import { waitForPieHover } from './chart-hover-readiness'
 import { compareDiagramPixels } from './diagram-pixels'
 import { assertChartReferenceInvariant, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, snapshotChartReference } from './chart-reference'
 import { assertChartRasterConsistency, compareChartRasterConsistency, type ChartRasterConsistency } from './chart-raster-consistency'
@@ -185,6 +186,7 @@ async function hoverData(page: Page, body: Locator, fixture: ChartFixture): Prom
   }
   if (fixture.branch !== 'donut') await expect(body.locator('.pointer-events-none.absolute.z-10')).toHaveCount(1)
   await page.waitForTimeout(300)
+  if (fixture.branch === 'donut') await waitForPieHover(body)
   return true
 }
 
