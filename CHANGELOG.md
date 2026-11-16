@@ -5,7 +5,9 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 
 ## [Unreleased]
 
-### Added
+## [0.2.6] - 2026-11-16
+
+### New
 - **Save a chemical drawing as SVG or PNG** from its export menu in the desktop app. Molecules and reactions keep
   their drawing style, group or guided-step highlighting, and light or dark paper background. Files contain the full
   drawing, independent of zoom, without controls, atom tooltips or answers hidden in an exercise prompt.
@@ -26,6 +28,42 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
   The original question, context and files stay intact, and repeated clicks do not send duplicate questions. If a saved
   attachment is unavailable, Aula explains the problem before starting another response.
 - **Diagram construction steps keep future shapes hidden**, including their emphasis rings and Venn cutouts.
+- **Running out of credit with Claude Code or OpenCode pauses course creation** with *Resume*, the same as with an API
+  key. Before, the course ended as done, with failed topics and no way to resume. A number like «line 402» in an error
+  message is no longer mistaken for an out-of-credit error.
+- **Resuming a course that was stopped while it was being planned no longer duplicates its topics.**
+- **Deleting a course while it's being created is safe:** its AI team stops, no hidden folder is left behind, and a
+  new course with the same title doesn't inherit its materials or its run.
+- **The *Resume* button on the course-creation screen says why it failed** instead of doing nothing, and both buttons
+  wait while a request is in progress.
+- **Keys and sessions are never saved unencrypted on macOS or Windows.** If the system keychain isn't available (for
+  example, after choosing *Deny*), Aula saves and removes nothing until it is, and the sidebar explains what to do.
+- **Rolling back a Mac update that doesn't start is safer:** the watchdog can no longer move the previous copy inside
+  the broken one.
+- **The tools that build the installers** no longer use a version of minimatch with a published advisory
+  (GHSA-g3hv-75wg-m249). It was only used while packaging, never inside Aula.
+
+### Mac signing
+- **Aula for Mac is now signed with an Apple Developer ID and notarized by Apple.** A downloaded copy opens without
+  *Open Anyway* or right-click → *Open*.
+- **The first time 0.2.6 opens after an update, macOS asks once for your Mac password for “Aula Safe Storage”**, the
+  keychain item that protects your keys and study-platform sessions. Type it and choose *Always Allow*. If you choose
+  *Deny*, nothing is lost: your saved keys stay locked, the sidebar shows *Aula can’t open the keychain*, and *Reopen
+  Aula* asks again. Your study-platform sessions wait for the keychain's answer, so they aren't dropped meanwhile.
+- **Mac copies on 0.2.0 to 0.2.4 still update:** they install the original 0.2.5 first and then 0.2.6. Every release
+  from now on carries the published 0.2.5 Mac update files (`Aula-0.2.5-mac.*` and `latest-mac.yml`), checked against
+  a pinned manifest. To install by hand, use `Aula-0.2.6-mac.dmg`.
+
+### Docs
+- **A new README** that works as a landing page: what Aula is in one line, a short demo loop, the AI tutor, courses,
+  notes and mock exams with screenshots in English and Spanish, and how to help. The long sections moved to
+  `docs/FEATURES.md` and `docs/INSTALL.md` (and their Spanish versions), and every old link still works. Installing on
+  a Mac no longer needs *Open Anyway*.
+
+### Updating
+- Windows and Linux: from 0.2.0 or later, Aula updates itself. macOS: 0.2.5 updates to 0.2.6 directly, and 0.2.0 to
+  0.2.4 go through 0.2.5 first. From 0.1.x, install this version by hand once (see 0.2.0 below). Windows is still
+  unsigned, so SmartScreen may ask the first time you install it by hand.
 
 ## [0.2.5] - 2026-11-14
 

@@ -110,9 +110,9 @@ page) helps other students find it.</sub>
 [latest release](https://github.com/luumlabs/aula/releases/latest). It's free and needs no account.
 
 - **Windows** 10 and 11 (x64 and ARM): `Aula-Setup-<version>.exe`. If SmartScreen shows up, click *More info → Run
-  anyway* (Aula isn't code-signed yet).
-- **macOS** 13 or later (Apple Silicon and Intel): `Aula-<version>-mac.dmg`. Drag Aula to *Applications*. It isn't
-  notarized yet, so try to open it once, then go to *System Settings → Privacy & Security → Open Anyway*.
+  anyway* (Aula isn't code-signed for Windows yet).
+- **macOS** 13 or later (Apple Silicon and Intel): `Aula-<version>-mac.dmg`. Drag Aula to *Applications* and open
+  it: it's signed with an Apple Developer ID and notarized.
 - **Linux** x64 and ARM64: the `.AppImage` (`chmod +x` it, then open it) or, on x64, the `.deb`
   (`sudo apt install ./Aula-<version>-linux-amd64.deb`).
 - **Android** 8 or later: `Aula-<version>-android.apk`, a window to Aula running on your Mac or on
