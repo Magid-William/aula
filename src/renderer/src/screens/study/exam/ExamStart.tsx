@@ -1,12 +1,13 @@
-// Inicio del simulacro: el modelo del examen (preguntas, duración, puntos, nota de corte), sus secciones, los simulacros
-// anteriores con su nota y, si hay uno a medias, continuarlo o descartarlo.
+// Inicio del simulacro (su portada): el modelo del examen (preguntas, duración, puntos, nota de corte), sus secciones, los
+// simulacros anteriores con su nota y, si hay uno a medias, continuarlo o descartarlo. La portada lleva la muestra de pigmento
+// (es el examen), en su esquina libre de abajo; nada flota.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import type { ExamRun } from '@shared/schema'
 import { examPercent } from '@shared/schema'
 import { examBlueprint } from '@engine/study'
-import { AnimatedNumber, Button, Card, ConfirmDialog, Floating, Icon, ProgressBar, SectionTitle, Stagger, StaggerItem } from '@renderer/design'
+import { AnimatedNumber, Button, Card, ConfirmDialog, Icon, ProgressBar, SectionTitle, Stagger, StaggerItem } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { fmtDate, fmtPercent, percentSuffix } from '@renderer/lib/format'
 import { StudyFrame, TopCapsule } from '../Chrome'
@@ -35,7 +36,7 @@ export function ExamStart({ data, pending, busy, onStart, onResume, onDiscard, o
     <StudyFrame wide capsule={<TopCapsule icon="exam" label={t('exam.title')} onExit={onExit} />} onExit={onExit}>
       <Stagger className="grid grid-cols-12 gap-4" gap={0.06}>
         <StaggerItem className="col-span-12 @4xl:col-span-7">
-          <Card padded="lg" className="h-full">
+          <Card padded="lg" mark={ink} markSize="sm" className="h-full">
             <div className="t-eyebrow">{data.pack.exam?.title ?? t('exam.title')}</div>
             <h1 className="t-display mt-1 text-[36px] leading-[42px]">{t('exam.mockTitle')}</h1>
             <p className="t-body text-text2 mt-2 max-w-[520px]">{t('exam.lead')}</p>
@@ -90,22 +91,20 @@ export function ExamStart({ data, pending, busy, onStart, onResume, onDiscard, o
         </StaggerItem>
 
         <StaggerItem className="col-span-12 @4xl:col-span-5">
-          <Floating amplitude={2} duration={10} className="h-full">
-            <Card padded="lg" mark={ink} className="h-full">
-              <SectionTitle title={t('exam.sections')} />
-              <div className="mt-2 flex flex-col">
-                {bp.sections.map((s, i) => (
-                  <div key={i} className="border-t-[0.5px] border-line-soft py-3 first:border-t-0">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="t-headline"><RichText text={s.title} inline /></span>
-                      <span className="t-ui tabular text-text2 shrink-0">{t('exam.sectionMeta', { count: s.count, points: s.pointsEach })}</span>
-                    </div>
-                    <div className="t-footnote mt-0.5 line-clamp-2">{s.skillIDs.map(title).join(' · ')}</div>
+          <Card padded="lg" className="h-full">
+            <SectionTitle title={t('exam.sections')} />
+            <div className="mt-2 flex flex-col">
+              {bp.sections.map((s, i) => (
+                <div key={i} className="border-t-[0.5px] border-line-soft py-3 first:border-t-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="t-headline"><RichText text={s.title} inline /></span>
+                    <span className="t-ui tabular text-text2 shrink-0">{t('exam.sectionMeta', { count: s.count, points: s.pointsEach })}</span>
                   </div>
-                ))}
-              </div>
-            </Card>
-          </Floating>
+                  <div className="t-footnote mt-0.5 line-clamp-2">{s.skillIDs.map(title).join(' · ')}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
         </StaggerItem>
 
         <StaggerItem className="col-span-12">

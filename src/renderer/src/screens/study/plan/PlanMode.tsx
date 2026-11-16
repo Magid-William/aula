@@ -1,5 +1,6 @@
 // «Estudiar ahora»: el plan de hoy del curso en orden (tarjetas → errores → aprender → practicar → simulacro), cada paso
-// con su porqué y sus minutos. Se hace paso a paso; al terminar cada modo se vuelve aquí (o se sigue directamente).
+// con su porqué y sus minutos. Se hace paso a paso; al terminar cada modo se vuelve aquí (o se sigue directamente). Desde
+// «Empezar el plan» (Hoy) y «Estudiar ahora» (el curso) se entra directamente en el primer paso que falta (`start`).
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
@@ -14,7 +15,7 @@ import { CapsuleProgress, StudyFrame, TopCapsule } from '../Chrome'
 import type { CourseData } from '../data'
 import { SessionSummary } from '../Summary'
 import { activePlan, endPlan, runStep, startPlan, usePlanStore } from './session'
-import { navigate } from '@renderer/app/router'
+import { navigate, useRoute } from '@renderer/app/router'
 import { planAvailability } from '../../course/failure'
 import { useCourseRun } from '../../course/runs'
 
@@ -47,6 +48,16 @@ export function PlanMode({ data }: { data: CourseData }) {
       startPlan(packId, items)
     }
   }, [plan, packId, items])
+  // una sola puerta para estudiar: con `start`, directo al paso que falta (en lugar de esta entrada del historial)
+  const route = useRoute()
+  const autoStart = route.name === 'study' && route.start === true
+  const launched = useRef(false)
+  const pendingStep = plan ? plan.done.findIndex((d) => !d) : -1
+  useEffect(() => {
+    if (!autoStart || launched.current || !plan) return
+    launched.current = true
+    if (pendingStep >= 0) runStep(packId, pendingStep, { replace: true })
+  }, [autoStart, plan, pendingStep, packId])
 
   const stats = useMemo(() => {
     try {
@@ -56,15 +67,17 @@ export function PlanMode({ data }: { data: CourseData }) {
     }
   }, [data.progress])
 
-  if (!plan) return null
+  // mientras salta al primer paso no se pinta la agenda (sin fotograma de más)
+  if (!plan || (autoStart && pendingStep >= 0)) return null
   const steps = plan.items
   const doneCount = plan.done.filter(Boolean).length
   const total = steps.reduce((a, s) => a + s.minutes, 0)
   const nextIndex = plan.done.findIndex((d) => !d)
   const capsule = (
     <TopCapsule icon="today" label={t('plan.title')} onExit={onExit}>
-      <CapsuleProgress value={doneCount} total={steps.length} label={t('plan.stepsDone', { n: doneCount, m: steps.length })} />
-      {stats && <span className="t-ui tabular text-text2 whitespace-nowrap">{t('plan.minutesToday', { n: Math.round(stats.minutesToday), m: data.progress.settings.dailyMinutes || 45 })}</span>}
+      <CapsuleProgress value={doneCount} total={steps.length} label={doneCount ? t('plan.stepsDone', { n: doneCount, m: steps.length }) : t('plan.steps', { count: steps.length })} />
+      {/* sin un «0 de 45 min»: antes de estudiar, la meta */}
+      {stats && <span className="t-ui tabular text-text2 whitespace-nowrap">{Math.round(stats.minutesToday) > 0 ? t('plan.minutesToday', { n: Math.round(stats.minutesToday), m: data.progress.settings.dailyMinutes || 45 }) : t('plan.goal', { m: data.progress.settings.dailyMinutes || 45 })}</span>}
     </TopCapsule>
   )
 

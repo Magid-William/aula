@@ -7,7 +7,7 @@ const CARD: Flashcard = { id: 'c1', kind: 'basic', front: '¿Capital de Francia?
 
 /** Las dos caras (frente y dorso), en el orden en que se pintan. */
 function faces(flipped: boolean): string[] {
-  const html = renderToStaticMarkup(<FlipCard card={CARD} flipped={flipped} onFlip={() => undefined} ink="var(--accent)" assetUrl={(a) => a} />)
+  const html = renderToStaticMarkup(<FlipCard card={CARD} flipped={flipped} onFlip={() => undefined} assetUrl={(a) => a} />)
   return [...html.matchAll(/<div [^>]*backface-visibility:hidden[^>]*>/g)].map((m) => m[0])
 }
 

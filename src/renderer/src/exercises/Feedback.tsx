@@ -1,6 +1,8 @@
 // Lo que pasa al comprobar (port de ExerciseFeedback.swift): el resultado en una palabra con su icono (la marca de acierto
-// se dibuja píxel a píxel), el diagnóstico, la explicación del error con una raya fina de su color, las pistas, la
-// solución paso a paso y «Otra forma de verlo».
+// se dibuja píxel a píxel y unas rayitas a tinta la celebran), el diagnóstico, la explicación, las pistas, la solución paso a
+// paso y «Otra forma de verlo».
+// Un error se corrige como lo haría el profesor con su boli rojo: la respuesta tachada en el campo y, debajo, una nota al
+// margen con el porqué. Una sola señal: sin caja rosa, sin borde rojo, sin pigmento.
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
@@ -10,7 +12,8 @@ import { StaticBlocks } from './Blocks'
 import type { BlockContext } from '@renderer/blocks/types'
 import { RichText } from '@renderer/lib/RichText'
 import { fmtPercent } from '@renderer/lib/format'
-import { Button, cx, Icon, PixelCheck } from '@renderer/design'
+import { Button, cx, Icon, InkBurst, MarginNote, PixelCheck } from '@renderer/design'
+import { tr as mathTr } from '@engine/math/core/i18n'
 import type { GradeResult } from './types'
 import { StatusWord, ToneRule } from './ui'
 
@@ -22,8 +25,14 @@ export function toneOf(r: GradeResult): string {
 
 const pct = (x: number): string => fmtPercent(x)
 
+/** «No es correcto.» del corrector no dice nada que no diga ya la nota: no se repite. */
+function isGeneric(md: string): boolean {
+  const s = md.trim()
+  return s === 'No es correcto.' || s === mathTr('No es correcto.')
+}
+
 /** Resultado de la comprobación, sin caja de color. */
-export function FeedbackPanel({ exercise, result, revealed, stale, hints, attempts, onAskTutor, checkRef, children }: {
+export function FeedbackPanel({ exercise, result, revealed, stale, hints, attempts, onAskTutor, burst = 0, children }: {
   exercise: Exercise
   result: GradeResult
   revealed: boolean
@@ -31,7 +40,8 @@ export function FeedbackPanel({ exercise, result, revealed, stale, hints, attemp
   hints: number
   attempts: number
   onAskTutor?: () => void
-  checkRef?: (el: HTMLSpanElement | null) => void
+  /** Cuántas veces se ha acertado (cada acierto nuevo lo celebran unas rayitas a tinta alrededor de la marca). */
+  burst?: number
   children?: ReactNode
 }) {
   const { t } = useTranslation('study')
@@ -48,13 +58,42 @@ export function FeedbackPanel({ exercise, result, revealed, stale, hints, attemp
   if (ok && attempts > 1) effort.push(t('ex.attempts', { count: attempts }))
   const title = ok ? t('ex.correct') : result.status === 'partial' ? t('ex.partial', { pct: pct(result.credit) }) : revealed ? t('ex.notThat') : t('ex.notYet')
 
+  // incorrecto: la nota al margen (el porqué; si el corrector no lo sabe, lo que reconoció) y «Explícame mi error»
+  if (result.status === 'incorrect') {
+    const why = explanation.filter((l) => !isGeneric(l.markdown))
+    return (
+      <motion.div {...reveal} className={cx('flex flex-col gap-2.5', stale && 'opacity-60 saturate-0')} aria-live="polite">
+        <MarginNote arrow seed={exercise.id} title={title}>
+          {why.length > 0 ? (
+            why.map((l, i) => (
+              <span key={i} className={i > 0 ? 'mt-1 block' : undefined}>
+                <RichText text={l.markdown} inline />
+              </span>
+            ))
+          ) : diagnosis.length > 0 ? (
+            diagnosis.join(' · ')
+          ) : null}
+        </MarginNote>
+        {!revealed && onAskTutor && (
+          <div className="ml-[36px]">
+            <Button size="sm" variant="secondary" icon={<Icon name="tutor" size={14} />} onClick={onAskTutor}>
+              {t('ex.explainMine')}
+            </Button>
+          </div>
+        )}
+        {stale && <div className="ml-[36px] t-footnote text-text2">{t('ex.stale')}</div>}
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div {...reveal} className={cx('flex flex-col gap-2', stale && 'opacity-60 saturate-0')} aria-live="polite">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {ok ? (
           <span className="inline-flex items-center gap-2 t-headline" style={{ color: tone }}>
-            <span ref={checkRef} className="inline-grid h-5 w-5 place-items-center">
+            <span className="relative inline-grid h-5 w-5 place-items-center">
               <PixelCheck size={18} />
+              {burst > 0 && <InkBurst seed={`acierto:${exercise.id}:${burst}`} size={44} color="var(--success)" delay={160} className="-left-3 -top-3" />}
             </span>
             {title}
           </span>

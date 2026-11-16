@@ -1,11 +1,12 @@
-// Informe del simulacro: la nota en serif grande que cuenta hasta su valor (medalla y ráfaga de píxeles si es buena), por
-// secciones y por tema, qué repasar (con enlaces) y cada pregunta con tu respuesta, la correcta y su explicación.
+// Informe del simulacro: la nota en serif grande que cuenta hasta su valor (si es buena, de la cifra salen las gotas de
+// píxeles: un logro de verdad), por secciones y por tema, qué repasar (con enlaces) y cada pregunta con tu respuesta, la
+// correcta y su explicación.
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Exercise } from '@shared/schema'
 import { answerSummary } from '@engine/study'
-import { AnimatedNumber, Button, Card, Floating, Icon, PixelMedal, ProgressBar, SectionTitle, Stagger, StaggerItem, cx, pixelBurst } from '@renderer/design'
+import { AnimatedNumber, Button, Card, Icon, ProgressBar, SectionTitle, Stagger, StaggerItem, cx, pixelBurst } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { fmtPercent } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
@@ -42,7 +43,7 @@ export function ExamReportView({ data, done, onExit, onPractice, onAgain }: { da
   const missed = report.wrongItems.map((id) => exercises[id]).filter((e): e is Exercise => !!e)
   useEffect(() => {
     if (!good) return
-    const id = setTimeout(() => medal.current && pixelBurst(medal.current, { count: 22 }), 700)
+    const id = setTimeout(() => medal.current && pixelBurst(medal.current, { count: 22 }), 1500)
     return () => clearTimeout(id)
   }, [good])
   const perfect = run.items.filter((it) => (graded.grades[it.exerciseID]?.credit ?? 0) >= 0.999).length
@@ -54,7 +55,7 @@ export function ExamReportView({ data, done, onExit, onPractice, onAgain }: { da
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="t-ui font-semibold text-text2">{t('exam.score')}</div>
-                <div className="mt-1 flex items-end gap-2">
+                <div ref={medal} className="mt-1 flex w-fit items-end gap-2">
                   <span className="font-serif text-[88px] leading-[84px] tracking-[-0.03em] tabular">
                     <AnimatedNumber value={Math.round(report.percent * 100)} duration={1.4} />
                   </span>
@@ -64,9 +65,6 @@ export function ExamReportView({ data, done, onExit, onPractice, onAgain }: { da
                   {t(`exam.verdict.${verdictKey(report.percent, pass)}`, { pass: fmtPercent(pass ?? 0) })}
                 </div>
               </div>
-              <motion.div ref={medal} initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 15, delay: 0.5 }}>
-                {good ? <PixelMedal size={76} /> : null}
-              </motion.div>
             </div>
             <p className="t-body text-text2 mt-3 max-w-[520px]">{good ? t('exam.goodBody') : t('exam.workBody')}</p>
             <div className="mt-6 grid grid-cols-3 gap-4 border-t-[0.5px] border-line-soft pt-5">
@@ -85,33 +83,31 @@ export function ExamReportView({ data, done, onExit, onPractice, onAgain }: { da
         </StaggerItem>
 
         <StaggerItem className="col-span-12 @4xl:col-span-5">
-          <Floating amplitude={2} duration={10} className="h-full">
-            <Card padded="lg" mark={ink} className="h-full">
-              <SectionTitle title={t('exam.toReview')} />
-              {report.review.length === 0 ? (
-                <p className="t-callout text-text2 mt-1">{t('exam.nothingToReview')}</p>
-              ) : (
-                <div className="mt-1 flex flex-col">
-                  {report.review.map((r) => (
-                    <div key={r.skillId} className="border-t-[0.5px] border-line-soft py-3 first:border-t-0">
-                      <div className="t-headline"><RichText text={r.title} inline /></div>
-                      <div className="t-callout text-text2 mt-0.5"><RichText text={r.reason} inline /></div>
-                      <div className="mt-2 flex gap-1.5">
-                        <Button size="sm" variant="secondary" onClick={() => navigate({ name: 'study', id: data.pack.id, mode: 'practice', skill: r.skillId })}>{t('exam.practiceSkill')}</Button>
-                        <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'study', id: data.pack.id, mode: 'learn', skill: r.skillId })}>{t('exam.reviewLesson')}</Button>
-                      </div>
+          <Card padded="lg" className="h-full">
+            <SectionTitle title={t('exam.toReview')} />
+            {report.review.length === 0 ? (
+              <p className="t-callout text-text2 mt-1">{t('exam.nothingToReview')}</p>
+            ) : (
+              <div className="mt-1 flex flex-col">
+                {report.review.map((r) => (
+                  <div key={r.skillId} className="border-t-[0.5px] border-line-soft py-3 first:border-t-0">
+                    <div className="t-headline"><RichText text={r.title} inline /></div>
+                    <div className="t-callout text-text2 mt-0.5"><RichText text={r.reason} inline /></div>
+                    <div className="mt-2 flex gap-1.5">
+                      <Button size="sm" variant="secondary" onClick={() => navigate({ name: 'study', id: data.pack.id, mode: 'practice', skill: r.skillId })}>{t('exam.practiceSkill')}</Button>
+                      <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'study', id: data.pack.id, mode: 'learn', skill: r.skillId })}>{t('exam.reviewLesson')}</Button>
                     </div>
-                  ))}
-                </div>
-              )}
-              {missed.length > 0 && (
-                <div className="mt-4">
-                  <Button variant="primary" size="lg" full onClick={() => onPractice(missed)}>{t('exam.practiceMissed', { count: missed.length })}</Button>
-                  <div className="t-footnote mt-1.5 text-center">{t('exam.practiceMissedHelp')}</div>
-                </div>
-              )}
-            </Card>
-          </Floating>
+                  </div>
+                ))}
+              </div>
+            )}
+            {missed.length > 0 && (
+              <div className="mt-4">
+                <Button variant="primary" size="lg" full onClick={() => onPractice(missed)}>{t('exam.practiceMissed', { count: missed.length })}</Button>
+                <div className="t-footnote mt-1.5 text-center">{t('exam.practiceMissedHelp')}</div>
+              </div>
+            )}
+          </Card>
         </StaggerItem>
 
         <StaggerItem className="col-span-12 @4xl:col-span-6">

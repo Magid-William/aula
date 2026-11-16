@@ -6,11 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Answer } from '@shared/schema/exercises'
 import { RichText } from '@renderer/lib/RichText'
-import { cx, Tooltip } from '@renderer/design'
+import { cx, InkStrike, Tooltip } from '@renderer/design'
 import { keysFor, type AnswerKey } from '../keys'
 import { chemTex, insertAt, mathPreview, previewIsUseful, usesDecimalComma } from '../normalize'
 import { Tex } from '../ui'
 import { partTone, type InputProps } from './shared'
+import type { GradeResult } from '../types'
 import { answerField } from './answerField'
 
 type TextKind = Extract<Answer['kind'], 'numeric' | 'expression' | 'equation' | 'set' | 'interval' | 'point' | 'short' | 'chem' | 'unknown'>
@@ -69,7 +70,7 @@ function readKeysPref(): boolean | null {
 }
 
 export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKind }>>) {
-  const { answer, draft, set, locked, reveal, result, lang, onSubmit, autoFocus, exam } = props
+  const { answer, draft, set, locked, reveal, result, lang, onSubmit, autoFocus, exam, exerciseId } = props
   const { t, i18n } = useTranslation('study')
   // los mensajes del analizador matemático están en español (aún sin catálogo en inglés)
   const spanish = i18n.language.startsWith('es')
@@ -123,6 +124,13 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
   }
 
   const tone = !exam && reveal !== 'none' ? partTone(result) : undefined
+  // lo que se comprobó: mientras no cambie, un error se queda tachado a mano en el campo (el boli rojo de quien corrige);
+  // al escribir otra cosa, el tachado se va
+  const [graded, setGraded] = useState<{ r: GradeResult | undefined; text: string }>({ r: result, text })
+  if (graded.r !== result) setGraded({ r: result, text })
+  const struck = tone !== undefined && result?.status === 'incorrect' && text.trim() !== '' && text === graded.text
+  // incorrecto: una sola señal (el tachado y la nota de debajo), sin borde rojo ni fondo rosa
+  const fieldTone = struck || result?.status === 'incorrect' ? undefined : tone
   const wide = answer.kind === 'equation' || answer.kind === 'expression' || answer.kind === 'interval' || answer.kind === 'set' || (answer.kind === 'chem' && answer.mode !== 'number') || answer.kind === 'short'
 
   return (
@@ -157,8 +165,15 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
               keys.length > 0 && 'pr-12',
               locked && 'cursor-default'
             )}
-            style={{ borderColor: tone ? `color-mix(in oklab, ${tone} 60%, transparent)` : 'color-mix(in oklab, var(--line-strong) 40%, transparent)', background: tone ? `color-mix(in oklab, ${tone} 6%, var(--field))` : undefined }}
+            aria-invalid={struck || undefined}
+            style={{ borderColor: fieldTone ? `color-mix(in oklab, ${fieldTone} 60%, transparent)` : 'color-mix(in oklab, var(--line-strong) 40%, transparent)', background: fieldTone ? `color-mix(in oklab, ${fieldTone} 6%, var(--field))` : undefined, color: struck ? 'var(--text2)' : undefined }}
           />
+          {struck && (
+            // el mismo texto, invisible y en la misma letra, para que el tachado mida lo escrito
+            <span aria-hidden className={cx('pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden whitespace-pre px-4 text-[17px] tabular text-transparent', keys.length > 0 ? 'right-12' : 'right-0')}>
+              <InkStrike seed={`respuesta:${exerciseId}:${text}`} alpha={0.9}>{text}</InkStrike>
+            </span>
+          )}
           {keys.length > 0 && !locked && (
             <Tooltip label={keysOpen ? t('ex.hideKeys') : t('ex.showKeys')}>
               <button

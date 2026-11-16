@@ -1,13 +1,21 @@
-// Aprender: las unidades y sus temas como tarjetas, con objetivos, minutos, contenido y el dominio en un anillo. Mientras Aula
-// crea el curso (o escribe un tema con «Escribir este tema ahora»), los temas que aún no están listos dicen «Escribiéndose…» o
-// «En cola» y no se abren (antes se abrían vacíos o a medias).
+// Aprender, como el índice de un libro: una tarjeta por unidad con sus temas en filas (el título, su resumen en una frase, el
+// dominio en una barra fina con la tinta del curso y los minutos), «Sigue aquí» en el que toca y, al final, el apéndice con
+// las fórmulas y el glosario. Mientras Aula crea el curso (o escribe un tema con «Escribir este tema ahora»), los temas que
+// aún no están listos dicen «Escribiéndose…» o «En cola» y no se abren (antes se abrían vacíos o a medias).
+import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, Chip, Icon, ProgressRing, SectionTitle, Spinner, Stagger, toneForHue, useTheme } from '@renderer/design'
+import { motion } from 'motion/react'
+import { Card, Chip, cx, Icon, Spinner, Stagger, toneForHue, useTheme } from '@renderer/design'
 import type { Pack } from '@shared/schema/pack'
 import type { CourseOverview } from '@shared/ipc/course-view'
 import { topicAvailability, topicOpens, type CreationPhase, type TopicAvailability } from '@engine/study/topics'
 import { RichText } from '@renderer/lib/RichText'
 import { navigate } from '@renderer/app/router'
+import { MasteryBar } from './MasteryBar'
+import { courseNextTopic } from './Overview'
+import { ReferenceAppendix } from './Reference'
+import { RULED_ROW, SECTION_ATTR } from './sections'
+import { firstSentence, shownMastery } from './topics'
 
 /** La marca de un tema que no está listo para abrir como lección. */
 function TopicState({ state }: { state: Exclude<TopicAvailability, 'ready'> }) {
@@ -22,84 +30,74 @@ export function LearnTab({ pack, ov, phase = 'none', writing }: { pack: Pack; ov
   const { dark } = useTheme()
   const tone = toneForHue(pack.hue)
   const ink = dark ? tone.inkDark : tone.inkLight
-  const mastery = new Map((ov?.skills ?? []).map((s) => [s.id, s.mastery]))
+  const mastery = new Map((ov?.skills ?? []).map((s) => [s.id, s]))
+  const next = courseNextTopic(pack, ov, { phase, writing })
   return (
-    <div className="flex flex-col gap-7">
+    <Stagger className="flex flex-col gap-4" gap={0.05}>
       {pack.units.map((u, ui) => (
-        <section key={u.id}>
-          <SectionTitle title={`${ui + 1}. ${u.title}`} detail={u.summary} />
-          <Stagger className="grid gap-4 mt-3 grid-cols-1 @3xl:grid-cols-2 @6xl:grid-cols-3" gap={0.04}>
-            {u.skillIDs.map((sid) => {
+        <Card key={u.id} enterAnim padded="lg">
+          <h2 className="t-title2 text-text">
+            {ui + 1}. {u.title}
+          </h2>
+          {u.summary && <p className="t-callout text-text2 mt-0.5">{u.summary}</p>}
+          <div className="mt-3 -mx-3 flex flex-col">
+            {u.skillIDs.map((sid, i) => {
               const s = pack.skills.find((x) => x.id === sid)
               if (!s) return null
-              const m = mastery.get(sid) ?? 0
               const state = topicAvailability(s, phase, sid === writing)
               // sin lección y sin creación pendiente se abre igual: allí se puede pedir que Aula lo escriba ahora
               const opens = topicOpens(state)
+              const open = (): void => navigate({ name: 'study', id: pack.id, mode: 'learn', skill: sid })
+              const onKey = (e: KeyboardEvent): void => {
+                if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+                e.preventDefault()
+                open()
+              }
+              const summary = firstSentence(s.summary)
               return (
-                <Card
+                <motion.div
                   key={sid}
-                  enterAnim
-                  interactive={opens}
-                  padded="lg"
-                  onClick={opens ? () => navigate({ name: 'study', id: pack.id, mode: 'learn', skill: sid }) : undefined}
-                  className="flex flex-col"
+                  role={opens ? 'button' : undefined}
+                  tabIndex={opens ? 0 : undefined}
+                  onClick={opens ? open : undefined}
+                  onKeyDown={opens ? onKey : undefined}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: Math.min(i, 8) * 0.03, ease: [0.2, 0.7, 0.2, 1] }}
                   data-topic-state={state}
+                  className={cx(RULED_ROW, 'group/topic flex items-center gap-5 rounded-[14px] px-3 py-3.5 outline-none transition-colors', opens ? 'cursor-default hover:bg-fill1 focus-visible:bg-fill1' : 'text-text3')}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="t-headline">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2.5">
+                      <span className={cx('t-callout font-medium', opens ? 'text-text' : 'text-text2')}>
                         <RichText text={s.title} inline />
-                      </div>
-                      {s.summary && (
-                        <div className="t-callout text-text2 mt-1 line-clamp-2">
-                          <RichText text={s.summary} inline />
-                        </div>
-                      )}
+                      </span>
+                      {sid === next && <span className="t-footnote font-medium text-accent-text">{t('learn.continueHere')}</span>}
                     </div>
-                    <ProgressRing value={m} size={40} stroke={4} color={ink}>
-                      <span className="t-caption tabular text-text">{Math.round(m * 100)}</span>
-                    </ProgressRing>
+                    {summary && (
+                      <div className="t-ui text-text2 mt-0.5 [text-wrap:pretty]">
+                        <RichText text={summary} inline />
+                      </div>
+                    )}
                   </div>
-                  {s.objectives.length > 0 && (
-                    <ul className="mt-3 flex flex-col gap-1">
-                      {s.objectives.slice(0, 3).map((o, i) => (
-                        <li key={i} className="t-ui text-text2 flex gap-2">
-                          <Icon name="check" size={13} className="text-text3 mt-0.5 shrink-0" />
-                          <span>
-                            <RichText text={o} inline />
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                  {state !== 'ready' ? (
+                    <TopicState state={state} />
+                  ) : (
+                    <>
+                      <MasteryBar value={shownMastery(mastery.get(sid))} ink={ink} className="hidden @2xl:inline-flex" />
+                      <span className="w-[52px] shrink-0 text-right t-footnote tabular text-text3">{t('minutes', { count: s.minutes })}</span>
+                    </>
                   )}
-                  <div className="flex items-center justify-between mt-auto pt-4">
-                    <span className="t-ui text-text3 flex items-center gap-3">
-                      <span className="inline-flex items-center gap-1">
-                        <Icon name="clock" size={13} /> {t('minutes', { count: s.minutes })}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Icon name="practice" size={13} /> {s.counts.exercises + s.counts.templates}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Icon name="cards" size={13} /> {s.counts.cards}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      {state !== 'ready' && <TopicState state={state} />}
-                      {opens && (
-                        <Button size="sm" variant="secondary">
-                          {t('learnSkill')}
-                        </Button>
-                      )}
-                    </span>
-                  </div>
-                </Card>
+                  {opens && <Icon name="chevron-right" size={14} className="shrink-0 text-text3 transition-transform group-hover/topic:translate-x-0.5" />}
+                </motion.div>
               )
             })}
-          </Stagger>
-        </section>
+          </div>
+        </Card>
       ))}
-    </div>
+      <div {...{ [SECTION_ATTR]: 'reference' }} className="scroll-mt-3">
+        <ReferenceAppendix pack={pack} />
+      </div>
+    </Stagger>
   )
 }

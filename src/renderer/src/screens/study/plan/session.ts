@@ -50,12 +50,12 @@ export function routeForStep(packId: string, item: PlanItem): Route {
   }
 }
 
-/** Abre el paso `i` del plan. */
-export function runStep(packId: string, i: number): void {
+/** Abre el paso `i` del plan. `replace`: en lugar de la entrada del historial de ahora (entrar directamente en el primer paso). */
+export function runStep(packId: string, i: number, opts: { replace?: boolean } = {}): void {
   const s = activePlan(packId)
   if (!s || !s.items[i]) return
   usePlanStore.setState({ session: { ...s, current: i } })
-  navigate(routeForStep(packId, s.items[i]))
+  navigate(routeForStep(packId, s.items[i]), opts.replace ? { replace: true } : undefined)
 }
 
 /** El paso en marcha terminó (lo llama el resumen de cada modo). */
