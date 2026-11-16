@@ -5,6 +5,10 @@ Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Before you start
 
+- **Start here:** pick a [good first issue](https://github.com/luumlabs/aula/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22),
+  comment on it to claim it, and open a draft pull request early. Each one names the files to touch and how to check it.
+  To run Aula without an AI key and without touching your own data (macOS and Linux):
+  `AULA_HOME="$(mktemp -d)" AULA_FAKE_AI=1 AULA_SEED=demo npm run dev`.
 - **Bugs and ideas** go in an [issue](https://github.com/luumlabs/aula/issues/new/choose) first, so we can agree on the
   approach before you write code. Small fixes (typos, an obvious bug) can go straight to a pull request.
 - **Security problems** never go in a public issue or pull request: see [`SECURITY.md`](SECURITY.md).
@@ -13,8 +17,9 @@ Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Working on the code
 
-Setup and commands are in the README ([Build from source](README.md#build-from-source)); how the code is organized, the
-IPC contracts, the data formats and the rules for the code are in [`CLAUDE.md`](CLAUDE.md). The essentials:
+Setup and commands are in the README ([Quick start](README.md#quick-start) and [How it's built](README.md#how-its-built));
+how the code is organized, the IPC contracts, the data formats and the rules for the code are in [`CLAUDE.md`](CLAUDE.md).
+You need Node.js 22.12 or later (20.19 or later also works) and Git. The essentials:
 
 - **TypeScript strict**, no `any` except at boundaries with external JSON (and then it's validated). Small functions
   with clear names.
@@ -23,6 +28,9 @@ IPC contracts, the data formats and the rules for the code are in [`CLAUDE.md`](
 - **Electron security stays on**: `contextIsolation`, sandbox, no `nodeIntegration`, the CSP, validated IPC arguments.
   Keys and secrets never leave the main process.
 - **Design**: follow [`src/renderer/src/design/README.md`](src/renderer/src/design/README.md) ("Papel y luz", paper and light: warm paper, brick as the only light, no color gradients) and respect `prefers-reduced-motion`.
+- **Docs come in pairs**: `README.md` and `README.es.md`, `docs/FEATURES.md` and `docs/FEATURES.es.md`,
+  `docs/INSTALL.md` and `docs/INSTALL.es.md` say the same things, in the same order. Change both, with natural Spanish
+  rather than a word-for-word translation.
 - **No new dependencies** without asking first in the issue. Prefer permissive licenses (MIT, BSD, ISC, Apache-2.0,
   MPL-2.0 at file level); copyleft dependencies (GPL, LGPL, AGPL) only after discussing it in the issue, because they
   would limit point 3 below.
