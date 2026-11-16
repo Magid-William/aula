@@ -12,8 +12,11 @@ export interface PieEntranceReport {
   phase: string
   firstPaths: string[]
   firstCommitNativeTimestamp: number | null
+  firstCommitLogicalTimestamp: number | null
   frozenTimestamp: number | null
   elapsedToCommit: number | null
+  entranceFrameCount: number
+  entranceFrames: Array<{ native: number; logical: number; elapsed: number }>
   coherentPaths: string[]
   deliveriesAfterFreeze: number
   steps: Array<{ milliseconds: number; paths: string[] }>
@@ -34,8 +37,8 @@ export function installPieEntranceClock(
   const rafDescriptor = Object.getOwnPropertyDescriptor(host, 'requestAnimationFrame')
   const nowDescriptor = Object.getOwnPropertyDescriptor(host.performance, 'now')
   const started = realNow()
-  const state: PieEntranceReport = { phase: 'native', firstPaths: [], firstCommitNativeTimestamp: null, frozenTimestamp: null, elapsedToCommit: null, coherentPaths: [], deliveriesAfterFreeze: 0, steps: [] }
-  let disposed = false, frozen = false, lastTimestamp: number | null = null, logicalTime = 0
+  const state: PieEntranceReport = { phase: 'advancing', firstPaths: [], firstCommitNativeTimestamp: null, firstCommitLogicalTimestamp: null, frozenTimestamp: null, elapsedToCommit: null, entranceFrameCount: 0, entranceFrames: [], coherentPaths: [], deliveriesAfterFreeze: 0, steps: [] }
+  let disposed = false, frozen = false, lastTimestamp: number | null = null, logicalTime = started
   let first: PieEntranceCommit | null = null, disconnect: (() => void) | undefined
   let timer: number | undefined, frame: number | undefined, deadline = started + deadlineMs
   let readySettled = false, resolveReady!: (value: PieEntranceReport) => void, rejectReady!: (error: Error) => void
@@ -43,7 +46,7 @@ export function installPieEntranceClock(
   const ready = new Promise<PieEntranceReport>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
   // El fallo puede ocurrir durante go(), antes de que el test espere el checkpoint.
   void ready.catch(() => undefined)
-  const report = (): PieEntranceReport => ({ ...state, firstPaths: [...state.firstPaths], coherentPaths: [...state.coherentPaths], steps: state.steps.map(step => ({ ...step, paths: [...step.paths] })) })
+  const report = (): PieEntranceReport => ({ ...state, firstPaths: [...state.firstPaths], entranceFrames: state.entranceFrames.map(frame => ({ ...frame })), coherentPaths: [...state.coherentPaths], steps: state.steps.map(step => ({ ...step, paths: [...step.paths] })) })
   const clearWait = (): void => {
     if (timer !== undefined) { clearTimer(timer); timer = undefined }
     if (frame !== undefined) { cancel(frame); frame = undefined }
@@ -100,24 +103,36 @@ export function installPieEntranceClock(
       withinDeadline()
       if (!current || current.paths.length === 0) return
       state.firstPaths = [...current.paths]; state.firstCommitNativeTimestamp = lastTimestamp
+      state.firstCommitLogicalTimestamp = lastTimestamp === null ? null : logicalTime
       state.elapsedToCommit = realNow() - started
       // Ocho sectores pueden estar todavía animándose: el test exige el primer commit de 1..7.
       if (current.paths.length >= 8) throw new Error('Pie first nonempty commit already contains all sectors; no 1..7 sector entrance was captured')
       if (lastTimestamp === null) throw new Error('Pie partial commit has no preceding native RAF delivery')
       first = { body: current.body, paths: [...current.paths] }
-      state.frozenTimestamp = lastTimestamp; state.phase = 'frozen'
-      frozen = true; logicalTime = lastTimestamp
+      state.frozenTimestamp = logicalTime; state.phase = 'frozen'
+      frozen = true
       disconnect?.(); disconnect = undefined
       barrier = { kind: 'checkpoint', milliseconds: 0, resolve: () => undefined, reject: () => undefined }
     } catch (error) { fail(error instanceof Error ? error : new Error(String(error))) }
   }
   try {
-    Object.defineProperty(host.performance, 'now', { configurable: true, enumerable: nowDescriptor?.enumerable ?? false, writable: true, value: () => disposed || !frozen ? realNow() : logicalTime })
+    Object.defineProperty(host.performance, 'now', { configurable: true, enumerable: nowDescriptor?.enumerable ?? false, writable: true, value: () => disposed ? realNow() : logicalTime })
     Object.defineProperty(host, 'requestAnimationFrame', { configurable: true, enumerable: rafDescriptor?.enumerable ?? true, writable: true, value: (callback: Frame): number => raf(timestamp => {
       if (disposed) { callback.call(host, timestamp); return }
+      if (!Number.isFinite(timestamp) || (lastTimestamp !== null && timestamp < lastTimestamp)) {
+        fail(new Error('Pie entrance requires finite, nondecreasing native RAF timestamps'))
+        callback.call(host, timestamp); return
+      }
+      if (!frozen && timestamp !== lastTimestamp) {
+        // Paso fijo desde la instalación: una entrega inicial tardía no consume toda la entrada.
+        // Todos los callbacks de un mismo frame reciben el mismo tiempo; no se buscan sectores.
+        if (lastTimestamp !== null) logicalTime += 100
+        state.entranceFrameCount++
+        if (state.entranceFrames.length < 32) state.entranceFrames.push({ native: timestamp, logical: logicalTime, elapsed: realNow() - started })
+      }
       lastTimestamp = timestamp
       if (frozen) state.deliveriesAfterFreeze++
-      callback.call(host, frozen ? logicalTime : timestamp)
+      callback.call(host, logicalTime)
       finishAfterDelivery()
     }) })
     disconnect = observe(changed)

@@ -170,6 +170,7 @@ test('Chart PNG: cambiar ancho conmuta la rama comprometida y puede volver a la 
   delete block.horizontal
   const source = await start(block)
   try {
+    const progressPath = join(source.home, 'Packs', PACK, 'progress.json'), progressBytes = readFileSync(progressPath, 'utf8')
     let initial: ChartRenderSceneV1 | undefined
     for (const [index, width] of [620, 180, 620].entries()) {
       await setWidth(source, width)
@@ -191,6 +192,7 @@ test('Chart PNG: cambiar ancho conmuta la rama comprometida y puede volver a la 
       if (index === 2) expect(scene).toEqual(initial)
       await info.attach(`responsive-${index}.png`, { path: output, contentType: 'image/png' })
     }
+    expect(readFileSync(progressPath, 'utf8')).toBe(progressBytes)
     expect(readFileSync(source.skillPath, 'utf8')).toBe(source.skillBytes); expect(source.errors).toEqual([])
   } finally { await close(source, info) }
 })
@@ -229,6 +231,7 @@ test('Chart PNG: Pie exporta el destino final y su entrada viva sigue avanzando'
   const paths = () => source.body.locator('svg path[d]').evaluateAll(elements => elements.map(element => element.getAttribute('d')))
   const step = (milliseconds: number) => source.page.evaluate(`window.__chartEntranceClock.step(${milliseconds})`)
   try {
+    const progressPath = join(source.home, 'Packs', PACK, 'progress.json'), progressBytes = readFileSync(progressPath, 'utf8')
     const checkpoint = await source.page.evaluate<PieEntranceReport>('window.__chartEntranceClock.checkpoint()')
     const partial = await paths()
     expect(partial).toEqual(checkpoint.firstPaths); expect(partial).toEqual(checkpoint.coherentPaths)
@@ -251,6 +254,7 @@ test('Chart PNG: Pie exporta el destino final y su entrada viva sigue avanzando'
     // También la leyenda HTML y el centro conservan su presentación final, no sólo los sectores SVG.
     expect(earlyScene).toEqual(finalScene)
     expect(await paths()).toEqual(finalPaths)
+    expect(readFileSync(progressPath, 'utf8')).toBe(progressBytes)
     expect(readFileSync(source.skillPath, 'utf8')).toBe(source.skillBytes); expect(source.errors).toEqual([])
     writeFileSync(info.outputPath('pie-entrance-paths.json'), JSON.stringify({ partial, continuing, finalPaths }, null, 2))
     await info.attach('pie-during-entrance.png', { path: first, contentType: 'image/png' })
