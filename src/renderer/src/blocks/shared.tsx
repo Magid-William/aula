@@ -169,16 +169,19 @@ export function Caption({ text, className }: { text?: string; className?: string
 }
 
 /**
- * Marco de una figura (gráfica, gráfico, recta, línea de tiempo): una burbuja de papel con título, herramientas y pie.
- * En el chat es más compacta; al imprimir, sin sombra.
+ * Marco de una figura (gráfica, gráfico, recta, línea de tiempo). En la lección va directamente sobre el papel, como en un
+ * libro: sin tarjeta, con el título en serif y el pie en cursiva debajo. En el chat, una burbuja compacta; al imprimir, sin sombra.
  */
 export function Figure({ ctx, title, tools, caption, children, className, eyebrow, bodyClassName }: { ctx: BlockContext; title?: string; tools?: ReactNode; caption?: ReactNode; children: ReactNode; className?: string; eyebrow?: ReactNode; bodyClassName?: string }) {
   const chat = ctx.mode === 'chat'
   const print = ctx.mode === 'print'
+  // dentro de un ejercicio (su tarjeta) sigue siendo una figura enmarcada. Sobre el papel lleva el mismo papel con su grano
+  // (opaco): quien exporta la figura o mide su fondo lee un color de verdad, no transparente
+  const sheet = ctx.mode === 'lesson' && !ctx.exerciseId
   return (
     <figure
-      className={cx('group/fig relative m-0 bg-surface border-[0.5px] border-line', chat ? 'rounded-[16px] p-3' : 'rounded-[22px] p-5', className)}
-      style={{ boxShadow: print || chat ? undefined : 'var(--e1)' }}
+      className={cx('group/fig relative m-0', sheet ? 'blk-figure-sheet paper-grain bg-paper py-2' : 'bg-surface border-[0.5px] border-line', !sheet && (chat ? 'rounded-[16px] p-3' : 'rounded-[22px] p-5'), className)}
+      style={{ boxShadow: print || chat || sheet ? undefined : 'var(--e1)' }}
     >
       {(eyebrow || title || tools) && (
         <div className={cx('flex items-start gap-3', chat ? 'mb-2' : 'mb-3')}>
@@ -190,7 +193,7 @@ export function Figure({ ctx, title, tools, caption, children, className, eyebro
         </div>
       )}
       <div className={bodyClassName}>{children}</div>
-      {caption && <figcaption className="mt-3">{caption}</figcaption>}
+      {caption && <figcaption className={sheet ? 'blk-figcaption mt-2.5' : 'mt-3'}>{caption}</figcaption>}
     </figure>
   )
 }

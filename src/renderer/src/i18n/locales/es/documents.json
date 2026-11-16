@@ -11,7 +11,6 @@
     "pink": "Rosa"
   },
   "library": {
-    "heading": "Tus documentos",
     "search": "Busca en el texto de todos tus documentos",
     "all": "Todos",
     "imports": "Importados",
@@ -49,13 +48,10 @@
     "emptyTitle": "Aún no hay documentos",
     "emptyBody": "Los materiales de tus cursos aparecen aquí. También puedes añadir PDF, apuntes o fotos sueltos.",
     "error": "No se pudo cargar la biblioteca",
-    "lead": "Los materiales de tus cursos y lo que añadas: léelos, subráyalos y pregúntale a Aula.",
-    "statDocs_one": "documento",
-    "statDocs_other": "documentos",
-    "statPages_one": "página",
-    "statPages_other": "páginas",
-    "statMarks_one": "marca",
-    "statMarks_other": "marcas",
+    "summaryPages_one": "{{count}} página",
+    "summaryPages_other": "{{count}} páginas",
+    "summaryMarks_one": "{{count}} marca",
+    "summaryMarks_other": "{{count}} marcas",
     "byAula": "De Aula"
   },
   "search": {

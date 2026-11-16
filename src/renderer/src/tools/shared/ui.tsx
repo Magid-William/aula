@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { animate, motion, useMotionValue, useTransform } from 'motion/react'
-import { Card, cx, toast, useTheme, type CardProps } from '@renderer/design'
+import { Card, cx, focusRing, toast, useTheme, type CardProps } from '@renderer/design'
 import { formatFixed, formatNumber, parseNumber, texNumber, type NumberStyle } from './lib/num'
 
 /** Coma decimal si la interfaz está en español. */
@@ -94,8 +94,9 @@ export function Panel({ title, detail, actions, children, className, padded = tr
   )
 }
 
+// Sin anillo: cada campo pone el de `D/Inputs` o, si el valor no vale, el rojo (así no compiten las dos clases de foco)
 const fieldCls =
-  'w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)]'
+  'w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition'
 
 /**
  * Campo para un número: guarda el texto tal como se escribe («1,» a medias) y avisa a quien lo usa con el valor leído
@@ -127,7 +128,7 @@ export function NumField({ label, value, onChange, unit, placeholder, className,
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value, e.target.value.trim() ? parseNumber(e.target.value) : null)}
-          className={cx(fieldCls, compact ? 'h-8' : 'h-9', 'tabular', mono && 'font-mono text-[13px]', unit != null && (typeof unit === 'string' && unit.length <= 2 ? 'pr-9' : 'pr-14'), bad && 'border-danger/60 focus:border-danger focus:shadow-[0_0_0_3px_var(--danger-soft)]')}
+          className={cx(fieldCls, compact ? 'h-8' : 'h-9', 'tabular', mono && 'font-mono text-[13px]', unit != null && (typeof unit === 'string' && unit.length <= 2 ? 'pr-9' : 'pr-14'), bad ? 'border-danger/60 focus:border-danger focus:shadow-[0_0_0_3px_var(--danger-soft)]' : focusRing)}
         />
         {unit != null && <span className="absolute right-3 t-ui text-text3 pointer-events-none">{unit}</span>}
       </span>
@@ -167,7 +168,7 @@ export function TextInput({ value, onChange, placeholder, className, label, onEn
             onEnter()
           }
         }}
-        className={cx(fieldCls, 'h-10', mono && 'font-mono text-[14px]', invalid && 'border-danger/60')}
+        className={cx(fieldCls, focusRing, 'h-10', mono && 'font-mono text-[14px]', invalid && 'border-danger/60')}
       />
     </label>
   )

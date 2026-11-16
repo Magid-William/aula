@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { makePlotCurve, makePlotSpec } from '@shared/schema/plot'
 import { compileFn, evalNumber, parseExpr } from './evaluate'
-import { clip, panRange, plotRange, saneParams, stableRange, trace, zoomRange } from './compile'
+import { clip, fitClosedCurves, panRange, plotRange, saneParams, stableRange, trace, zoomRange } from './compile'
 import { formatNumber, niceStep, numberTicks, piLabel, piStep, piText, piTicks, sane, ticks } from './ticks'
 
 describe('marcas de los ejes', () => {
@@ -134,6 +134,19 @@ describe('rango de la gráfica', () => {
     expect(p).toMatchObject({ min: -5, max: 5, value: 5 })
     expect(p.step).toBeGreaterThan(0)
     expect(saneParams([{ name: 'k', min: 0, max: 1, step: 1, value: 0 }, { name: 'k', min: 0, max: 1, step: 1, value: 0 }]).length).toBe(1)
+  })
+  it('una circunferencia que se sale un poco del rango no se corta; un zoom a propósito, sí', () => {
+    const circle = { x: 'cos(t)', y: 'sin(t)', tMin: 0, tMax: 6.2832, color: 'gray', dashed: false }
+    const r = plotRange(makePlotSpec({ xMin: -1.5, xMax: 1.5, yMin: -0.45, yMax: 1.25, parametric: [circle] }))
+    expect(r.yMin).toBeLessThan(-1)
+    expect(r.yMax).toBe(1.25)
+    expect(r.xMin).toBe(-1.5)
+    // muy dentro: es un zoom, se respeta
+    const zoom = fitClosedCurves({ xMin: -0.2, xMax: 0.2, yMin: 0.8, yMax: 1.1 }, makePlotSpec({ parametric: [circle] }))
+    expect(zoom).toEqual({ xMin: -0.2, xMax: 0.2, yMin: 0.8, yMax: 1.1 })
+    // un arco abierto (no cerrado) no cuenta
+    const arc = fitClosedCurves({ xMin: -1.5, xMax: 1.5, yMin: -0.45, yMax: 1.25 }, makePlotSpec({ parametric: [{ ...circle, tMax: 3.1416 }] }))
+    expect(arc.yMin).toBe(-0.45)
   })
   it('acerca y desplaza alrededor de un punto', () => {
     const r = { xMin: -5, xMax: 5, yMin: -5, yMax: 5 }

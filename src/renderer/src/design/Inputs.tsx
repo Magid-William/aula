@@ -1,13 +1,19 @@
-// Campos de texto, interruptores, deslizadores y selector, con el mismo cristal y foco suave.
+// Campos de texto, interruptores, deslizadores y selector. El foco de un campo se ve: un anillo de 2 px con `--focus`
+// (antes, un velo ladrillo que se quedaba en 1,3–1,7:1 sobre el papel).
 import { forwardRef, useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, X } from 'lucide-react'
 import { cx } from './cx'
 import { spring } from './tokens'
 import { placePopover } from './popover'
 
-const field = 'w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)]'
+/** Anillo de foco de un campo (borde de 0,5 px + sombra de 1,5 px = 2 px de `--focus`). Lo usan también herramientas y bloques. */
+export const focusRing = 'focus:border-[color:var(--focus)] focus:shadow-[0_0_0_1.5px_var(--focus)]'
+/** El mismo anillo en una caja que envuelve un campo sin borde propio. */
+export const focusWithinRing = 'focus-within:border-[color:var(--focus)] focus-within:shadow-[0_0_0_1.5px_var(--focus)]'
+
+const field = `w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition ${focusRing}`
 
 export const TextField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { icon?: ReactNode; trailing?: ReactNode; label?: ReactNode; hint?: ReactNode }>(function TextField(
   { icon, trailing, label, hint, className, ...rest },
@@ -190,5 +196,60 @@ export function Select<T extends string>({ value, options, onChange, placeholder
         document.body
       )}
     </div>
+  )
+}
+
+/** «2026-12-06» → «dom., 6 dic. 2026» / «Sun, Dec 6, 2026», en el idioma que se pida (el de la interfaz). Vacío si no es una fecha. */
+export function formatDateValue(value: string, locale: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return ''
+  const d = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+}
+
+/**
+ * Campo de fecha (`AAAA-MM-DD`) que se lee en el idioma de la interfaz («Sun, Dec 6, 2026»), nunca «mm/dd/yyyy». Al pulsarlo
+ * se abre el calendario del sistema; con una fecha puesta, la × la quita. `locale`, `placeholder` y `clearLabel` los da la
+ * pantalla (el sistema de diseño no traduce).
+ */
+export function DateField({ value, onChange, label, locale, placeholder, clearLabel, min, icon, className }: {
+  value: string
+  onChange: (v: string) => void
+  /** Nombre del campo (para lectores de pantalla y la pista). */
+  label: string
+  locale: string
+  placeholder: string
+  clearLabel: string
+  min?: string
+  icon?: ReactNode
+  className?: string
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  const shown = formatDateValue(value, locale)
+  const open = () => {
+    const el = input.current
+    if (!el) return
+    try {
+      el.showPicker()
+    } catch {
+      el.focus()
+    }
+  }
+  return (
+    <span className={cx('relative inline-flex items-center gap-1', className)}>
+      <span className="relative inline-flex">
+        <button type="button" onClick={open} aria-label={shown ? `${label}: ${shown}` : label} className="inline-flex h-8 items-center gap-2 rounded-[10px] border-[0.5px] border-line-strong/40 bg-field px-3 text-left t-ui text-text transition-colors hover:bg-fill1">
+          {icon && <span className="text-text3">{icon}</span>}
+          <span className={cx('whitespace-nowrap', !shown && 'text-text3')}>{shown || placeholder}</span>
+        </button>
+        {/* el selector nativo, invisible encima del botón: su calendario sale justo ahí */}
+        <input ref={input} type="date" tabIndex={-1} aria-hidden value={value} min={min} onChange={(e) => onChange(e.target.value)} className="pointer-events-none absolute inset-0 h-full w-full opacity-0" />
+      </span>
+      {value && (
+        <button type="button" onClick={() => onChange('')} aria-label={clearLabel} className="grid h-7 w-7 place-items-center rounded-[8px] text-text3 hover:bg-fill2 hover:text-text">
+          <X size={13} />
+        </button>
+      )}
+    </span>
   )
 }

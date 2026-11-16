@@ -1,8 +1,8 @@
 // Bloques que se juegan: «¿Qué crees que pasa?» (eliges y se revela con su porqué), «Encuentra el error» (tocas la línea
-// con el fallo) y «Pruébalo» (abre los ejercicios). Acertar suelta una ráfaga de píxeles; fallar, un leve temblor.
+// con el fallo) y «Pruébalo» (abre los ejercicios). Acertar dibuja unas rayitas a tinta junto a la marca; fallar, un leve temblor.
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
-import { Button, Card, cx, Icon, pixelBurst, PixelCheck, Sprite, useTheme } from '@renderer/design'
+import { Button, Card, Celebrate, cx, Icon, PixelCheck, Sprite, useTheme } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import type { BlockOf } from '@shared/schema/blocks'
 import type { BlockContext, BlockProps } from './types'
@@ -36,7 +36,7 @@ function GameCard({ ctx, children, onKeyDown }: { ctx: BlockContext; children: R
 type Mark = 'none' | 'right' | 'wrong' | 'dimmed'
 
 /** Fila de respuesta: letra o número, el texto y, al revelar, su marca (✓ que se dibuja, ✗ o atenuada). */
-function AnswerRow({ badge, mark, locked, onPick, children, detail, animate, mono }: { badge: string; mark: Mark; locked: boolean; onPick: () => void; children: ReactNode; detail?: ReactNode; animate: boolean; mono?: boolean }) {
+function AnswerRow({ badge, mark, locked, onPick, children, detail, animate, mono, cheer = null }: { badge: string; mark: Mark; locked: boolean; onPick: () => void; children: ReactNode; detail?: ReactNode; animate: boolean; mono?: boolean; /** Cuándo se acertó (se celebra a tinta junto al ✓). */ cheer?: number | null }) {
   const shake = useAnimationControls()
   useEffect(() => {
     if (mark === 'wrong' && animate) void shake.start({ x: [0, -5, 5, -3, 3, 0], transition: { duration: 0.42 } })
@@ -65,7 +65,7 @@ function AnswerRow({ badge, mark, locked, onPick, children, detail, animate, mon
             mono && 'font-serif font-normal text-[14px] tabular'
           )}
         >
-          {mark === 'right' ? <PixelCheck size={14} color="currentColor" /> : mark === 'wrong' ? <Icon name="close" size={13} /> : badge}
+          {mark === 'right' ? <Celebrate at={cheer}><PixelCheck size={14} color="currentColor" /></Celebrate> : mark === 'wrong' ? <Icon name="close" size={13} /> : badge}
         </span>
         <span className="min-w-0 flex-1 pt-[1px]">
           {children}
@@ -102,7 +102,7 @@ export function PredictBlockView({ block, ctx }: BlockProps<BlockOf<'predict'>>)
   const animate = useAnimate(ctx)
   const print = ctx.mode === 'print'
   const [picked, setPicked] = useBlockMemory<number | null>(ctx, block.id, 'predict', null)
-  const rowRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [cheer, setCheer] = useState<number | null>(null)
   const options = block.options.slice(0, 12)
   const revealed = picked !== null || print
   const correctIndex = options.findIndex((o) => o.correct)
@@ -112,10 +112,7 @@ export function PredictBlockView({ block, ctx }: BlockProps<BlockOf<'predict'>>)
     if (picked !== null || print || !options[i]) return
     setPicked(i)
     ctx.onInteract?.(block.id, options[i].correct ? 'predict.right' : 'predict.wrong')
-    if (options[i].correct && animate) {
-      const el = rowRefs.current[i]
-      if (el) requestAnimationFrame(() => pixelBurst(el, { count: 16 }))
-    }
+    if (options[i].correct && animate) setCheer(Date.now())
   }
   const mark = (i: number): Mark => {
     if (!revealed) return 'none'
@@ -173,13 +170,14 @@ export function PredictBlockView({ block, ctx }: BlockProps<BlockOf<'predict'>>)
       </div>
       <div className={cx('mt-4 grid gap-2', options.length >= 4 && options.every((o) => o.md.length < 48) && ctx.mode !== 'chat' && 'sm:grid-cols-2')}>
         {options.map((o, i) => (
-          <div key={i} ref={(el) => { rowRefs.current[i] = el }}>
+          <div key={i}>
             <AnswerRow
               badge={optionLetter(i)}
               mark={mark(i)}
               locked={revealed}
               onPick={() => pick(i)}
               animate={animate}
+              cheer={cheer}
               detail={revealed && (picked === i || o.correct) && o.why?.trim() ? <Inline text={o.why} /> : undefined}
             >
               <Prose text={o.md} ctx={ctx} size="small" />
@@ -216,7 +214,7 @@ export function SpotBlockView({ block, ctx }: BlockProps<BlockOf<'spot'>>) {
   const print = ctx.mode === 'print'
   const [stored, setPicked] = useBlockMemory<number | null>(ctx, block.id, 'spot', null)
   const picked = print ? block.wrongIndex : stored
-  const rowRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [cheer, setCheer] = useState<number | null>(null)
   const lines = block.lines.slice(0, 40)
   const inRange = block.wrongIndex >= 0 && block.wrongIndex < lines.length
   const ok = picked !== null && picked === block.wrongIndex
@@ -225,10 +223,7 @@ export function SpotBlockView({ block, ctx }: BlockProps<BlockOf<'spot'>>) {
     if (picked !== null || print) return
     setPicked(i)
     ctx.onInteract?.(block.id, i === block.wrongIndex ? 'spot.right' : 'spot.wrong')
-    if (i === block.wrongIndex && animate) {
-      const el = rowRefs.current[i]
-      if (el) requestAnimationFrame(() => pixelBurst(el, { count: 16 }))
-    }
+    if (i === block.wrongIndex && animate) setCheer(Date.now())
   }
   const mark = (i: number): Mark => {
     if (picked === null) return 'none'
@@ -247,7 +242,7 @@ export function SpotBlockView({ block, ctx }: BlockProps<BlockOf<'spot'>>) {
       </div>
       <div className="mt-4 flex flex-col gap-2">
         {lines.map((l, i) => (
-          <div key={i} ref={(el) => { rowRefs.current[i] = el }}>
+          <div key={i}>
             <AnswerRow
               badge={String(i + 1)}
               mono
@@ -255,6 +250,7 @@ export function SpotBlockView({ block, ctx }: BlockProps<BlockOf<'spot'>>) {
               locked={picked !== null}
               onPick={() => pick(i)}
               animate={animate}
+              cheer={cheer}
               detail={picked !== null && i === block.wrongIndex && !print ? t('spot.here') : undefined}
             >
               <Prose text={l} ctx={ctx} size="small" />

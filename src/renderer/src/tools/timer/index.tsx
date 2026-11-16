@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { Pause, Play, RotateCcw, SkipForward } from 'lucide-react'
-import { Button, Card, ProgressRing, SegmentedTabs, Slider, pixelBurst, cx, useTheme } from '@renderer/design'
+import { Button, Card, ProgressRing, SegmentedTabs, Slider, cx, useTheme } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import type { ToolProps } from '../registry'
 
@@ -86,8 +86,6 @@ function ensureTicker(t: (k: string) => string) {
       const wasFocus = s.phase === 'focus'
       s.finish()
       const msg = wasFocus ? t('tools:timer.doneFocus') : t('tools:timer.doneBreak')
-      const ring = document.querySelector('[data-timer-ring]')
-      if (wasFocus && ring) pixelBurst(ring)
       // por el proceso principal: la página de la app no tiene permiso de avisos (J3-8). Se pide SIEMPRE y el proceso principal
       // decide si hace falta: en macOS `document.hidden` es false aun minimizada, oculta o detrás de otra app (A5-P1-2)
       void api.invoke('app.notify', { body: msg, whenAway: true }).catch(() => undefined)

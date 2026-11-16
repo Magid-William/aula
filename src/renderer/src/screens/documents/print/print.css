@@ -248,18 +248,30 @@ html.aula-printing * {
   margin-top: 4px;
 }
 
-/* Chuleta: dos columnas, apretada */
+/* Chuleta: dos columnas, apretada y en UNA página (PrintDocument la mide y quita lo menos importante si no cabe) */
 .pd-cheat {
-  font-size: 0.86em;
+  font-size: 0.82em;
+  line-height: 1.36;
+}
+.pd-cheat .pd-head {
+  margin-bottom: 10px;
 }
 .pd-cheat .pd-sections {
   columns: 2;
   column-gap: 0.28in;
   column-rule: 0.5px solid var(--pd-line);
 }
+/* con la altura de lo que queda de la hoja, las columnas se llenan una tras otra (lo que sobra no se imprime) */
+.pd-cheat .pd-sections.pd-fit {
+  column-fill: auto;
+  overflow: hidden;
+}
 .pd-cheat .pd-section {
   break-inside: auto;
-  margin-bottom: 0.12in;
+  margin-bottom: 0.1in;
+}
+.pd-cheat .pd-section-head {
+  margin-bottom: 0.08in;
 }
 .pd-cheat .pd-section-head h2 {
   font-size: 1.15em;
@@ -268,7 +280,15 @@ html.aula-printing * {
 }
 .pd-cheat .pd-item {
   break-inside: avoid;
-  margin-bottom: 0.07in;
+  margin-bottom: 0.05in;
+}
+/* un grupo de fórmulas sí se parte entre columnas (sus filas no): entero y sin partir, empujaba la chuleta a la página 2 y la
+   primera salía en blanco */
+.pd-cheat .pd-formula-group {
+  break-inside: auto;
+}
+.pd-cheat .pd-formula {
+  padding: 2px 0;
 }
 
 /* Examen */

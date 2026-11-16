@@ -1,15 +1,14 @@
-// Bienvenida del primer arranque: tres pasos y listo. Aula detecta sola la IA y nada más hace falta.
+// Bienvenida del primer arranque: tres pasos y listo. Aula detecta sola la IA y nada más hace falta. Un solo dibujo, el arco
+// a tinta y acuarela: amanece al llegar y está a pleno sol al terminar (sin pegatinas ni medallas).
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { ArchLight, AulaMark, Button, Companion, InkArrow, PixelMedal, TextField, cx, spring, useTabTrap } from '@renderer/design'
+import { ArchLight, Button, InkArrow, TextField, cx, spring, useTabTrap } from '@renderer/design'
 import { useSettings } from '@renderer/lib/settings'
 import { useCourses } from '@renderer/lib/courses'
 import { navigate } from '@renderer/app/router'
 import { AIPicker } from '../settings/AIPicker'
 import { PlatformsCard } from '../settings/Platforms'
-
-const PARADE = ['libro', 'pluma', 'buho', 'cohete', 'sobre', 'farol', 'estrella']
 
 export function Onboarding() {
   const { t } = useTranslation('onboarding')
@@ -44,13 +43,6 @@ export function Onboarding() {
                 <ArchLight scene="dawn" className="h-[170px] w-[204px]" />
                 <h1 className="t-display mt-6">{t('hello')}</h1>
                 <p className="t-body text-text2 mt-3">{t('helloBody')}</p>
-                <div className="flex gap-2 mt-7">
-                  {PARADE.map((id, i) => (
-                    <motion.div key={id} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...spring.bouncy, delay: 0.3 + i * 0.07 }}>
-                      <Companion id={id} size={42} working />
-                    </motion.div>
-                  ))}
-                </div>
                 <div className="w-full max-w-[340px] mt-8 text-left">
                   <TextField label={t('name')} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('namePlaceholder')} onKeyDown={(e) => e.key === 'Enter' && setStep(1)} autoFocus />
                 </div>
@@ -78,10 +70,7 @@ export function Onboarding() {
             {step === 2 && (
               <div className="w-full max-w-[640px]">
                 <div className="text-center">
-                  <div className="flex justify-center">
-                    <Companion id="abeja" size={64} working appear />
-                  </div>
-                  <h1 className="t-title1 text-[34px] leading-[40px] mt-4">{t('platformTitle')}</h1>
+                  <h1 className="t-title1 text-[34px] leading-[40px]">{t('platformTitle')}</h1>
                   <p className="t-body text-text2 mt-2">{t('platformBody')}</p>
                 </div>
                 <div className="mt-7">
@@ -92,9 +81,8 @@ export function Onboarding() {
             )}
             {step === 3 && (
               <div className="flex flex-col items-center text-center max-w-[560px]">
-                <motion.div initial={{ scale: 0.4, rotate: -12 }} animate={{ scale: 1, rotate: 0 }} transition={spring.bouncy}>
-                  <PixelMedal size={88} />
-                </motion.div>
+                {/* el mismo arco del principio, ya a pleno sol */}
+                <ArchLight scene="noon" className="h-[150px] w-[180px]" />
                 <h1 className="t-display mt-6">{t('doneTitle')}</h1>
                 <p className="t-body text-text2 mt-3">{t('doneBody')}</p>
                 <div className="flex flex-wrap justify-center gap-2 mt-8">

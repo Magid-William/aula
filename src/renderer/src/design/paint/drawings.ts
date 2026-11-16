@@ -296,17 +296,21 @@ export function checkInk(size: number, seed: string | number): InkDrawing {
  * Rayitas de alegría alrededor de algo (un logro): trazos cortos que salen hacia fuera, uno detrás de otro, como los que se
  * dibujan alrededor de una estrella en un cuaderno.
  */
-export function burstInk(w: number, h: number, seed: string | number, count = 6): InkDrawing {
-  return cached(`x:${seed}:${w}x${h}:${count}`, () => {
+/** El abanico de las rayitas de alegría: por arriba y los lados (no por debajo, donde va el texto). Ángulos en radianes. */
+export const BURST_ARC: readonly [number, number] = [-Math.PI * 0.98, -Math.PI * 0.02]
+/** Por arriba y a la izquierda: junto a una marca que tiene texto a su derecha (un ✓ y su respuesta). */
+export const BURST_ARC_LEFT: readonly [number, number] = [-Math.PI * 0.98, -Math.PI * 0.4]
+
+export function burstInk(w: number, h: number, seed: string | number, count = 6, arc: readonly [number, number] = BURST_ARC): InkDrawing {
+  const [from, to] = arc
+  const key = arc === BURST_ARC ? '' : `:${from.toFixed(3)}..${to.toFixed(3)}`
+  return cached(`x:${seed}:${w}x${h}:${count}${key}`, () => {
     const { rng, noise } = tools(seed)
     const cx = w / 2
     const cy = h / 2
     const r0 = Math.min(w, h) * 0.36
     const strokes: InkStroke[] = []
     let at = 0
-    // en abanico por arriba y los lados (no por debajo, donde va el texto)
-    const from = -Math.PI * 0.98
-    const to = -Math.PI * 0.02
     for (let k = 0; k < count; k++) {
       const a = from + ((to - from) * (k + 0.5)) / count + gauss(rng) * 0.08
       const r1 = r0 * between(rng, 1.08, 1.16)

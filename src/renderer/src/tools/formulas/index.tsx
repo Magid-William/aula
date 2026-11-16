@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Copy, Search, Star, X } from 'lucide-react'
-import { Card, EmptyState, IconButton, cx, spring, useTheme } from '@renderer/design'
+import { Card, EmptyState, IconButton, cx, focusRing, spring, useTheme } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { toneInk } from '../shared/palette'
 import { useCopy, useStored } from '../shared/ui'
@@ -51,7 +51,7 @@ export default function FormulasTool(_props: ToolProps) {
             placeholder={t('formulas.search')}
             aria-label={t('formulas.search')}
             autoFocus
-            className="w-full h-11 rounded-[12px] bg-field border-[0.5px] border-line-strong/40 pl-10 pr-9 text-[15px] outline-none focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)]"
+            className={`w-full h-11 rounded-[12px] bg-field border-[0.5px] border-line-strong/40 pl-10 pr-9 text-[15px] outline-none ${focusRing}`}
           />
           {query && (
             <button onClick={() => setQuery('')} className="absolute right-3 text-text3 hover:text-text" aria-label={t('formulas.clear')}>
@@ -104,7 +104,6 @@ export default function FormulasTool(_props: ToolProps) {
 function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: Lang; index: number; fav: boolean; onFav: () => void }) {
   const { t } = useTranslation('tools')
   const copy = useCopy()
-  const { dark } = useTheme()
   const [copied, setCopied] = useState(false)
   const tex = localizeDecimal(texOf(f, lang), lang)
   return (
@@ -115,7 +114,6 @@ function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: La
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: Math.min(index, 10) * 0.035 }}
       className="group flex flex-col"
-      mark={toneInk(SUBJECT_TONE[f.subject], dark)}
     >
       <div className="flex items-start gap-2 px-5 pt-4">
         <div className="flex-1 min-w-0">

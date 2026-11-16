@@ -5,7 +5,7 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Eye, EyeOff, Home, Minus, MoreHorizontal, Pause, Play, Plus, Trash2 } from 'lucide-react'
-import { Button, Card, IconButton, Menu, Slider, cx, spring, useTheme } from '@renderer/design'
+import { Button, Card, IconButton, Menu, Slider, cx, focusRing, focusWithinRing, spring, useTheme } from '@renderer/design'
 import { derivative } from '@engine/math/algebra/derivative'
 import { Tex } from '../shared/Tex'
 import { formatNumber, localizeTex, niceTicks, parseNumber } from '../shared/lib/num'
@@ -296,9 +296,9 @@ const FnRow = memo(function FnRow({ f, name, color, compiled, selected, comma, o
           {f.kind !== 'fx' && (
             <div className="mt-1.5 flex items-center gap-1.5 t-caption">
               <span>{f.kind === 'polar' ? 'θ' : 't'} ∈</span>
-              <input value={f.t0} onChange={(e) => onChange({ t0: e.target.value })} className="w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none focus:border-accent-line" />
+              <input value={f.t0} onChange={(e) => onChange({ t0: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
               <span>…</span>
-              <input value={f.t1} onChange={(e) => onChange({ t1: e.target.value })} className="w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none focus:border-accent-line" />
+              <input value={f.t1} onChange={(e) => onChange({ t1: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
             </div>
           )}
           {err ? (
@@ -330,7 +330,7 @@ const FnRow = memo(function FnRow({ f, name, color, compiled, selected, comma, o
 
 function FnInput({ label, value, onChange, invalid, className }: { label: string; value: string; onChange: (v: string) => void; invalid?: boolean; className?: string }) {
   return (
-    <label className={cx('flex items-center gap-2 h-9 rounded-[10px] bg-field border-[0.5px] px-2.5 transition focus-within:border-accent-line focus-within:shadow-[0_0_0_3px_var(--accent-wash)]', invalid ? 'border-danger/50' : 'border-line-strong/40', className)}>
+    <label className={cx('flex items-center gap-2 h-9 rounded-[10px] bg-field border-[0.5px] px-2.5 transition', focusWithinRing, invalid ? 'border-danger/50' : 'border-line-strong/40', className)}>
       <span className="text-[13px] text-text3 shrink-0">
         <Tex tex={label} />
       </span>

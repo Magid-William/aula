@@ -1,10 +1,10 @@
 // Piezas del mapa: la chincheta (con su nombre donde lo colocó el que reparte los nombres), el panel de la práctica
 // «¿Dónde está…?», las leyendas (grupos de países y la escala del mapa de coropletas, en toques de pincel planos) y lo
 // que se imprime en papel en lugar de la ficha que se abre al pulsar.
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Icon, PixelCheck, cx, pixelBurst, spring } from '@renderer/design'
+import { Button, Celebrate, Icon, PixelCheck, cx, spring } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import type { Candidate } from '../lib/mapLabels'
 import { legendLayout, type LegendStops } from '../lib/mapChoropleth'
@@ -86,13 +86,13 @@ export function MapPin({ x, y, color, title, label, active, state, delay, animat
 
 export function QuizPanel({ target, index, total, right, feedback, onEnd }: { target?: string; index: number; total: number; right: number; feedback: Feedback | null; onEnd: () => void }) {
   const { t } = useTranslation('visual')
-  const ref = useRef<HTMLDivElement>(null)
+  const [cheer, setCheer] = useState<number | null>(null)
   const done = target === undefined && total > 0
   useEffect(() => {
-    if (done && right === total && ref.current) pixelBurst(ref.current, { count: 18 })
+    if (done && right === total) setCheer(Date.now())
   }, [done]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div ref={ref} className={cx('flex items-center gap-2.5 flex-wrap rounded-[14px] px-3.5 py-2.5', done && right === total ? 'bg-success-soft' : 'bg-fill1')}>
+    <div className={cx('flex items-center gap-2.5 flex-wrap rounded-[14px] px-3.5 py-2.5', done && right === total ? 'bg-success-soft' : 'bg-fill1')}>
       {target !== undefined ? (
         <>
           <Icon name="place" size={15} className="text-accent-text" />
@@ -112,7 +112,7 @@ export function QuizPanel({ target, index, total, right, feedback, onEnd }: { ta
         </>
       ) : (
         <>
-          {right === total ? <PixelCheck size={18} /> : <Icon name="flag" size={16} className="text-text2" />}
+          {right === total ? <Celebrate at={cheer}><PixelCheck size={18} /></Celebrate> : <Icon name="flag" size={16} className="text-text2" />}
           <span className="t-callout font-semibold">{t('labeled.score', { right, total })}</span>
           <span className="flex-1" />
           <Button size="sm" variant="ghost" onClick={onEnd}>

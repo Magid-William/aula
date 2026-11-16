@@ -1,11 +1,13 @@
-// Galería del sistema de diseño (solo para desarrollo y capturas: window.__aula.navigate({ name: 'gallery' })).
-import { Card, Companion, COMPANION_IDS, PixelSky, PixelMedal, PixelCheck, PixelFlame, Spinner, AulaMark, CourseIcon, Button, SegmentedTabs, ProgressBar, ProgressRing, Chip, pixelBurst, SectionTitle, Group, Row, Icon, BrushUnderline, InkRing, DrawnTile, DrawnBorder, InkStrike, InkCheck, InkBurst, PencilRays, InkArrow, CoverBand, ArchLight, InkSpot, INK_SPOT_NAMES, EmptyState } from '@renderer/design'
+// Galería del sistema de diseño (solo para desarrollo y capturas: window.__aula.navigate({ name: 'gallery' })). Un solo
+// estilo de dibujo: tinta y acuarela, más los iconos pixel que significan algo (los de los cursos, el ✓).
+import { Card, Celebrate, PixelCheck, Spinner, AulaMark, CourseIcon, Button, SegmentedTabs, ProgressBar, ProgressRing, Chip, SectionTitle, Group, Row, Icon, BrushUnderline, InkRing, DrawnTile, DrawnBorder, InkStrike, InkCheck, InkBurst, PencilRays, InkArrow, CoverBand, ArchLight, InkSpot, INK_SPOT_NAMES, EmptyState } from '@renderer/design'
 import { ICON_IDS } from '@renderer/design/pixel/resolve'
 import { useState } from 'react'
 import { ActivityPreview } from '../chat/ActivityPreview'
 
 export default function Gallery() {
   const [tab, setTab] = useState<'a' | 'b' | 'c'>('a')
+  const [cheer, setCheer] = useState<number | null>(null)
   return (
     <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-24 grid gap-4 grid-cols-12 content-start">
       <Card className="col-span-12" padded="lg">
@@ -24,22 +26,10 @@ export default function Gallery() {
       </Card>
       <HandDrawn />
       <ActivityPreview />
-      <Card className="col-span-12" padded="lg">
-        <SectionTitle title="Compañeros (trabajando)" />
-        <div className="flex flex-wrap gap-3 mt-3">
-          {COMPANION_IDS.map((id) => (
-            <Companion key={id} id={id} size={44} working appear />
-          ))}
-        </div>
-      </Card>
       <Card className="col-span-6" padded="lg">
-        <SectionTitle title="Pixel" />
+        <SectionTitle title="Marcas y controles" />
         <div className="flex items-end gap-5 mt-3">
-          <PixelSky size={30} hour={10} />
-          <PixelSky size={30} hour={23} />
-          <PixelMedal size={44} />
-          <PixelCheck size={28} />
-          <PixelFlame size={28} />
+          <Celebrate at={cheer}><PixelCheck size={28} /></Celebrate>
           <Spinner size={18} />
           <AulaMark size={40} />
           <AulaMark size={40} state="working" />
@@ -47,7 +37,7 @@ export default function Gallery() {
           <AulaMark size={40} state="offline" />
         </div>
         <div className="flex gap-2 mt-5">
-          <Button variant="primary" onClick={(e) => pixelBurst(e.currentTarget)}>Primario</Button>
+          <Button variant="primary" onClick={() => setCheer(Date.now())}>Primario</Button>
           <Button>Secundario</Button>
           <Button variant="ghost">Fantasma</Button>
           <Button variant="plain">Enlace</Button>
@@ -96,7 +86,7 @@ function HandDrawn() {
           </DrawnTile>
           <span className="relative grid place-items-center w-14 h-14">
             <InkBurst seed="gallery" size={96} delay={600} className="-left-5 -top-5" />
-            <PixelMedal size={40} />
+            <PixelCheck size={32} />
           </span>
         </div>
         <div className="relative h-[130px] rounded-[22px] bg-surface" style={{ boxShadow: 'var(--e1)' }}>

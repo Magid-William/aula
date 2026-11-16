@@ -1,6 +1,6 @@
 {
   "title": "Herramientas",
-  "subtitle": "Todo lo que necesitas para estudiar, a un clic. Fija la calculadora, el conversor o el temporizador para que floten sobre cualquier pantalla.",
+  "subtitle": "Calculadora, graficadora, tabla periódica y más. Fija la calculadora, el conversor o el temporizador para tenerlos sobre cualquier pantalla.",
   "open": "Abrir",
   "pin": "Dejar flotando",
   "unpin": "Quitar",
@@ -537,7 +537,7 @@
     "breakLength": "Descanso"
   },
   "stats": {
-    "name": "Estadística",
+    "name": "Calculadora estadística",
     "desc": "Media, desviación, histogramas y regresión",
     "tab": {
       "describe": "Descriptiva",

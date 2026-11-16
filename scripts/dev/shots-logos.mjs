@@ -86,7 +86,7 @@ for (const theme of ['light', 'dark']) {
   })
   await run(false, theme, async (win) => {
     await win.waitForTimeout(800)
-    await win.getByRole('button', { name: lang === 'es' ? 'Empezar' : 'Get started', exact: true }).click()
+    await win.getByRole('button', { name: lang === 'es' ? 'Empezar' : 'Start', exact: true }).click()
     await win.waitForTimeout(2200)
     await win.screenshot({ path: join(out, `bienvenida-${theme}.png`) })
   })
