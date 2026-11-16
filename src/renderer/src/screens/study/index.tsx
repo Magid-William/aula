@@ -46,7 +46,7 @@ export default function StudyScreen() {
   return (
     // el tutor, en una ventana ancha, va al lado y empuja el estudio a la izquierda (no lo tapa)
     <div className="flex min-h-0 flex-1">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div data-study-main className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* el texto del curso (RichText) va en su idioma; la interfaz, en el suyo */}
         <StudyLanguage.Provider value={data.pack.language}>{modeView(r.mode, key, data, r.skill)}</StudyLanguage.Provider>
       </div>

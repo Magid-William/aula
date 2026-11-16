@@ -4,12 +4,13 @@
 // En una ventana ancha es una columna al lado: empuja el ejercicio a la izquierda y no tapa nada («Intentar de nuevo» sigue a
 // la vista). En una estrecha no cabe al lado: se abre encima, como un cajón. Bajo el título, una línea dice qué está mirando
 // («Mirando: ejercicio 1 de 10»). Vacío, Aula habla primero y propone preguntas rápidas (como el chat vacío).
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { studentTextOf } from '@engine/assistant/trust'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Drawer, AulaMark, Icon, IconButton, toast, useMarkPhase, useTheme } from '@renderer/design'
+import { useScreenActive } from '@renderer/app/router'
 import { api } from '@renderer/lib/api'
 import { RichText } from '@renderer/lib/RichText'
 import { Conversation } from '../chat/Conversation'
@@ -19,6 +20,8 @@ import { ChatActionsContext, type ChatActions } from '../chat/actions'
 import { IdeaList } from '../chat/IdeaList'
 import { useStudyStore } from './data'
 import { tutorLooking, tutorVisibleFor, useTutor, type TutorLooking } from './tutorStore'
+import { exerciseTarget, focusBackTarget, shouldMoveFocus } from './tutorFocus'
+import { tabbables } from '@renderer/design/focusTrap'
 
 export { useTutor } from './tutorStore'
 
@@ -162,11 +165,43 @@ function TutorHeader({ title, looking, closeLabel, onClose }: { title: string; l
   )
 }
 
+/** Al cerrar el tutor, el foco vuelve a lo que lo abrió (si ya no está, al botón del tutor o al ejercicio): en la columna se
+ *  quedaba en <body>, y el cajón lo devolvía a su propia caja, que se había enfocado sola al abrirse. */
+function useFocusBack(open: boolean, panel: RefObject<HTMLElement | null>): void {
+  const screenActive = useScreenActive()
+  const opener = useRef<HTMLElement | null>(null)
+  // se apunta al abrirse, aún dentro del clic o la tecla que lo abre: después, la caja (autoFocus) ya tiene el foco
+  useEffect(
+    () =>
+      useTutor.subscribe((s, prev) => {
+        if (s.open && !prev.open) opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      }),
+    []
+  )
+  const wasOpen = useRef(open)
+  useEffect(() => {
+    const closed = wasOpen.current && !open
+    wasOpen.current = open
+    // al irse a otra pantalla también se cierra, pero ahí el foco es cosa de la pantalla nueva
+    if (!closed || !screenActive) return
+    const active = document.activeElement
+    if (!shouldMoveFocus(active, document.body, !!active && !!panel.current?.contains(active))) return
+    const screen: ParentNode = document.querySelector('[data-screen][data-active="true"]') ?? document
+    const study = screen.querySelector<HTMLElement>('[data-study-main]')
+    const button = screen.querySelector<HTMLElement>('[data-tutor-button]') ?? document.querySelector<HTMLElement>('[data-tutor-button]')
+    const target = focusBackTarget([opener.current, button, study ? exerciseTarget(tabbables(study)) : null])
+    opener.current = null
+    target?.focus({ preventScroll: true })
+  }, [open, screenActive, panel])
+}
+
 /** El marco del panel: columna al lado (ventana ancha) o cajón encima (estrecha). Sobre `surface`, no `raised`: en oscuro, la
  *  burbuja de lo que escribe el estudiante se perdía en el fondo. */
 function TutorShell({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const side = useSideBySide()
   const { reducedMotion } = useTheme()
+  const panel = useRef<HTMLDivElement>(null)
+  useFocusBack(open, panel)
   // Esc cierra el tutor antes que el modo de estudio (salvo un menú o la lista de «@» abiertos, que se cierran ellos)
   useEffect(() => {
     if (!open || !side) return
@@ -185,7 +220,7 @@ function TutorShell({ open, onClose, title, children }: { open: boolean; onClose
   if (!side)
     return (
       <Drawer open={open} onClose={onClose} width={460} className="bg-surface!">
-        <div className="flex h-full min-h-0 flex-col">{children}</div>
+        <div ref={panel} className="flex h-full min-h-0 flex-col">{children}</div>
       </Drawer>
     )
   return (
@@ -200,7 +235,7 @@ function TutorShell({ open, onClose, title, children }: { open: boolean; onClose
           exit={{ width: 0, opacity: 0 }}
           transition={reducedMotion ? { duration: 0 } : { duration: 0.32, ease: [0.2, 0.7, 0.2, 1] }}
         >
-          <div className="absolute inset-y-0 right-3 flex flex-col pb-3 pt-1" style={{ width: PANEL_W }}>
+          <div ref={panel} className="absolute inset-y-0 right-3 flex flex-col pb-3 pt-1" style={{ width: PANEL_W }}>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border-[0.5px] border-line bg-surface shadow-[var(--e2)]">{children}</div>
           </div>
         </motion.aside>
