@@ -9,7 +9,7 @@ import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { CHART_FIXTURES, type ChartFixture } from './chart-fixtures'
 import { waitForPieHover } from './chart-hover-readiness'
 import { compareDiagramPixels } from './diagram-pixels'
-import { assertChartReferenceInvariant, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, snapshotChartReference } from './chart-reference'
+import { assertChartReferenceInvariant, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, snapshotChartReference } from './chart-reference'
 import { assertChartRasterConsistency, compareChartRasterConsistency, type ChartRasterConsistency } from './chart-raster-consistency'
 import { go, homeWithDemoCourse } from './helpers'
 
@@ -42,8 +42,9 @@ function prepare(fixture: ChartFixture, theme: 'light' | 'dark'): { home: string
   return { home, skillPath, skillBytes: readFileSync(skillPath, 'utf8') }
 }
 
-async function start(home: string, dark: boolean): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
-  const app = await electron.launch({ args: [resolve(__dirname, '../..'), ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--use-mock-keychain', `--force-device-scale-factor=${dark ? 2 : 1}`], env: { ...process.env, AULA_HOME: home, AULA_FAKE_AI: '1', AULA_SKIP_ONBOARDING: '1', AULA_HIDDEN: '1', AULA_NO_UPDATES: '1', AULA_NO_LOGIN_ITEM: '1' } })
+async function start(home: string, dpr2: boolean): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
+  const sourceDpr = dpr2 ? 2 : 1
+  const app = await electron.launch({ args: [resolve(__dirname, '../..'), ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--use-mock-keychain', `--force-device-scale-factor=${sourceDpr}`], env: { ...process.env, AULA_HOME: home, AULA_FAKE_AI: '1', AULA_SKIP_ONBOARDING: '1', AULA_HIDDEN: '1', AULA_NO_UPDATES: '1', AULA_NO_LOGIN_ITEM: '1' } })
   try {
     const page = await app.firstWindow(), errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -75,6 +76,7 @@ async function start(home: string, dark: boolean): Promise<{ app: ElectronApplic
     })
     await page.setViewportSize({ width: 1440, height: 1100 })
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
+    await initializeChartReference(page, sourceDpr)
     return { app, page, errors }
   } catch (error) { await app.close().catch(() => undefined); throw error }
 }
@@ -152,7 +154,7 @@ async function capture(app: ElectronApplication, page: Page, figure: Locator, ho
     expect({ ...canonical, scene: { ...canonical.scene, layers } }).toEqual(original)
     await sameExportRaster(page, readFileSync(path), readFileSync(canonicalPath), reference.geometry.background, info, name)
     writeFileSync(info.outputPath(`${name}-placement.json`), JSON.stringify({ before: placement.before, after: placement.after, displacement: placement.displacement, target: placement.target, quantum: placement.quantum, residual: placement.residual, method: placement.method, geometryTolerance }, null, 2))
-    await compareDiagramPixels(page, reference.png, readFileSync(path), reference.geometry, info, name)
+    await compareDiagramPixels(page, reference.png, readFileSync(path), reference.geometry, info, name, 'dense')
     for (const audit of [originalAudits.at(-1)!, audits.at(-1)!]) {
       expect(audit.shown).toBe(0); expect(audit.destroyed).toBe(true); expect(audit.defaultSession).toBe(false)
       expect(audit.isolation).toMatchObject({ bridge: false, node: false, links: 0, images: 0, frames: 0, context })

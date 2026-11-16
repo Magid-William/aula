@@ -7,6 +7,7 @@ import type { BlockOf } from '../../src/shared/schema/blocks'
 import type { ChartRenderSceneV1 } from '../../src/shared/figuresChart'
 import { CHART_FIXTURES } from './chart-fixtures'
 import { assertChartReferenceInvariant, snapshotChartReference } from './chart-reference'
+import { pieEntranceClockExpression, type PieEntranceReport } from './chart-entrance-clock'
 import { go, homeWithDemoCourse } from './helpers'
 
 const PACK = 'exam-2-math112', SKILL = 'reference-angles'
@@ -16,30 +17,6 @@ interface Started { app: ElectronApplication; page: Page; figure: Locator; body:
 
 // Clock de Playwright abarca todo el BrowserContext. Este reloj de RAF se instala sólo en la fuente;
 // el renderer privado sigue recibiendo frames reales y sus deadlines no cambian.
-const installEntranceClock = `(() => {
-  const raf = window.requestAnimationFrame, cancel = window.cancelAnimationFrame;
-  const ownNow = Object.getOwnPropertyDescriptor(performance, 'now');
-  let now = performance.now(), id = 0;
-  const pending = new Map();
-  Object.defineProperty(performance, 'now', { configurable: true, value: () => now });
-  window.requestAnimationFrame = callback => { const key = --id; pending.set(key, callback); return key; };
-  window.cancelAnimationFrame = key => { if (key < 0) pending.delete(key); else cancel.call(window, key); };
-  window.__chartEntranceClock = {
-    async step(milliseconds) {
-      now += milliseconds;
-      const batch = [...pending.values()]; pending.clear();
-      for (const callback of batch) callback.call(window, now);
-      await new Promise(resolve => raf.call(window, resolve));
-    },
-    restore() {
-      window.requestAnimationFrame = raf; window.cancelAnimationFrame = cancel;
-      if (ownNow) Object.defineProperty(performance, 'now', ownNow); else delete performance.now;
-      for (const callback of pending.values()) raf.call(window, callback);
-      pending.clear(); delete window.__chartEntranceClock;
-    }
-  };
-})()`
-
 async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started> {
   const home = homeWithDemoCourse(), skillPath = join(home, 'Packs', PACK, 'skills', `${SKILL}.json`)
   const skill = JSON.parse(readFileSync(skillPath, 'utf8')); skill.lesson = [block]
@@ -90,7 +67,7 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
     })
     await page.setViewportSize({ width: 1440, height: 1100 })
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
-    if (entrance) await page.evaluate(installEntranceClock)
+    if (entrance) await page.evaluate(pieEntranceClockExpression)
     await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
     const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
     await expect(body).toBeVisible(); await page.evaluate('document.fonts.ready'); await page.mouse.move(8, 8)
@@ -103,7 +80,9 @@ async function release(app: ElectronApplication): Promise<void> {
 }
 async function close(source: Started, info: TestInfo): Promise<void> {
   try {
-    await source.page.evaluate('window.__chartEntranceClock?.restore()')
+    const entrance = await source.page.evaluate<PieEntranceReport | null>('window.__chartEntranceClock?.report() ?? null')
+    if (entrance) writeFileSync(info.outputPath('pie-entrance-clock.json'), JSON.stringify(entrance, null, 2))
+    await source.page.evaluate('window.__chartEntranceClock?.restore(); delete window.__chartEntranceClock')
     await release(source.app)
     const audit = await source.app.evaluate(() => (globalThis as unknown as { chartStateAudit: StateAudit }).chartStateAudit.captures)
     writeFileSync(info.outputPath('chart-state-audit.json'), JSON.stringify(audit, null, 2))
@@ -201,8 +180,9 @@ test('Chart PNG: Pie exporta el destino final y su entrada viva sigue avanzando'
   const paths = () => source.body.locator('svg path[d]').evaluateAll(elements => elements.map(element => element.getAttribute('d')))
   const step = (milliseconds: number) => source.page.evaluate(`window.__chartEntranceClock.step(${milliseconds})`)
   try {
-    await step(300)
+    const checkpoint = await source.page.evaluate<PieEntranceReport>('window.__chartEntranceClock.checkpoint()')
     const partial = await paths()
+    expect(partial).toEqual(checkpoint.firstPaths); expect(partial).toEqual(checkpoint.coherentPaths)
     expect(partial.length).toBeGreaterThan(0); expect(partial.length).toBeLessThan(8)
     await source.app.evaluate(() => { (globalThis as unknown as { chartStateAudit: StateAudit }).chartStateAudit.hold = true })
     const first = join(source.home, 'pie-during-entrance.png'); await choose(source, first)

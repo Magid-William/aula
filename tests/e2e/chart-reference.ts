@@ -2,7 +2,7 @@
 // No lee escenas DTO, atributos de exportación en las hojas ni helpers de bounds del producto.
 import { writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import type { JSHandle, Locator, TestInfo } from 'playwright/test'
+import type { CDPSession, JSHandle, Locator, Page, TestInfo } from 'playwright/test'
 import type { LiveDiagramGeometry, PixelRect } from './diagram-pixels'
 
 export interface ChartReferenceSnapshot {
@@ -41,7 +41,11 @@ export interface ChartReference {
     ink: PixelRect
     canvasOffset: { x: number; y: number }
     isolation: { matte: PixelRect; hidden: Array<{ tag: string; className: string }>; maskedInk: false }
-    capture: { api: 'playwright.page.screenshot'; scale: 'css'; reportedDpr: number; width: number; height: number }
+    capture: {
+      api: 'Page.captureScreenshot'; sourceDpr: number; raster: 'dense'; width: number; height: number
+      calibration: { width: number; height: number; pixelsPerCss: number }; requestedScale: number; desiredPixelsPerCss: number
+      observations: Array<{ stage: string; before: ChartReferenceSnapshot; after: ChartReferenceSnapshot }>
+    }
     invariantTolerance: number
     geometryTolerance: ChartReferenceGeometryTolerance
     placement: ChartPlacementObservation
@@ -51,6 +55,26 @@ export interface ChartReference {
 // Texto/estilos/atributos siguen exactos; sólo BCR admite su precisión observacional Float32.
 const INVARIANT_TOLERANCE = 1e-6
 const placements = new WeakMap<Locator, ChartPlacementObservation>()
+const protocols = new WeakMap<Page, { session: CDPSession; sourceDpr: number }>()
+
+/** El viewport de Playwright restablece DPR=1; fijamos y comprobamos la densidad real antes del caso. */
+export async function initializeChartReference(page: Page, sourceDpr: 1 | 2): Promise<void> {
+  if (protocols.has(page)) throw new Error('Chart reference protocol is already initialized')
+  const viewport = page.viewportSize()
+  if (!viewport) throw new Error('Chart reference needs an explicit viewport')
+  const session = await page.context().newCDPSession(page)
+  await session.send('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: sourceDpr, mobile: false })
+  const actual = await page.evaluate<{ width: number; height: number; dpr: number }>('({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})')
+  if (actual.width !== viewport.width || actual.height !== viewport.height || actual.dpr !== sourceDpr) throw new Error('Chart source metrics do not match the requested viewport and DPR')
+  // La página cierra la sesión. Un detach entre capturas puede restablecer la emulación de Electron.
+  protocols.set(page, { session, sourceDpr })
+}
+
+export function requireContainedChartClip(clip: PixelRect, viewport: { width: number; height: number }): void {
+  if (![clip.x, clip.y, clip.width, clip.height, viewport.width, viewport.height].every(Number.isFinite)
+    || clip.x < 0 || clip.y < 0 || clip.width <= 0 || clip.height <= 0 || viewport.width <= 0 || viewport.height <= 0
+    || clip.x + clip.width > viewport.width || clip.y + clip.height > viewport.height) throw new Error('The complete Chart reference clip must fit inside its actual viewport')
+}
 
 export interface ChartReferenceGeometryTolerance {
   screenUlp: number
@@ -297,6 +321,14 @@ export function assertChartReferenceInvariant(before: ChartReferenceSnapshot, af
   compare(comparable(before), comparable(after), 'snapshot')
 }
 
+/** La captura, a diferencia de la colocación previa, tampoco puede mover el origen absoluto. */
+export function assertChartCaptureInvariant(before: ChartReferenceSnapshot, after: ChartReferenceSnapshot): void {
+  assertChartReferenceInvariant(before, after)
+  for (const axis of ['x', 'y'] as const) {
+    if (Math.abs(before.body.box[axis] - after.body.box[axis]) > INVARIANT_TOLERANCE) throw new Error(`Chart capture changed absolute body.${axis}`)
+  }
+}
+
 /** Una traslación global de layout; no usa transform, zoom, redondeos de hojas ni cambios de fuente. */
 export async function canonicalizeChartReference(body: Locator): Promise<ChartReferencePlacement> {
   if (placements.has(body)) throw new Error('Chart reference placement is already active')
@@ -397,7 +429,10 @@ export async function canonicalizeChartReference(body: Locator): Promise<ChartRe
 
 /** Captura completa con clip entero observado; no oculta overflow ni usa el encuadre del exportador. */
 export async function captureChartReference(body: Locator, info?: TestInfo, name = 'chart'): Promise<ChartReference> {
+  const protocol = protocols.get(body.page())
+  if (!protocol) throw new Error('Initialize the Chart reference protocol before capturing')
   const observation = await observe(body), { snapshot, ink, background } = observation
+  if (snapshot.viewport.devicePixelRatio !== protocol.sourceDpr) throw new Error('Chart source DPR changed before capture')
   const geometryTolerance = chartReferenceGeometryTolerance(snapshot, snapshot)
   const placement = placements.get(body) ?? { target: { x: Math.round(snapshot.body.box.x), y: Math.round(snapshot.body.box.y) }, quantum: { x: 0, y: 0 }, residual: { x: 0, y: 0 }, method: 'exact' as const }
   for (const axis of ['x', 'y'] as const) {
@@ -414,7 +449,7 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
   // El matcher omite seis píxeles del borde: ocho dejan toda la tinta observada dentro
   // de la zona auditada, también los extremos de trazo y el halo conservador de sombra.
   const clip = { x: Math.floor(ink.x - 8), y: Math.floor(ink.y - 8), width: Math.ceil(ink.x + ink.width + 8) - Math.floor(ink.x - 8), height: Math.ceil(ink.y + ink.height + 8) - Math.floor(ink.y - 8) }
-  if (clip.x < 0 || clip.y < 0 || clip.x + clip.width > snapshot.viewport.width || clip.y + clip.height > snapshot.viewport.height) throw new Error(`Chart reference overflow is outside the viewport: ${JSON.stringify({ clip, viewport: snapshot.viewport })}`)
+  requireContainedChartClip(clip, snapshot.viewport)
   for (const outer of observation.outerClips) {
     if (outer.x && (ink.x < outer.box.x - 1e-6 || ink.x + ink.width > outer.box.x + outer.box.width + 1e-6) || outer.y && (ink.y < outer.box.y - 1e-6 || ink.y + ink.height > outer.box.y + outer.box.height + 1e-6)) throw new Error(`Chart reference ink is clipped by external ${outer.tag}`)
   }
@@ -462,21 +497,48 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
 }`, { clip, background })
   try {
     await body.page().evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-    assertChartReferenceInvariant(snapshot, await snapshotChartReference(body))
-    const dpr = snapshot.viewport.devicePixelRatio
-    if (!Number.isFinite(dpr) || dpr <= 0) throw new Error('Invalid live reference DPR')
-    // Playwright administra su propia emulación de pantalla durante la captura CSS.
-    // Un CDP auxiliar que se desconecta puede restablecer el DPR nativo de Electron.
-    const png = await body.page().screenshot({ type: 'png', scale: 'css', clip: { x: clip.x + snapshot.viewport.scrollX, y: clip.y + snapshot.viewport.scrollY, width: clip.width, height: clip.height } })
+    assertChartCaptureInvariant(snapshot, await snapshotChartReference(body))
+    const observations: ChartReference['metadata']['capture']['observations'] = []
+    const capture = async (scale: number, stage: string): Promise<Buffer> => {
+      if (!Number.isFinite(scale) || scale <= 0) throw new Error('Invalid Chart reference capture scale')
+      const before = await snapshotChartReference(body)
+      assertChartCaptureInvariant(snapshot, before)
+      requireContainedChartClip(clip, before.viewport)
+      // El clip completo cabe en el viewport: no permitimos el resize temporal de beyondViewport.
+      const response = await protocol.session.send('Page.captureScreenshot', {
+        format: 'png', fromSurface: true, captureBeyondViewport: false,
+        clip: { x: clip.x + before.viewport.scrollX, y: clip.y + before.viewport.scrollY, width: clip.width, height: clip.height, scale }
+      })
+      const bytes = Buffer.from(response.data, 'base64'), after = await snapshotChartReference(body)
+      observations.push({ stage, before, after })
+      if (info) {
+        writeFileSync(info.outputPath(`${name}-${stage}.png`), bytes)
+        writeFileSync(info.outputPath(`${name}-capture-observations.json`), JSON.stringify(observations, null, 2))
+      }
+      assertChartCaptureInvariant(before, after)
+      if (bytes.length < 24 || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('Chart reference capture returned an invalid PNG')
+      return bytes
+    }
+    // La densidad se mide en los píxeles recibidos, nunca se deduce sólo del DPR solicitado.
+    const calibrated = await capture(1, 'live-calibration')
+    const calibrationWidth = calibrated.readUInt32BE(16), calibrationHeight = calibrated.readUInt32BE(20)
+    const pixelsPerCss = calibrationWidth / clip.width, verticalPixelsPerCss = calibrationHeight / clip.height
+    if (![pixelsPerCss, verticalPixelsPerCss].every(n => Number.isFinite(n) && n > 0)
+      || Math.abs(pixelsPerCss - verticalPixelsPerCss) > 1 / clip.width + 1 / clip.height) throw new Error('Chart reference density calibration is not uniform')
+    const desiredPixelsPerCss = 2 / snapshot.body.scaleX, requestedScale = desiredPixelsPerCss / pixelsPerCss
+    const png = await capture(requestedScale, 'live')
     const width = png.readUInt32BE(16), height = png.readUInt32BE(20)
-    if (width !== clip.width || height !== clip.height) throw new Error(`Chart reference raster does not match CSS clip: ${width}x${height}, expected ${clip.width}x${clip.height}, DPR ${dpr}`)
-    assertChartReferenceInvariant(snapshot, await snapshotChartReference(body))
+    if (Math.abs(width - clip.width * desiredPixelsPerCss) > 1 || Math.abs(height - clip.height * desiredPixelsPerCss) > 1) throw new Error('Chart reference raster does not match its calibrated density')
     const geometry: LiveDiagramGeometry = {
       width: clip.width, height: clip.height,
       canvas: { x: snapshot.body.box.x - clip.x, y: snapshot.body.box.y - clip.y, width: snapshot.body.box.width, height: snapshot.body.box.height, naturalWidth: snapshot.body.naturalWidth, naturalHeight: snapshot.body.naturalHeight, scale: snapshot.body.scaleX },
       background, exclusions: [], labels: observation.labels.map(label => ({ ...label, x: label.x - clip.x, y: label.y - clip.y }))
     }
-    const metadata: ChartReference['metadata'] = { clip, ink, canvasOffset: { x: geometry.canvas.x, y: geometry.canvas.y }, isolation: await isolation.evaluate(state => state.metadata), capture: { api: 'playwright.page.screenshot', scale: 'css', reportedDpr: dpr, width, height }, invariantTolerance: INVARIANT_TOLERANCE, geometryTolerance, placement }
+    const metadata: ChartReference['metadata'] = {
+      clip, ink, canvasOffset: { x: geometry.canvas.x, y: geometry.canvas.y }, isolation: await isolation.evaluate(state => state.metadata),
+      capture: { api: 'Page.captureScreenshot', sourceDpr: protocol.sourceDpr, raster: 'dense', width, height, calibration: { width: calibrationWidth, height: calibrationHeight, pixelsPerCss }, requestedScale, desiredPixelsPerCss, observations },
+      invariantTolerance: INVARIANT_TOLERANCE, geometryTolerance, placement
+    }
     if (info) {
       const imagePath = info.outputPath(`${name}-live.png`), dataPath = info.outputPath(`${name}-live-dom.json`)
       writeFileSync(imagePath, png); writeFileSync(dataPath, JSON.stringify({ geometry, metadata, snapshot }, null, 2))
@@ -485,6 +547,6 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
     return { png, geometry, clip, snapshot, metadata }
   } finally {
     try { await isolation.evaluate(state => state.restore()) } finally { await isolation.dispose() }
-    assertChartReferenceInvariant(snapshot, await snapshotChartReference(body))
+    assertChartCaptureInvariant(snapshot, await snapshotChartReference(body))
   }
 }

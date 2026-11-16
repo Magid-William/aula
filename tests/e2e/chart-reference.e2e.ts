@@ -1,6 +1,6 @@
 // Pruebas puras de precisión observacional: no abren Electron ni un navegador.
 import { test, expect } from 'playwright/test'
-import { assertChartReferenceInvariant, chartReferenceGeometryTolerance, type ChartReferenceSnapshot } from './chart-reference'
+import { assertChartCaptureInvariant, assertChartReferenceInvariant, chartReferenceGeometryTolerance, requireContainedChartClip, type ChartReferenceSnapshot } from './chart-reference'
 
 function snapshot(): ChartReferenceSnapshot {
   const width = 634.3325805664062, height = 311.74310302734375
@@ -83,4 +83,32 @@ test('referencia Chart: falla si la precisión disponible podría ocultar una un
   expect(() => assertChartReferenceInvariant(before, after)).toThrow(/precision cannot distinguish/)
   after.body.box.x = NaN
   expect(() => assertChartReferenceInvariant(before, after)).toThrow(/Invalid Chart screen precision/)
+})
+
+test('referencia Chart: la captura conserva también el origen absoluto y el DPR real', () => {
+  const before = snapshot()
+  assertChartCaptureInvariant(before, structuredClone(before))
+  for (const axis of ['x', 'y'] as const) {
+    const moved = structuredClone(before); moved.body.box[axis] += 1
+    // La colocación puede trasladar el cuerpo; una captura no tiene esa autorización.
+    assertChartReferenceInvariant(before, moved)
+    expect(() => assertChartCaptureInvariant(before, moved)).toThrow(/absolute body/)
+  }
+  const dpr = structuredClone(before); dpr.viewport.devicePixelRatio = 2
+  expect(() => assertChartCaptureInvariant(before, dpr)).toThrow(/devicePixelRatio/)
+  const viewport = structuredClone(before); viewport.viewport.width += 1
+  expect(() => assertChartCaptureInvariant(before, viewport)).toThrow(/viewport.width/)
+  const scroll = structuredClone(before); scroll.viewport.scrollY += 1
+  expect(() => assertChartCaptureInvariant(before, scroll)).toThrow(/scrollY/)
+})
+
+test('referencia Chart: exige el clip completo dentro del viewport observado', () => {
+  const viewport = { width: 1440, height: 1100 }, clip = { x: 10, y: 20, width: 100, height: 200 }
+  requireContainedChartClip(clip, viewport)
+  requireContainedChartClip({ x: 0, y: 0, ...viewport }, viewport)
+  for (const invalid of [
+    { ...clip, x: -1 }, { ...clip, y: -1 }, { ...clip, width: 0 }, { ...clip, height: 0 },
+    { ...clip, x: 1341 }, { ...clip, y: 901 }, { ...clip, x: NaN }, { ...clip, width: Infinity }
+  ]) expect(() => requireContainedChartClip(invalid, viewport)).toThrow(/complete Chart reference clip/)
+  expect(() => requireContainedChartClip(clip, { width: 0, height: 1100 })).toThrow(/complete Chart reference clip/)
 })
