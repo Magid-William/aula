@@ -1,11 +1,11 @@
 // Documentos: la biblioteca del estudiante — los materiales de cada curso, los archivos que importa y los documentos que creó
 // Aula — con búsqueda en el texto de todo, filtro por curso, «Recientes» con su página en miniatura y una zona para soltar
-// archivos (el pixel-art del papel se enciende al pasar por encima).
+// archivos (el pixel-art del papel se enciende al pasar por encima). El título es el de la barra de arriba.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { DocumentEntry, DocumentLibrary, DocumentSearchHit } from '@shared/documents'
-import { AnimatedNumber, Button, Card, Chip, cx, EmptyState, Icon, IconButton, Menu, PixelIcon, ProgressBar, SectionTitle, Spinner, Stagger, StaggerItem, TextField, toast, toneForHue, useTheme, type MenuItem } from '@renderer/design'
+import { Button, Card, Chip, cx, EmptyState, Icon, IconButton, Menu, PixelIcon, ProgressBar, SectionTitle, Spinner, Stagger, StaggerItem, TextField, toast, toneForHue, useTheme, type MenuItem } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import i18n from '@renderer/i18n'
 import { useRpc, useRpcEvent } from '@renderer/lib/useRpc'
@@ -43,10 +43,11 @@ export function Library() {
   return (
     <div className="@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pt-1 pb-24">
       <Stagger className="grid grid-cols-12 gap-4" gap={0.05}>
-        <StaggerItem className="col-span-12 @2xl:col-span-7 @5xl:col-span-8">
+        {/* lado a lado solo si la zona para soltar cabe en una fila; si no, una debajo de otra */}
+        <StaggerItem className="col-span-12 @4xl:col-span-7 @5xl:col-span-8">
           <SearchCard lib={lib} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
         </StaggerItem>
-        <StaggerItem className="col-span-12 @2xl:col-span-5 @5xl:col-span-4">
+        <StaggerItem className="col-span-12 @4xl:col-span-5 @5xl:col-span-4">
           <DropCard onCreate={() => setExportOpen(true)} hasCourses={lib.courses.length > 0} />
         </StaggerItem>
 
@@ -101,35 +102,23 @@ function i18nT(key: string, opts?: Record<string, unknown>): string {
 
 // MARK: - Buscar y filtrar
 
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="min-w-[52px]">
-      <div className="font-serif text-[28px] leading-[30px] tabular text-text"><AnimatedNumber value={value} /></div>
-      <div className="t-caption text-text3">{label}</div>
-    </div>
-  )
-}
-
 function SearchCard({ lib, query, setQuery, filter, setFilter }: { lib: DocumentLibrary; query: string; setQuery: (q: string) => void; filter: string; setFilter: (f: string) => void }) {
   const { t } = useTranslation('documents')
   const { dark } = useTheme()
   const imports = lib.items.filter((i) => i.origin === 'import').length
   const pages = lib.items.reduce((n, i) => n + i.pages, 0)
   const marks = lib.items.reduce((n, i) => n + i.marks, 0)
+  // lo que hay, en una línea y sin ceros: «3 documentos · 7 páginas» (las marcas, solo si las hay)
+  const facts = [
+    lib.items.length > 0 ? t('library.count', { count: lib.items.length }) : '',
+    pages > 0 ? t('library.summaryPages', { count: pages }) : '',
+    marks > 0 ? t('library.summaryMarks', { count: marks }) : ''
+  ].filter(Boolean)
   return (
-    <Card padded="lg" className="h-full">
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="t-title1">{t('library.heading')}</h1>
-          <p className="t-callout text-text2 mt-1">{t('library.lead')}</p>
-        </div>
-        <div className="flex gap-6">
-          <Stat value={lib.items.length} label={t('library.statDocs', { count: lib.items.length })} />
-          <Stat value={pages} label={t('library.statPages', { count: pages })} />
-          <Stat value={marks} label={t('library.statMarks', { count: marks })} />
-        </div>
-      </div>
-      <div className="mt-5">
+    <Card padded="lg" className="h-full flex flex-col">
+      {/* el título visible es el de la barra de arriba */}
+      <h1 className="sr-only">{t('title')}</h1>
+      <div>
         <TextField value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('library.search')} icon={<Icon name="search" size={15} />}
           trailing={query ? <IconButton label={t('clear')} size="sm" onClick={() => setQuery('')}><Icon name="close" size={13} /></IconButton> : undefined} />
       </div>
@@ -147,6 +136,8 @@ function SearchCard({ lib, query, setQuery, filter, setFilter }: { lib: Document
         })}
         {imports > 0 && <Chip active={filter === IMPORTED} onClick={() => setFilter(IMPORTED)} icon={<Icon name="folder" size={12} />}>{t('library.imports')}</Chip>}
       </div>
+      {/* al pie de la tarjeta, a la altura de los botones de al lado */}
+      {facts.length > 0 && <p className="mt-auto pt-4 t-callout text-text2">{facts.join(' · ')}</p>}
     </Card>
   )
 }
@@ -238,20 +229,23 @@ function DropCard({ onCreate, hasCourses }: { onCreate: () => void; hasCourses: 
       onDragLeave={() => { depth.current = Math.max(0, depth.current - 1); if (!depth.current) setDrag(false) }}
       onDrop={(e) => { e.preventDefault(); depth.current = 0; setDrag(false); onDrop(e.dataTransfer.files) }}
     >
+      {/* la zona para soltar, en una fila (la hoja pixel y lo que se puede soltar): así las dos tarjetas de arriba miden lo mismo */}
       <button type="button" onClick={() => void pick()} disabled={!!busy}
-        className={cx('flex-1 min-h-[120px] flex flex-col items-center justify-center gap-2 rounded-[18px] border-[1.5px] border-dashed px-4 py-4 text-center transition-colors', drag ? 'border-accent bg-accent-wash' : 'border-line-strong/40 hover:bg-fill1')}>
-        <PaperSprite lit={drag || !!busy} size={38} />
-        {busy ? (
-          <>
-            <span className="t-ui font-medium truncate max-w-full">{busy.name ? t('library.reading', { name: busy.name }) : t('library.readingAny')}</span>
-            <ProgressBar value={busy.fraction} className="w-[160px]" />
-          </>
-        ) : (
-          <>
-            <span className="t-ui font-medium">{drag ? t('library.dropNow') : t('library.drop')}</span>
-            <span className="t-footnote">{t('library.kinds')}</span>
-          </>
-        )}
+        className={cx('flex-1 min-h-[72px] flex items-center gap-3.5 rounded-[16px] border-[1.5px] border-dashed px-4 py-3 text-left transition-colors', drag ? 'border-accent bg-accent-wash' : 'border-line-strong/40 hover:bg-fill1')}>
+        <span className="shrink-0"><PaperSprite lit={drag || !!busy} size={32} /></span>
+        <span className="min-w-0 flex-1">
+          {busy ? (
+            <>
+              <span className="block t-ui font-medium truncate">{busy.name ? t('library.reading', { name: busy.name }) : t('library.readingAny')}</span>
+              <ProgressBar value={busy.fraction} className="mt-1.5 w-full max-w-[200px]" />
+            </>
+          ) : (
+            <>
+              <span className="block t-ui font-medium">{drag ? t('library.dropNow') : t('library.drop')}</span>
+              <span className="block t-footnote mt-0.5">{t('library.kinds')}</span>
+            </>
+          )}
+        </span>
       </button>
       {/* se reparten el ancho de la tarjeta y bajan de línea si no caben (nunca se salen) */}
       <div className="mt-4 flex flex-wrap gap-2">

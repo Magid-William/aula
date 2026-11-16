@@ -1,6 +1,6 @@
 {
-  "hello": "Hola, soy Aula",
-  "helloBody": "Dame tus apuntes, tus diapositivas o solo un tema, y lo convierto en un curso para tu examen. Después lo estudiamos juntos.",
+  "hello": "Tus apuntes se convierten en un curso.",
+  "helloBody": "Dame tus apuntes, tus diapositivas o solo un tema, y preparo lecciones, ejercicios y tarjetas para tu examen. Después lo estudiamos juntos.",
   "name": "¿Cómo te llamas?",
   "namePlaceholder": "Tu nombre (opcional)",
   "start": "Empezar",

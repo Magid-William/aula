@@ -2,7 +2,7 @@
 // para el resto, una hoja de papel con su título en serif y unas líneas de texto.
 import { useEffect, useState } from 'react'
 import type { DocumentEntry } from '@shared/documents'
-import { Icon, PigmentMark, cx, toneForHue, useTheme } from '@renderer/design'
+import { Icon, cx } from '@renderer/design'
 import { kindIcon, kindLabel } from './lib'
 import { openEntryPdf, pageThumbnail, pdfKey } from './pdf'
 
@@ -32,13 +32,9 @@ export function Thumbnail({ entry, width, page = 1, className }: { entry: Docume
 
 /** Hoja de papel con el título del documento (para lo que no es un PDF). */
 function PaperFace({ entry, width, height, loading, className }: { entry: DocumentEntry; width: number; height: number; loading: boolean; className?: string }) {
-  const { dark } = useTheme()
-  const tone = toneForHue(entry.courseHue)
-  const ink = entry.courseId ? (dark ? tone.inkDark : tone.inkLight) : 'var(--accent)'
+  // una hoja lisa: el color del curso ya lo lleva el pozo de la ficha (el pigmento es solo del examen)
   return (
-    <div className={cx('relative isolate overflow-hidden rounded-[6px] bg-surface shadow-[var(--e2)] border-[0.5px] border-line', className)} style={{ width, height }}>
-      {/* el color del curso como una muestra de pigmento en la esquina (antes, un lomo de 3 px) */}
-      <PigmentMark color={ink} size="sm" seed={entry.title} />
+    <div className={cx('relative overflow-hidden rounded-[6px] bg-surface shadow-[var(--e2)] border-[0.5px] border-line', className)} style={{ width, height }}>
       <div className="px-3 pt-3">
         <div className="flex items-center gap-1 text-text3"><Icon name={kindIcon(entry.kind)} size={10} /><span className="text-[8px] font-semibold tracking-wide uppercase">{kindLabel(entry.kind)}</span></div>
         <div className="mt-1.5 font-serif text-[11px] leading-[14px] text-text line-clamp-3">{entry.title}</div>

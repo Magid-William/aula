@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Card, Chip, Companion, ConfirmDialog, Icon, Select, Spinner, Switch, TextArea, TextField, cx, spring, toast, pixelBurst } from '@renderer/design'
+import { Button, Card, Chip, ConfirmDialog, DateField, Icon, InkSpot, Select, Spinner, Switch, TextArea, TextField, cx, spring, toast } from '@renderer/design'
 import type { CreateRequest, GenerationDepth, MaterialView } from '@shared/generation/types'
 import { CourseLanguages } from '@engine/base/language'
 import { resolveCourseLanguage } from '@shared/settings/courseLanguage'
@@ -124,7 +124,7 @@ export default function CreateScreen() {
     }
   }
 
-  const start = async (el: HTMLElement) => {
+  const start = async () => {
     if (!title.trim()) return toast.warning(t('needTitle'))
     setBusy(true)
     // lo pegado sin pulsar «Añadir» también cuenta (antes se perdía y el curso salía sin materiales)
@@ -154,7 +154,6 @@ export default function CreateScreen() {
     }
     try {
       const r = await api.invoke('create.start', { draftId: staged.draftId || undefined, request })
-      pixelBurst(el)
       // el borrador ya es un curso: la próxima vez, el formulario vacío (con el mismo idioma)
       useCreateDraft.getState().reset(formAfterStart(prefillKey, pickedLanguage, remembered))
       navigate({ name: 'run', id: r.runId })
@@ -170,9 +169,6 @@ export default function CreateScreen() {
       <div className="mx-auto max-w-[1080px] grid grid-cols-12 gap-4">
         <Card padded="lg" className="col-span-12" enterAnim>
           <div className="flex items-start gap-5">
-            <div className="hidden @3xl:block pt-1">
-              <Companion role="planner" size={56} working={!!title} />
-            </div>
             <div className="flex-1 min-w-0">
               <h1 className="t-title1">{t('heading')}</h1>
               <p className="t-callout text-text2 mt-1">{t('subheading')}</p>
@@ -184,11 +180,12 @@ export default function CreateScreen() {
                 className="mt-5 w-full bg-transparent font-serif text-[28px] leading-9 outline-none placeholder:text-text3 border-b-[1.5px] border-line focus:border-accent pb-2 transition-colors"
               />
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-                <label className="flex items-center gap-2 t-ui text-text2">
+                <div className="flex items-center gap-2 t-ui text-text2">
                   <Icon name="calendar" size={15} />
                   {t('examDate')}
-                  <input type="date" aria-label={t('examDate')} value={date} onChange={(e) => setDate(e.target.value)} className="h-8 rounded-[8px] bg-field border-[0.5px] border-line px-2 t-ui text-text outline-none" />
-                </label>
+                  {/* la fecha en el idioma de la interfaz («Sun, Dec 6, 2026»), no el «mm/dd/yyyy» del selector nativo */}
+                  <DateField value={date} onChange={setDate} label={t('examDate')} locale={i18n.language} placeholder={t('addDate')} clearLabel={t('clearDate')} className="ml-1" />
+                </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="t-ui text-text2 mr-1">{t('level')}</span>
                   {LEVELS.map((l) => (
@@ -215,7 +212,6 @@ export default function CreateScreen() {
           {signedPlatforms.length > 0 && (
             <Card padded="sm" className="mt-4">
               <div className="flex items-center gap-3">
-                <Companion role="gatherer" size={40} working={!!gather} />
                 <div className="flex-1 min-w-0">
                   <div className="t-callout font-medium">{t('fromPlatform', { platform: signedPlatforms[0].label })}</div>
                   <div className="t-ui text-text3">{t('fromPlatformHint')}</div>
@@ -279,7 +275,7 @@ export default function CreateScreen() {
               </Button>
             </div>
           )}
-          <Button variant="primary" size="xl" className="min-w-[240px]" loading={busy} disabled={!title.trim() || !ready} onClick={(e) => void start(e.currentTarget)} icon={<Icon name="create" size={18} />}>
+          <Button variant="primary" size="xl" className="min-w-[240px]" loading={busy} disabled={!title.trim() || !ready} onClick={() => void start()} icon={<Icon name="create" size={18} />}>
             {busy ? t('creating') : t('create')}
           </Button>
           {filled && !busy && (
@@ -373,13 +369,8 @@ function Materials({ materials, official, onToggleOfficial, onFiles, pending, on
         className={cx('mt-4 flex-1 min-h-[180px] grid place-items-center rounded-[18px] border-[1.5px] border-dashed p-7 text-center transition-colors', drag ? 'border-accent bg-accent-wash' : 'border-line-strong/40 bg-sunken')}
       >
         <div className="flex flex-col items-center gap-3">
-          <div className="flex gap-1.5">
-            {['libro', 'sobre', 'nota'].map((id, i) => (
-              <motion.div key={id} animate={drag ? { y: [0, -6, 0] } : { y: 0 }} transition={{ duration: 0.6, repeat: drag ? Infinity : 0, delay: i * 0.1 }}>
-                <Companion id={id} size={36} working={drag} />
-              </motion.div>
-            ))}
-          </div>
+          {/* los libros a tinta: el único dibujo de la pantalla */}
+          <InkSpot name="books" className="h-[80px] w-[96px]" />
           <div className="t-callout text-text2">{t('drop')}</div>
           <div className="flex flex-wrap justify-center gap-2">
             <Button size="md" icon={<Icon name="folder-open" size={15} />} onClick={() => picker.current?.click()}>

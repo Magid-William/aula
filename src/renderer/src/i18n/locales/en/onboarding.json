@@ -1,9 +1,9 @@
 {
-  "hello": "Hi, I’m Aula",
-  "helloBody": "Give me your notes, your slides or just a topic, and I’ll turn it into a course for your exam. Then we study it together.",
+  "hello": "Your notes become a course.",
+  "helloBody": "Give me your notes, your slides or just a topic, and I’ll make lessons, exercises and flashcards for your exam. Then we study them together.",
   "name": "What’s your name?",
   "namePlaceholder": "Your name (optional)",
-  "start": "Get started",
+  "start": "Start",
   "aiTitle": "Choose your AI",
   "aiBody": "I’ve already looked at what you have on this computer. If unsure, keep the one I marked: you can change it anytime.",
   "later": "I’ll do it later",

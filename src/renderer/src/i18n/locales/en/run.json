@@ -51,7 +51,9 @@
   "limitBody": "Nothing is lost, and what’s ready can already be studied. Resume when the limit renews, switch provider, or keep what’s there.",
   "cancelled": "Creation stopped",
   "elapsed": "{{min}} min",
-  "notFound": "Can’t find this run",
+  "notFound": "This course isn’t being created anymore",
+  "notFoundBody": "If it finished, you’ll find it under Your courses.",
+  "notFoundAction": "Back to Today",
   "canClose": "Keep using Aula: the course is being created in the background.",
   "header": {
     "done": "Course ready",

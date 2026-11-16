@@ -1,11 +1,11 @@
 // Monitor de una creación: el icono del curso se enciende, la ruta de etapas se va llenando y el equipo trabaja en
-// vivo (cada agente es un compañero pixel-art que parpadea mientras trabaja). Al terminar, medalla y a estudiar; antes, lo
-// que ya está listo se puede estudiar («Empezar con lo que está listo» y los temas listos se abren).
+// vivo (cada agente, una ficha con lo que está haciendo y un punto de sol mientras trabaja). Al terminar, el resumen y a
+// estudiar; antes, lo que ya está listo se puede estudiar («Empezar con lo que está listo» y los temas listos se abren).
 // Si se para por un límite, se dice qué pasó, cuándo se renueva y dónde cambiar de proveedor.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedNumber, AulaMark, Button, Card, Companion, ConfirmDialog, CourseIcon, EmptyState, Icon, PixelMedal, ProgressBar, ProviderLogo, SectionTitle, Spinner, TextField, cx, logoForText, pixelBurst, spring, toneForHue, useMarkPhase, useTheme } from '@renderer/design'
+import { AnimatedNumber, AulaMark, Button, Card, ConfirmDialog, CourseIcon, EmptyState, Icon, LiveDot, ProgressBar, ProviderLogo, SectionTitle, Spinner, TextField, cx, logoForText, spring, toneForHue, useMarkPhase, useTheme } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import type { GenerationStage, RunView, SkillRunStatus } from '@shared/generation/types'
 import { GENERATION_STAGES } from '@shared/generation/types'
@@ -70,14 +70,21 @@ export default function RunScreen() {
   const [confirmStop, setConfirmStop] = useState(false)
   // «Reanudar» o «Quedarme con lo que hay» en curso: el botón gira y no se pide dos veces
   const [busy, setBusy] = useState<StoppedAction | null>(null)
-  useScreenTitle(run?.title ?? t('title'), null, [run?.title])
+  // la cabecera ya enseña el título del curso (su h1), y el vacío dice lo que pasa: en escritorio la barra no lo repite
+  useScreenTitle(run?.title ?? t('title'), null, [run?.title], { compactOnly: run !== undefined })
   if (run === undefined)
     return (
       <div className="grid flex-1 place-items-center text-text3">
         <Spinner size={18} />
       </div>
     )
-  if (!run) return <EmptyState title={t('notFound')} />
+  // ya no existe (se terminó y se borró, o el enlace es viejo): se dice qué pasa y por dónde se sale, sin fiesta
+  if (!run)
+    return (
+      <div className="grid flex-1 place-items-center">
+        <EmptyState mark="paused" title={t('notFound')} body={t('notFoundBody')} action={<Button variant="primary" onClick={() => navigate({ name: 'home' })}>{t('notFoundAction')}</Button>} />
+      </div>
+    )
   const tone = toneForHue(run.hue)
   const ink = dark ? tone.inkDark : tone.inkLight
   const working = run.state === 'running' || run.state === 'waiting'
@@ -202,13 +209,13 @@ export default function RunScreen() {
                 <motion.div key={l.id} layout initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ ...spring.smooth, delay: i * 0.04, ...relayout }}>
                   <Card padded="sm" className="h-full">
                     <div className="flex items-start gap-3">
-                      {/* terminado: se atenúa el compañero, no el texto (el contraste bajaba a 2,95:1: A4-P2-20) */}
-                      <span className={cx('shrink-0 transition-opacity', l.status === 'done' && 'opacity-60')}>
-                        <Companion role={l.role} size={44} working={l.status === 'working'} appear />
-                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="t-ui font-semibold text-text2">{t(`roles.${l.role}`)}</span>
+                          <span className="inline-flex items-center gap-2 t-ui font-semibold text-text2">
+                            {/* mientras trabaja, el punto de sol de lo que está en vivo */}
+                            {l.status === 'working' && <LiveDot size={6} />}
+                            {t(`roles.${l.role}`)}
+                          </span>
                           <span className="t-caption tabular">{t('steps', { count: l.steps })}</span>
                         </div>
                         <div className="t-callout font-medium truncate">{l.title}</div>
@@ -267,10 +274,7 @@ export default function RunScreen() {
           </Card>
           {run.findings && (
             <Card padded="lg">
-              <div className="flex items-center gap-2">
-                <Companion role="gatherer" size={30} />
-                <span className="t-headline">{t('findings')}</span>
-              </div>
+              <div className="t-headline">{t('findings')}</div>
               <div className="t-callout text-text2 mt-2">
                 <RichText text={run.findings} />
               </div>
@@ -285,10 +289,6 @@ export default function RunScreen() {
 function DoneCard({ run }: { run: RunView }) {
   const { t, i18n } = useTranslation('run')
   const r = run.report!
-  useEffect(() => {
-    const el = document.querySelector('[data-run-medal]')
-    if (el) pixelBurst(el, { count: 18 })
-  }, [])
   const extend = run.mode === 'extend'
   const list = (xs: SummaryItem[]): string => new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(xs.map((x) => t(`summary.${x.key}`, { count: x.count })))
   const sum = doneSummary(r, run.mode)
@@ -305,9 +305,6 @@ function DoneCard({ run }: { run: RunView }) {
   return (
     <Card padded="lg" className="col-span-12 bg-success-soft!">
       <div className="flex items-center gap-5 flex-wrap">
-        <motion.div data-run-medal initial={{ scale: 0.4, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} transition={spring.bouncy}>
-          <PixelMedal size={64} />
-        </motion.div>
         <div className="flex-1 min-w-0">
           <h2 className="t-title2">{t(extend ? 'extendReady' : 'done')}</h2>
           <p className="t-callout text-text2 mt-1">{sentences.join(' ')}</p>

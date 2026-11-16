@@ -15,6 +15,8 @@
   "subheading": "Type the subject or the exam. Your notes make it better, but they’re optional.",
   "titlePlaceholder": "Calculus I · Midterm 2, English B2, Art history…",
   "examDate": "Exam date",
+  "addDate": "Add the date",
+  "clearDate": "Remove the date",
   "level": "Level",
   "levels": {
     "school": "Middle school",

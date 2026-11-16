@@ -11,7 +11,6 @@
     "pink": "Pink"
   },
   "library": {
-    "heading": "Your documents",
     "search": "Search the text of all your documents",
     "all": "All",
     "imports": "Imported",
@@ -49,13 +48,10 @@
     "emptyTitle": "No documents yet",
     "emptyBody": "Your courses’ materials show up here. You can also add loose PDFs, notes or photos.",
     "error": "Couldn’t load the library",
-    "lead": "Your courses’ materials and anything you add: read them, mark them up and ask Aula.",
-    "statDocs_one": "document",
-    "statDocs_other": "documents",
-    "statPages_one": "page",
-    "statPages_other": "pages",
-    "statMarks_one": "annotation",
-    "statMarks_other": "annotations",
+    "summaryPages_one": "{{count}} page",
+    "summaryPages_other": "{{count}} pages",
+    "summaryMarks_one": "{{count}} annotation",
+    "summaryMarks_other": "{{count}} annotations",
     "byAula": "By Aula"
   },
   "search": {

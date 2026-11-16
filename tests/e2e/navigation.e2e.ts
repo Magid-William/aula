@@ -132,7 +132,7 @@ test('bienvenida en una ventana baja (1000×680): «Continuar» siempre a la vis
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.setViewportSize({ width: 1000, height: 680 })
-  await page.getByRole('button', { name: 'Get started' }).click()
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
   const next = page.getByRole('button', { name: 'Continue', exact: true })
   await expect(next).toBeVisible()
   const box = await next.boundingBox()

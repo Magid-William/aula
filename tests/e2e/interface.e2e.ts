@@ -161,7 +161,7 @@ test('A4-P2-11 · Tab no sale de un diálogo, de ⌘K ni de la bienvenida', asyn
   await app.close()
 
   const first = await launch({ home: home({}, { onboarded: false }), onboarding: true })
-  await expect(first.page.getByText('Hi, I’m Aula')).toBeVisible()
+  await expect(first.page.getByText('Your notes become a course.')).toBeVisible()
   for (let i = 0; i < 8; i++) {
     await first.page.keyboard.press('Tab')
     expect(await js<boolean>(first.page, '!!document.activeElement.closest("[aria-modal=true]")'), `bienvenida, Tab ${i + 1}`).toBe(true)
@@ -187,13 +187,13 @@ test('A4-P2-9/10/12 · la pista no se sale ni se queda pegada; el foco no cambia
   await page.keyboard.press('Escape')
   // puntos de progreso con nombre
   expect(await js<number>(page, 'document.querySelectorAll("[role=group] > button:not([aria-label])").length')).toBe(0)
-  // el anillo de foco respeta el radio de la tarjeta
+  // el anillo de foco respeta el radio de la fila (la galería de herramientas es una lista: filas de 14 px de radio)
   await go(page, { name: 'tools' })
   const card = page.getByRole('button', { name: /Calculator/ }).first()
   await card.focus()
   await page.keyboard.press('Shift+Tab')
   await page.keyboard.press('Tab')
-  expect(await js<string>(page, 'getComputedStyle(document.activeElement).borderTopLeftRadius')).toBe('22px')
+  expect(await js<string>(page, 'getComputedStyle(document.activeElement).borderTopLeftRadius')).toBe('14px')
   // la barra lateral plegada: todos sus botones con nombre
   await page.getByRole('button', { name: 'Collapse sidebar' }).click()
   await page.waitForTimeout(400)

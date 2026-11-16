@@ -104,7 +104,6 @@ export default function FormulasTool(_props: ToolProps) {
 function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: Lang; index: number; fav: boolean; onFav: () => void }) {
   const { t } = useTranslation('tools')
   const copy = useCopy()
-  const { dark } = useTheme()
   const [copied, setCopied] = useState(false)
   const tex = localizeDecimal(texOf(f, lang), lang)
   return (
@@ -115,7 +114,6 @@ function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: La
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: Math.min(index, 10) * 0.035 }}
       className="group flex flex-col"
-      mark={toneInk(SUBJECT_TONE[f.subject], dark)}
     >
       <div className="flex items-start gap-2 px-5 pt-4">
         <div className="flex-1 min-w-0">
