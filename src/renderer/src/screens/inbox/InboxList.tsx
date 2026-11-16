@@ -117,14 +117,14 @@ function EntryRow({ entry: e, index, items, chatLinked, selected, expanded, onTo
       transition={{ duration: 0.3, delay: Math.min(index, 10) * 0.03 }}
       className={cx(
         'group/entry relative',
-        'before:absolute before:top-0 before:right-0 before:left-[82px] before:h-[0.5px] before:bg-line-soft first:before:hidden',
+        'before:absolute before:top-0 before:right-0 before:left-[64px] before:h-[0.5px] before:bg-line-soft first:before:hidden',
         selected && !expanded && 'bg-selected',
         expanded && 'bg-fill1/60'
       )}
     >
       <button onClick={onToggle} aria-expanded={expanded} className={cx('w-full flex items-start gap-3 pl-3.5 pr-4 py-3 text-left outline-none transition-colors', !expanded && 'hover:bg-fill1')}>
-        <span aria-hidden className={cx('mt-[13px] w-2 h-2 rounded-full shrink-0 transition-colors', unread ? 'bg-accent' : 'bg-transparent')} />
-        <KindTile entry={e} />
+        <span aria-hidden className={cx('mt-[7px] w-2 h-2 rounded-full shrink-0 transition-colors', unread ? 'bg-accent' : 'bg-transparent')} />
+        <KindGlyph entry={e} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-3">
             <span className={cx('t-callout text-text min-w-0', expanded ? 'whitespace-normal' : 'truncate', unread ? 'font-semibold' : 'font-normal')}>
@@ -155,13 +155,9 @@ function EntryRow({ entry: e, index, items, chatLinked, selected, expanded, onTo
   )
 }
 
-function KindTile({ entry: e }: { entry: InboxEntry }) {
-  const tone = e.kind === 'problem' ? 'text-warning bg-warning-soft' : e.priority === 2 && !e.read ? 'text-accent-text bg-accent-wash' : 'text-text2 bg-fill2'
-  return (
-    <span className={cx('mt-0.5 grid place-items-center w-9 h-9 rounded-[11px] shrink-0', tone)}>
-      <Icon name={KIND_ICONS[e.kind]} size={18} />
-    </span>
-  )
+/** El tipo de novedad: su glifo a tinta, sin loseta de color (lo nuevo ya lleva su punto y lo urgente, su etiqueta). */
+function KindGlyph({ entry: e }: { entry: InboxEntry }) {
+  return <Icon name={KIND_ICONS[e.kind]} size={18} className="mt-px shrink-0 text-text2" />
 }
 
 function Badge({ tone, icon, children }: { tone: 'warning' | 'neutral' | 'info'; icon?: 'alert' | 'clock'; children: React.ReactNode }) {
@@ -227,7 +223,7 @@ function EntryDetail({ entry: e, items, chatLinked }: { entry: InboxEntry; items
   const cards = (msg?.cards ?? []).filter((c) => c.state !== 'done' || c.actions.length === 0)
   const cardsOpenAutomation = cards.some((c) => c.actions.some((a) => a.kind === 'openAutomation'))
   return (
-    <div className="pl-[82px] pr-5 pb-4 flex flex-col gap-3">
+    <div className="pl-[64px] pr-5 pb-4 flex flex-col gap-3">
       {msg?.notices.map((n, i) => <p key={i} className="t-footnote text-text2">{n}</p>)}
       {msg ? <RichText text={msg.text} className="t-body text-text" /> : <p className="t-body text-text">{e.preview}</p>}
       {cards.map((c, i) => <MessageCard key={c.id} card={c} entry={e} primary={i === 0} />)}

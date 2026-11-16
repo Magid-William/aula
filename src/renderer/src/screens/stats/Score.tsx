@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { Card, CourseIcon, AnimatedNumber, Chip, toneForHue, useTheme } from '@renderer/design'
+import { Card, CourseIcon, AnimatedNumber, toneForHue, useTheme } from '@renderer/design'
 import { daysUntil, fmtDate, fmtPercent } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
 import type { StatsCourse } from '@shared/ipc/stats'
@@ -28,7 +28,6 @@ export function ScoreCard({ course, index }: { course: StatsCourse; index: numbe
           <div className="t-headline text-text truncate">{course.title}</div>
           <div className="t-footnote text-text3">{t('score.title')}</div>
         </div>
-        <Chip>{t(`score.labels.${course.label}`)}</Chip>
       </div>
       {e != null ? (
         <div className="mt-4 flex items-baseline gap-3 flex-wrap">

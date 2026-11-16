@@ -1,9 +1,9 @@
-// Panel del día elegido: título en serif y sus eventos como tarjetas (con «Preparar este examen» y casillas de tareas).
-// Tocar una tarjeta abre su hoja; el «+» añade un evento ese día.
+// Panel del día elegido: título en serif y sus eventos como tarjetas (con «Preparar este examen» y casillas de tareas); el
+// color del curso va en un punto junto a la hora. Tocar una tarjeta abre su hoja; el «+» añade un evento ese día.
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { isSameDay } from 'date-fns'
-import { Button, Card, CourseIcon, Icon, IconButton, PixelCheck, cx, useTheme, pixelBurst } from '@renderer/design'
+import { Button, Card, CourseIcon, Icon, IconButton, PixelCheck, cx, useTheme } from '@renderer/design'
 import type { CalEvent } from './data'
 import { toggleTask, useEventColor } from './data'
 import { eventsOn, isAssessment, KIND_ICON } from './util'
@@ -36,15 +36,14 @@ export function DayPanel({ day, events, onToggled, bare }: { day: Date; events: 
         )}
       </div>
       <div className={cx('mt-4 flex min-h-0 flex-1 flex-col gap-2.5 pb-4 pr-1', !bare && 'overflow-y-auto')}>
-        {/* vacío discreto, sin la marca: la marca de Aula queda para el vacío principal (la agenda) */}
+        {/* vacío discreto: una línea y cómo añadir algo (la marca de Aula queda para el vacío principal, la agenda) */}
         {list.length === 0 && (
-          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[16px] border border-dashed border-line px-4 py-5 text-center">
-            <div className="t-callout font-medium text-text2">{t('noEvents')}</div>
-            <div className="t-ui text-text3 mt-1">{t('noEventsBody')}</div>
-            <button className="mt-2 t-ui font-medium text-accent-text hover:underline underline-offset-2" onClick={() => openNewEventSheet(day)}>
+          <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="border-t border-rule px-1 pt-3 t-callout text-text2">
+            {t('noEventsBody')}{' '}
+            <button className="t-callout font-medium text-accent-text hover:underline underline-offset-2" onClick={() => openNewEventSheet(day)}>
               {t('newEvent')}
             </button>
-          </motion.div>
+          </motion.p>
         )}
         <AnimatePresence initial={false}>
           {list.map((e, i) => (
@@ -68,8 +67,6 @@ function EventCard({ e, index, onToggled }: { e: CalEvent; index: number; onTogg
     <motion.div layout initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.28, delay: index * 0.04 }}>
       <Card
         padded="sm"
-        mark={color}
-        markSize="sm"
         interactive
         className="pl-5 cursor-pointer outline-none focus-visible:shadow-[0_0_0_3px_var(--accent-wash)]"
         role="button"
@@ -87,7 +84,11 @@ function EventCard({ e, index, onToggled }: { e: CalEvent; index: number; onTogg
           {course ? <CourseIcon icon={course.icon} hue={course.hue} size={34} radius={10} title={course.title} /> : <span className="grid place-items-center w-[34px] h-[34px] rounded-[10px] bg-tile text-text2"><Icon name={KIND_ICON[e.kind]} size={17} /></span>}
           <div className="min-w-0 flex-1">
             <div className={cx('t-headline', e.done && 'line-through text-text3')}>{e.title}</div>
-            <div className="t-ui text-text2 mt-0.5">{time}</div>
+            <div className="flex items-center gap-1.5 t-ui text-text2 mt-0.5">
+              {/* el color del curso, en un punto (sin muestra de pigmento: va con texto al lado) */}
+              <span aria-hidden className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: color }} />
+              {time}
+            </div>
             <div className="t-ui text-text3 mt-0.5 flex items-center gap-1.5 flex-wrap">
               <span>{t(`kinds.${e.kind}`)}</span>
               {e.course && <span>· {e.course}</span>}
@@ -105,8 +106,6 @@ function EventCard({ e, index, onToggled }: { e: CalEvent; index: number; onTogg
             aria-checked={!!e.done}
             onClick={async (ev) => {
               ev.stopPropagation()
-              const el = ev.currentTarget
-              if (!e.done) pixelBurst(el, { count: 10, colors: ['var(--success)', 'var(--sun)'] })
               onToggled({ ...e, done: !e.done })
               try {
                 await toggleTask(e, !e.done)
