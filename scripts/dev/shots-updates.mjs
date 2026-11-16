@@ -55,7 +55,7 @@ const states = {
 for (const theme of ['light', 'dark']) {
   for (const lang of ['es', 'en']) {
     const home = mkdtempSync(join(tmpdir(), 'aula-upd-shots-'))
-    writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: lang, name: 'Boris', theme } }))
+    writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: lang, name: 'Maya', theme } }))
     const app = await electron.launch({ args: [project, '--no-sandbox'], env: { ...process.env, AULA_HOME: home, AULA_DEMO: '1' } })
     const win = await app.firstWindow()
     await win.setViewportSize({ width: 1440, height: 900 })
