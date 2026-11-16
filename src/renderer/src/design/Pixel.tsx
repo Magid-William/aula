@@ -1,7 +1,6 @@
 // Los personajes de Aula, dibujados a mano a partir de su pixel art (./pixel/brush): iconos de asignatura que cobran vida
 // (cada uno con su historia: reposo de vez en cuando, la historia completa al pasar el ratón y una celebración al entrar
-// en el curso), la loseta del curso, el indicador de carga a pincel, la llamita de la racha y la ráfaga de pintura de los
-// logros. Formato de las historias: ./pixel/README.md.
+// en el curso), la loseta del curso, el indicador de carga a pincel y la ráfaga de pintura de los logros. Formato de las historias: ./pixel/README.md.
 import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { motion } from 'motion/react'
 import { toneForHue } from './pixel/tones'
@@ -11,7 +10,6 @@ import { PixelPlayer, type Entrance, type PlayerOptions } from './pixel/player'
 import type { CompiledAnim } from './pixel/anim'
 import { useTheme } from './theme'
 import { useAmbient } from './ambient'
-import { Drawn } from './PixelSprites'
 
 export type PixelAnimation = 'none' | 'drop' | 'dissolve'
 
@@ -120,27 +118,6 @@ export function Spinner({ size = 14, className = '' }: { size?: number; classNam
         return <path key={i} d={d} fill="currentColor" opacity={op} />
       })}
     </svg>
-  )
-}
-
-/** Llamita de la racha, dibujada a mano (dos fotogramas que se alternan: la punta se mece). Apagada, en grises. */
-export function PixelFlame({ size = 28, lit = true }: { size?: number; lit?: boolean }) {
-  const { reducedMotion, dark } = useTheme()
-  const [frame, setFrame] = useState(0)
-  const moving = useAmbient()
-  useEffect(() => {
-    if (!lit || reducedMotion || !moving) return
-    const id = setInterval(() => setFrame((f) => 1 - f), 380)
-    return () => clearInterval(id)
-  }, [lit, reducedMotion, moving])
-  const colors = lit
-    ? { outer: 'var(--accent)', inner: dark ? 'var(--sun)' : '#e3a03a', core: '#ffe2a8' }
-    : { outer: dark ? '#4a4642' : '#cfc8bf', inner: dark ? '#5e5954' : '#e2ddd5', core: dark ? '#6e6965' : '#f0ece6' }
-  // el dibujo es algo más alto que ancho, como la llamita de antes (8 × 9)
-  return (
-    <span aria-hidden style={{ display: 'inline-grid', placeItems: 'center', width: size, height: (size * 9) / 8, flexShrink: 0 }}>
-      <Drawn name="flame" colors={colors} frame={frame} size={(size * 9) / 8} />
-    </span>
   )
 }
 

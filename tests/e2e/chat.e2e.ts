@@ -260,6 +260,32 @@ test('el tutor va al lado del ejercicio (no tapa «Try again»), dice qué mira,
   await app.close()
 })
 
+test('la puerta fija del tutor en la cápsula: abre el tutor con el ejercicio que se mira y lo cierra (nunca en el simulacro)', async () => {
+  test.setTimeout(120_000)
+  const { app, page } = await launch({ home: homeWithDemoCourse() })
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await go(page, { name: 'study', id: 'exam-2-math112', mode: 'practice', skill: 'exact-trig-values' })
+  const door = page.locator('[data-tutor-button]')
+  await expect(door).toHaveCount(1)
+  await expect(door).toHaveAttribute('aria-label', 'Ask the tutor')
+  await door.click()
+  const column = page.locator('aside[aria-label="Your tutor"]')
+  await expect(column).toBeVisible()
+  // sin pregunta: el vacío del tutor, y dice qué ejercicio de la sesión mira
+  await expect(page.locator('[data-tutor-looking]')).toHaveText(/^Looking at: exercise 1 of \d+$/)
+  await expect(page.locator('[data-role="user"]')).toHaveCount(0)
+  await expect(door).toHaveAttribute('aria-pressed', 'true')
+  await door.click()
+  await expect(column).toHaveCount(0)
+  // en el simulacro no hay tutor
+  await go(page, { name: 'study', id: 'exam-2-math112', mode: 'exam' })
+  await expect(page.getByRole('button', { name: 'Start the mock exam' })).toBeVisible()
+  await expect(page.locator('[data-tutor-button]')).toHaveCount(0)
+  expect(errors).toEqual([])
+  await app.close()
+})
+
 test('el chat vacío: Aula habla primero con el examen y lo pendiente, tres ideas de sus cursos y el aviso tras el primer mensaje', async () => {
   test.setTimeout(120_000)
   // modo demostración: el curso de ejemplo hace de curso del estudiante (si no, su examen no es «tuyo»)

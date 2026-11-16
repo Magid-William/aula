@@ -184,7 +184,7 @@ function PracticeExercise({ data, exercise, index, total, label, streak, onExit,
   // lo que se está mirando, para la puerta fija del tutor de la cápsula (no al practicar lo fallado del simulacro: allí no hay
   // tutor)
   const tutor = !!tutorScreenOf(useRoute())
-  usePublishTutorContext(tutor ? exerciseContext(data.pack.id, exercise, c.run, 'practice') : null)
+  usePublishTutorContext(tutor ? exerciseContext(data.pack.id, exercise, c.run, 'practice') : null, { n: index + 1, m: total })
   const skill = data.skills.find((s) => s.id === exercise.skill)
   const alternate = useMemo(() => alternateFor(data, exercise), [data, exercise])
   const last = index + 1 >= total

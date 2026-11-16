@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import type { AchievementId, AchievementView } from '@shared/ipc/achievements'
-import { Card, DrawnTile, Icon, ProgressBar, SectionTitle, cx, type IconName, type PixelAnimation } from '@renderer/design'
+import { Card, DrawnTile, Icon, ProgressBar, SectionTitle, cx, type IconName } from '@renderer/design'
 import { useRpc } from '@renderer/lib/useRpc'
 import { fmtDate } from '@renderer/lib/format'
 
@@ -16,13 +16,7 @@ export const ACHIEVEMENT_ICONS: Record<AchievementId, IconName> = {
 }
 
 /** El glifo de un logro: en ladrillo si se consiguió; si no, en gris. (El aviso lo pone sobre su propio sello.) */
-export function AchievementArt({ id, size = 40, lit = true }: {
-  id: AchievementId
-  size?: number
-  lit?: boolean
-  /** @deprecated Sin uso desde el sello a tinta: solo lo pasa aún `AchievementToast` (de W1); se quita con W5-Z. */
-  animation?: PixelAnimation
-}) {
+export function AchievementArt({ id, size = 40, lit = true }: { id: AchievementId; size?: number; lit?: boolean }) {
   return <Icon name={ACHIEVEMENT_ICONS[id]} size={Math.round(size * 0.6)} className={lit ? 'text-accent-text' : 'text-text2'} />
 }
 

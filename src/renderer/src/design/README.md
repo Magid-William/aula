@@ -69,13 +69,13 @@ texto» cambia la raíz y todo crece con él; lo nuevo, también en `rem`.
 - Chat (`screens/chat`): `Conversation` (mensajes, «pensando» al enviar, desplazamiento que no pelea), `Activity` (una fila por
   herramienta con su icono y animación; al terminar, resumen «Consultó 3 materiales · creó 5 tarjetas»). Vista previa de todo en
   la galería (`navigate({ name: 'gallery' })`).
-- Personajes (dibujados a mano; los nombres `Pixel*` se quedan por compatibilidad): `PixelIcon` / `CourseIcon`
-  (`animation="drop" | "dissolve"`, `celebrate`) y `Companion` (`working`, `celebrate`): cada personaje tiene su historia
-  (reposo de vez en cuando, la historia entera al pasar el ratón por él o por su fila/tarjeta, celebración al entrar en el
-  curso); canvas sin re-render de React y cada fotograma pintado una vez en un hilo aparte. Los iconos se pintan leyendo su
-  pixel art; los 44 compañeros están redibujados uno a uno (`pixel/brush/cast/`). Formato y cómo añadir más:
-  `pixel/README.md`. `Sprite` (glifos de la interfaz a mano), `Spinner` (toques de pincel en corro), `PixelFlame`,
-  `PixelMedal`, `PixelSky`, `PixelCheck` (a pluma), `PixelCurtain` y `pixelBurst(elemento)` (gotas de pintura) para logros.
+- Iconos de curso (dibujados a mano; los nombres `Pixel*` se quedan por compatibilidad): `PixelIcon` / `CourseIcon`
+  (`animation="drop" | "dissolve"`, `celebrate`): cada icono tiene su historia (reposo de vez en cuando, la historia entera al
+  pasar el ratón por él o por su fila/tarjeta, celebración al entrar en el curso); canvas sin re-render de React y cada
+  fotograma pintado una vez en un hilo aparte, leyendo su pixel art. Formato y cómo añadir más: `pixel/README.md`. `Sprite`
+  (glifos de la interfaz a mano), `Spinner` (toques de pincel en corro), `PixelCheck` (a pluma), `PixelCurtain` y
+  `pixelBurst(elemento)` (gotas de pintura) para logros de verdad. Las pegatinas (`Companion`), la llama, el cielo, el sobre
+  y la medalla ya no existen: lo vigila `artRules.test.ts`.
 - Movimiento (bucles siempre en CSS/WAAPI de transform y opacity, nunca un bucle de motion en JavaScript): `Stagger`/`StaggerItem`, `Floating` (`useFloat`), `Reveal`, `LiveDot`, `AnimatedNumber`, `ProgressRing`, `ProgressBar`.
   Muelles `spring.snappy` (controles), `spring.smooth` (paneles), `spring.bouncy` (solo interruptor, diálogo, aviso).
 - Capas: `Dialog`, `Drawer`, `ConfirmDialog`, `toast.*` (el mismo aviso no se apila), `Tooltip`, `Menu` y `Select` (abren hacia arriba
@@ -136,8 +136,8 @@ grano de papel muy suave, algo fuera de registro de su línea. Minimalista y ama
 
 ## Una sola mano: tinta y acuarela
 - **Un solo estilo de dibujo**: tinta y acuarela (`ArchLight`, `InkSpot`, `paint/*`) más los iconos pixel de los cursos
-  (`PixelIcon`, `PixelCurtain`). Nada de pegatinas ni sprites que solo adornan (`Companion`, la llama, el cielo, el sobre, la
-  medalla): se van quitando. Se quedan los iconos pixel pequeños que significan algo (el icono del curso, el `?` de las
+  (`PixelIcon`, `PixelCurtain`). Nada de pegatinas ni sprites que solo adornan (las pegatinas, la llama, el cielo, el sobre, la
+  medalla). Se quedan los iconos pixel pequeños que significan algo (el icono del curso, el `?` de las
   preguntas de la lección, la marca del examen en el mes, la hoja de Documentos, los de la calculadora y la tabla periódica).
 - **Un dibujo y un gesto de tinta por pantalla, como mucho**: la mano en todas partes es otra forma de plantilla.
 - **Pigmento solo para el examen** (`PigmentMark`, `Card mark`, `Row mark`): la tarjeta «El examen» del Resumen del curso y la
