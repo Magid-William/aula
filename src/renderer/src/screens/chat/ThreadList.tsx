@@ -36,7 +36,7 @@ export function ThreadList({ threads, active, onOpen, onNew }: { threads: Assist
     return g.filter((x) => x.items.length)
   }, [threads, q, t])
   return (
-    <div className="flex h-full flex-col">
+    <div data-thread-list className="flex h-full flex-col">
       <div className="flex items-center justify-between px-1">
         <h2 className="t-title2 text-[19px]">{t('threads')}</h2>
         <Button size="sm" variant="ghost" icon={<Icon name="new-chat" size={15} />} onClick={onNew} aria-label={t('newThread')} />

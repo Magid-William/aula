@@ -19,6 +19,7 @@ import { MentionChip, refKey } from './Mentions'
 import { ActivityBlock, ThinkingLine } from './Activity'
 import { replyPhase } from './activityKinds'
 import { nextReveal, safeCut, splitParagraphs, tidyStreamingTail } from './smoothText'
+import { stripCitedSources } from './citedSources'
 import { api } from '@renderer/lib/api'
 import './chat.css'
 
@@ -102,6 +103,8 @@ function AssistantReply({ m, threadId, streaming, label, language, onRetry }: Om
   const thinking = streaming && !waiting && (phase === 'thinking' || (phase === 'tools' && !m.steps.some((s) => s.ok === undefined)))
   // el estado del proceso principal se queda en el último paso aunque haya terminado: ese ya se ve en su fila
   const fresh = label && !m.steps.some((s) => s.label === label) ? label : undefined
+  // la fuente ya está en su píldora (abajo): no se repite en el texto
+  const text = useMemo(() => stripCitedSources(m.text, m.citations), [m.text, m.citations])
   return (
     // una respuesta que empieza vacía no hace su entrada: la línea de «pensando» ya estaba (sin parpadeo)
     <motion.div
@@ -122,7 +125,7 @@ function AssistantReply({ m, threadId, streaming, label, language, onRetry }: Om
         {m.failed && !m.interrupted ? (
           <ErrorCard text={m.text} onRetry={onRetry} />
         ) : (
-          <StreamText text={m.text} live={streaming && !waiting} packId={m.context?.courseID ?? null} language={language} />
+          <StreamText text={text} live={streaming && !waiting} packId={m.context?.courseID ?? null} language={language} />
         )}
         {m.citations && m.citations.length > 0 && <Citations citations={m.citations} />}
         {m.cards.length > 0 && <MessageCards cards={m.cards} threadId={threadId} messageId={m.id} packId={m.context?.courseID ?? null} />}

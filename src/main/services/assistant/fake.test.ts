@@ -211,6 +211,14 @@ describe('la IA simulada en el chat', () => {
     expect(fakeMistake({}, undefined, undefined)).toContain("Reread what it's asking")
     expect(fakeMistake({ wrongs: [{ input: '-4', why: 'Amplitude is $|A|$.' }], hints: ['A distance.'] }, ' -4 ')).toContain('> Amplitude is $|A|$.')
   })
+
+  it('el «No es correcto.» del corrector no se cita como el porqué, y sin frases enlatadas', () => {
+    const out = fakeMistake({ hints: ['$s=r\\theta$.'] }, '27', "That's not correct.")
+    expect(out).not.toContain("That's not correct.")
+    expect(out).not.toContain('common slip')
+    expect(out).toContain('You answered **27**')
+    expect(out).toContain('A nudge for your next try')
+  })
 })
 
 describe('equipo simulado', () => {
