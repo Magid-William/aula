@@ -1,17 +1,20 @@
 // Busca versión EXACTAMENTE como las copias instaladas (el GitHubProvider real de electron-updater, sin sesión, contra
 // github.com) para cada sistema, y comprueba la firma de Aula de cada archivo anunciado (con las claves de
 // src/main/services/updates/signature.ts). Para después de hacer público el repositorio o de publicar una versión
-// (A1-P2-23: pedir /releases/latest/download/<yml> no es lo que hacen las copias).
+// (A1-P2-23: pedir /releases/latest/download/<yml> no es lo que hacen las copias). Desde 0.2.6 también baja de esa
+// versión más reciente latest-mac.yml y Aula-0.2.5-mac.* (unos 530 MB) y los compara con el manifiesto del puente: las
+// copias 0.2.4 los piden ahí (docs/PUBLISHING.md → The macOS signing bridge).
 //
-//   node scripts/dev/check-public-feed.mjs luumlabs/aula 0.1.0
+//   node scripts/dev/check-public-feed.mjs luumlabs/aula 0.2.6
 //
-// Sale con 1 si algún sistema no ve esa versión o le falta la firma. Repositorio privado → 404 en todos.
+// Sale con 1 si algún sistema no ve esa versión, le falta la firma o el puente no está intacto. Repositorio privado → 404.
 import { createRequire } from 'node:module'
 import { createHash, createPublicKey, verify } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BRIDGE_VERSION, macMode } from '../release-common.mjs'
+import { checkPublishedBridge } from '../release-mac-bridge.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const [repo, expected] = process.argv.slice(2)
@@ -32,6 +35,8 @@ const valid = (msg, sig) => typeof sig === 'string' && keys.some((k) => { try { 
 
 const [owner, name] = repo.split('/')
 let bad = 0
+// la etiqueta de la versión más reciente, tal como la ven las copias Mac del canal antiguo (las 0.2.4)
+let legacyTag = null
 // Sin versión explícita, se valida el contrato vigente del repositorio local.
 const target = expected || JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
 const bridge = macMode(target) !== 'legacy'
@@ -56,11 +61,28 @@ for (const [platform, arch, channel, wanted] of targets) {
         : 'sin firma (la app 0.1.1+ no las enseña)'
       : 'ninguna'
     const ok = info.version === wanted && sigs.length > 0 && sigs.every(Boolean) && notes === 'firmadas'
+    if (platform === 'darwin' && !channel) legacyTag ??= info.tag
     if (!ok) bad++
     console.log(`${ok ? '✓' : '✗'} ${platform}/${arch}/${channel || 'latest'}: ${info.tag} v${info.version} → ${files.map((f) => f.url.pathname.split('/').pop()).join(', ')} · firma de Aula: ${sigs.map((s) => (s ? 'ok' : 'NO')).join(',')} · notas: ${notes}`)
   } catch (e) {
     bad++
     console.log(`✗ ${platform}/${arch}/${channel || 'latest'}: ${e.code || ''} ${String(e.message).split('\n')[0].slice(0, 160)}`)
+  }
+}
+if (macMode(target) === 'developer-id') {
+  // el puente 0.2.5 tiene que ir, byte a byte, en la versión más reciente (no basta con que siga en v0.2.5)
+  if (!legacyTag) {
+    bad++
+    console.log(`✗ puente ${BRIDGE_VERSION}: las copias del canal antiguo no ven ninguna versión`)
+  } else {
+    console.log(`· bajando de ${legacyTag} latest-mac.yml y Aula-${BRIDGE_VERSION}-mac.* para compararlos con el manifiesto…`)
+    try {
+      await checkPublishedBridge(repo, legacyTag)
+      console.log(`✓ puente ${BRIDGE_VERSION} en ${legacyTag}: los cinco originales, idénticos al manifiesto y con la firma de Aula`)
+    } catch (e) {
+      bad++
+      console.log(`✗ puente ${BRIDGE_VERSION} en ${legacyTag}: ${String(e.message).split('\n')[0]}`)
+    }
   }
 }
 process.exit(bad ? 1 : 0)

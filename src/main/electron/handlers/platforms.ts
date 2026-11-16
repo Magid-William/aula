@@ -1,12 +1,16 @@
 // IPC del dominio «platforms»: cuentas de plataformas, inicio de sesión (una vez: la sesión se guarda y se mantiene viva),
 // cursos, calendario y permisos. Al registrar arranca el navegador (reposición de cookies + mantener la sesión) y se instala
-// la copia final de las cookies al salir.
+// la copia final de las cookies al salir. En macOS, antes de arrancar se comprueba que el llavero deja descifrar las
+// cookies: si no (aviso denegado), las sesiones quedan en pausa sin tocarse hasta reabrir Aula (ver session-gate.ts).
 import { handle, emit } from '../rpc'
 import { invalidArgs } from '@main/services/errors'
 import { tr } from '@shared/ai/i18n'
 import { log } from '@main/services/log'
 import { PLATFORM_KINDS, type PlatformKind } from '@shared/settings/platforms'
+import { listAccounts } from '@main/services/platforms/accounts'
+import { startPlatformSessions } from '@main/services/platforms/session-gate'
 import { installQuitHook, platformBrowser } from '../browser'
+import { cookieEncryptionAvailable } from '../secrets'
 
 function id(args: unknown, key = 'accountId'): string {
   const v = args && typeof args === 'object' ? (args as Record<string, unknown>)[key] : undefined
@@ -66,5 +70,10 @@ export function register(): void {
   browser.onApproval((e) => emit('platforms.approval', e))
 
   installQuitHook(browser)
-  void browser.start().catch((err) => log.error('[platforms] arranque del navegador de plataformas', err))
+  void startPlatformSessions({
+    platform: process.platform,
+    hasAccounts: () => listAccounts().length > 0,
+    probe: cookieEncryptionAvailable,
+    start: () => browser.start()
+  }).catch((err) => log.error('[platforms] arranque del navegador de plataformas', err))
 }

@@ -5,12 +5,17 @@
     "why": {
       "decrypt": "El sistema no dejó a Aula leer tus claves y sesiones guardadas: quizá pulsaste «Denegar» en el aviso del llavero, el llavero está bloqueado o todavía no se ha abierto.",
       "corrupt": "El archivo donde Aula guarda tus claves y sesiones parece dañado y no se puede leer.",
-      "io": "Aula no pudo leer el archivo donde guarda tus claves y sesiones."
+      "io": "Aula no pudo leer el archivo donde guarda tus claves y sesiones.",
+      "unavailable": "El sistema no deja a Aula cifrar con el llavero ahora mismo, así que no guarda claves ni sesiones hasta que pueda hacerlo.",
+      "platforms": "El sistema no dejó a Aula abrir el llavero para tus sesiones de las plataformas: quizá pulsaste «Denegar» en el aviso del llavero."
     },
     "safe": "No se ha perdido nada: mientras tanto Aula no guarda ni borra claves ni sesiones, y el archivo sigue intacto.",
-    "howRetry": "Pulsa «Reintentar» y, si el sistema te pregunta, permite que Aula use el llavero (en macOS, «Permitir siempre»).",
+    "platformsPaused": "Tus sesiones de las plataformas quedan en pausa hasta que reabras Aula: así el sistema no las borra.",
+    "howRetry": "Pulsa «Reintentar» y, si el sistema te pregunta, permite que Aula use el llavero.",
+    "howRestart": "macOS solo pregunta por el llavero al abrir Aula. Pulsa «Reabrir Aula» y, cuando te pida la contraseña de tu Mac para «Aula Safe Storage», escríbela y elige «Permitir siempre».",
     "howReset": "«Empezar de cero» aparta el archivo (no lo borra) para que puedas volver a pegar tus claves e iniciar sesión en tus plataformas.",
     "retry": "Reintentar",
+    "restart": "Reabrir Aula",
     "reset": "Empezar de cero",
     "stillLocked": "Sigue sin poder abrirlo. Desbloquea el llavero del sistema y vuelve a intentarlo."
   }

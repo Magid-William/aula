@@ -126,9 +126,14 @@ A failed *automatic* check (e.g. offline) stays silent.
    Its fingerprint must be committed in `native/android/release-cert.sha256` (once, before the first APK: the script
    tells you the value). `scripts/release-local.sh` builds and checks the APK; Actions never does (the key never leaves
    that Mac).
-6. Commit and push to `main`.
-7. **After publishing**: the *Server* workflow builds the server image for that version. The first time only, make
-   the package public by hand ([The server image](#the-server-image-ghcrio)), or nobody can `docker pull` it.
+6. **macOS.** On the same Mac: exactly one valid *Developer ID Application* identity of team `87BM9KFJZW` in the
+   keychain, a `notarytool` keychain profile (`faro-notary`, or the one in `AULA_NOTARY_PROFILE`) and the five original
+   files of the v0.2.5 bridge for `--bridge-dir`. See [The Developer ID release](#the-developer-id-release-026-and-later).
+7. Commit and push to `main`.
+8. **After publishing**: the *Server* workflow builds the server image for that version. The first time only, make
+   the package public by hand ([The server image](#the-server-image-ghcrio)), or nobody can `docker pull` it. Then
+   `node scripts/dev/check-public-feed.mjs luumlabs/aula <version>` checks what every installed copy sees, including the
+   v0.2.5 bridge files under the new tag.
 
 ## Publishing from your computer (no GitHub Actions)
 
@@ -142,8 +147,10 @@ scripts/release-local.sh            # checks + the Android APK and the macOS, Wi
 ```
 
 It refuses to start if `VERSION`, `CHANGELOG.md`, the release notes or `releaseInfo` don't match `package.json`, or the
-tag already exists. Before compiling anything it checks the keys (update signatures, the macOS certificate, and the
-Android release key, which must match the fingerprint in `native/android/release-cert.sha256`) and the tools: Go for
+tag already exists. Before compiling anything it checks the Mac signing configuration and the keys (update signatures,
+the macOS Developer ID identity and notarization profile, see
+[The Developer ID release](#the-developer-id-release-026-and-later), and the Android release key, which must match the
+fingerprint in `native/android/release-cert.sha256`) and the tools: Go for
 the Tailscale component, and for Android everything `native/android/build.sh` uses (JDK 17+, the SDK build-tools with
 `apksigner`, `aapt2`, `d8` and `zipalign`, and the `android-36` platform). It runs `npm run typecheck` and `npm test`,
 then builds the **APK first** (`native/android/build.sh`: a few seconds, and the step with the most prerequisites, so
@@ -225,7 +232,7 @@ That's also how the Mac files and the APK join a draft built by Actions. It refu
 (`developer-id-mac.yml`, `latest-mac.yml`, `latest.yml`, `latest-linux.yml`, `latest-linux-arm64.yml`) and
 `Aula-<v>-android.apk` end up on the
 release, counting what the draft already has; `--partial` uploads anyway, on purpose. Every `Aula-…` file the release
-notes name must be there too. Use this checked upload path for 0.2.5 and later so the final Mac ZIP, both channels
+notes name must be there too. Use this checked upload path for 0.2.5 and later so the final Mac ZIP and DMG, both channels
 and the preserved bridge files are verified together before the draft is changed.
 
 Upload each channel YAML, including `developer-id-mac.yml`, **together with** the files it lists (same build): if you rebuild one system, upload its
@@ -263,11 +270,11 @@ with other SHA-512s.
 > [Update signatures](#update-signatures-ed25519)), or store the key as the `AULA_UPDATE_SIGNING_KEY` secret and add a
 > signing step before the upload.
 >
-> **No macOS and no Android in Actions.** Mac signing follows the local bridge and subsequent Developer ID policy (see
-> [Signing](#signing)); the APK uses Aula's Android release key. Signing takes place on the maintainer's Mac, so
-> the workflow builds Windows and Linux only. Add the Mac files and the APK to the same draft from your Mac:
-> for 0.2.5, `scripts/release-local.sh --only mac --only android`; for later versions, append
-> `--bridge-dir /path/to/original-v0.2.5`. Then run `scripts/release-local.sh --upload --repo luumlabs/aula`
+> **No macOS and no Android in Actions.** Mac signing uses Aula's Developer ID identity and notarization, and carries
+> the v0.2.5 bridge (see [Signing](#signing)); the APK uses Aula's Android release key. Signing takes place on the
+> maintainer's Mac, so the workflow builds Windows and Linux only. Add the Mac files and the APK to the same draft from
+> your Mac: `scripts/release-local.sh --only mac --only android --bridge-dir /path/to/original-v0.2.5`. Then run
+> `scripts/release-local.sh --upload --repo luumlabs/aula`
 > (it adds them to the existing draft; see [Upload](#publishing-from-your-computer-no-github-actions)). The *verify*
 > job lists what's still missing.
 
@@ -427,9 +434,19 @@ are administrators, so a standard (non-admin) Windows account is only covered by
 
 ## Rehearsing an update locally
 
-For a rehearsal of the local signing identity, sign both versions with *Aula Local Signing*: a copy signed with that
-certificate rejects an ad-hoc update. The signing-migration rehearsal deliberately changes identity after the bridge;
-follow [The macOS signing bridge](#the-macos-signing-bridge) for its required sequence and checks.
+Sign every rehearsal build the way installed copies expect. From 0.2.6 that is Aula's Developer ID identity: an
+installed copy signed with it rejects an ad-hoc update, and an ad-hoc copy never accepts one. `electron-builder.yml`
+now notarizes whenever `APPLE_KEYCHAIN_PROFILE` (or another Apple credential) is set, so rehearsal builds pass
+`-c.mac.notarize=false` and pin the identity by its SHA-1 (`$ID` below); installed copies don't check notarization.
+These builds carry the real team signature: keep them local and delete them afterwards. A build that never has to
+update (a smoke test) can be ad hoc instead: `-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false
+-c.mac.forceCodeSigning=false`, which is what `AULA_MAC_ADHOC=1` does. The signing-migration rehearsal deliberately
+changes identity after the bridge; follow [The macOS signing bridge](#the-macos-signing-bridge) for its required
+sequence and checks.
+
+```bash
+ID=$(security find-identity -v -p codesigning | node scripts/release-mac-config.mjs identity)   # the one Developer ID Application
+```
 
 Run the GUI rehearsals below in a **dedicated macOS test account**. `AULA_HOME` isolates Aula's data, but published
 copies also use `~/Library/Caches/aula-updater`, and a mock keychain does not isolate that cache. Do not run these
@@ -443,7 +460,7 @@ there, into a temporary folder:
 T=$(mktemp -d); npm run build
 for V in 0.1.0 0.1.1; do
   npx electron-builder --mac zip --arm64 --publish never -c.extraMetadata.version=$V -c.directories.output=$T/rel-$V \
-    -c.publish.host=127.0.0.1:8765 -c.publish.protocol=http
+    -c.publish.host=127.0.0.1:8765 -c.publish.protocol=http -c.mac.identity=$ID -c.mac.notarize=false
   node scripts/release-sign.mjs $T/rel-$V
   cp $T/rel-$V/latest-mac.yml $T/rel-$V/developer-id-mac.yml
   mkdir -p $T/R/v$V && cp $T/rel-$V/{*.zip,*.blockmap,latest-mac.yml,developer-id-mac.yml} $T/R/v$V/
@@ -473,7 +490,8 @@ before 0.1). `scripts/dev/fake-github-com.mjs` answers like github.com over HTTP
 T=$(mktemp -d)
 openssl req -x509 -newkey rsa:2048 -nodes -keyout $T/key.pem -out $T/cert.pem -days 2 -subj /CN=github.com \
   -addext subjectAltName=DNS:github.com,DNS:release-assets.githubusercontent.com          # throwaway, delete it after
-npx electron-builder --mac zip --universal --publish never -c.extraMetadata.version=0.1.1 -c.directories.output=$T/rel-0.1.1
+npx electron-builder --mac zip --universal --publish never -c.extraMetadata.version=0.1.1 -c.directories.output=$T/rel-0.1.1 \
+  -c.mac.identity=$ID -c.mac.notarize=false                                                # never notarize a rehearsal
 node scripts/release-sign.mjs $T/rel-0.1.1                                                 # the real key: delete these files after
 mkdir -p $T/R/v0.1.1 && cp $T/rel-0.1.1/{*.zip,*.blockmap,latest-mac.yml} $T/R/v0.1.1/
 echo '[{"tag":"v0.1.1"},{"tag":"v0.1.0"}]' > $T/R/releases.json
@@ -507,9 +525,9 @@ do not recognize the login-item flag and still require a separate test account.
 
 ## Signing
 
-| System | Without certificates (now) | With certificates |
+| System | Now | With (more) certificates |
 | --- | --- | --- |
-| macOS | Through the **0.2.5 bridge**, signed with **Aula Local Signing** (`scripts/build/mac-sign.cjs`), using the existing pinned certificate. The first launch can still need *Open Anyway*: 0.2.5 is not notarized. `AULA_MAC_ADHOC=1` is for test builds only and never permits upload. | From the later Developer ID release, use the project's Developer ID Application identity, hardened runtime, timestamp and notarization. The archive verifier requires the expected Apple team and a stapled ticket. Both update channels and the unchanged 0.2.5 bridge remain required; see below. |
+| macOS | **Developer ID** from 0.2.6: Aula's *Developer ID Application* identity (team `87BM9KFJZW`, pinned by its SHA-1), hardened runtime, Apple's secure timestamp, notarized and stapled; no more *Open Anyway*. `scripts/release-local.sh` checks the configuration, the identity and the notary profile before building, and `scripts/release-mac-verify.mjs` checks the final ZIP and DMG before upload (see [The Developer ID release](#the-developer-id-release-026-and-later)). The 0.2.5 bridge, signed with the retired *Aula Local Signing* certificate, travels unchanged in every later release. `AULA_MAC_ADHOC=1` is for test builds only and never permits upload. | — |
 | Windows | Unsigned: SmartScreen shows *More info → Run anyway* the first time. Updates work. | `CSC_LINK`/`CSC_KEY_PASSWORD` (or Azure Trusted Signing). electron-updater then requires updates signed by the same publisher. |
 | Linux | AppImage and .deb are not signed (normal for Linux). | — |
 | Android | Signed with Aula's own Android release key (`~/.aula-signing/android/aula-release.keystore`, its password in `aula-release.pass`; made once with `native/android/build.sh --new-key`). Android installs an update over the app only if it's signed with the same key, so **every later APK must be signed with it**: its certificate's SHA-256 is committed in `native/android/release-cert.sha256`, and `release-local.sh` refuses to build with a keystore, or upload an APK, that doesn't match it (see [The Android app](#the-android-app-apk)). | Google Play would need an `.aab` and Play App Signing. |
@@ -519,13 +537,16 @@ Never commit certificates, `.p12` files or keys: `.gitignore` already blocks the
 **Back up the Android release key** the same way: `~/.aula-signing/android/aula-release.keystore` and
 `aula-release.pass`. If it's lost, every Android user has to uninstall the app and install the next version by hand.
 
-**Back up the macOS certificate** together with the update keys (same offline places): `~/.aula-signing/aula-signing.p12`
-and its password `p12.pass` (or the keychain `aula-signing.keychain-db` and `keychain.pass`); `cert.pem` is public. If
-it's lost, copies signed with it reject every later macOS update (*invalid signature*) and Mac users would have to
-install by hand once. To restore it on a new Mac: `security create-keychain -p "$(cat keychain.pass)"
-~/.aula-signing/aula-signing.keychain-db`, then `security import aula-signing.p12 -k ~/.aula-signing/aula-signing.keychain-db
--P "$(cat p12.pass)" -T /usr/bin/codesign` and `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
-"$(cat keychain.pass)" ~/.aula-signing/aula-signing.keychain-db` (so `codesign` uses it without a dialog).
+**Back up the Developer ID certificate** together with the update keys (same offline places): export it with its
+private key from Keychain Access as a `.p12`, with a strong password stored next to it. Installed copies from 0.2.6
+trust Aula's **team** (`87BM9KFJZW`) and the certificate type, not this exact certificate, so a lost, expired or revoked
+one is replaced by a new *Developer ID Application* certificate of the same team without stranding anyone; the backup
+only saves that step. A certificate of another team is never accepted: Mac users would have to install by hand.
+
+The retired local certificate (`~/.aula-signing/aula-signing.p12` and `p12.pass`, or `aula-signing.keychain-db` and
+`keychain.pass`; `cert.pem` is public) signed 0.2.0 to 0.2.5 and signs nothing any more: the 0.2.5 bridge is published
+and every later release carries its original bytes, checked by hash. Keep its backup as the record of that pin
+(`LEGACY_PIN` in `scripts/release-common.mjs`).
 
 ## The macOS signing bridge
 
@@ -570,19 +591,76 @@ manifest. Every subsequent latest release must include them because the GitHub u
 filenames under the **latest tag**, even when the metadata's version is 0.2.5. Leaving them only on the v0.2.5 release
 is insufficient.
 
-### The subsequent Developer ID release
+### The Developer ID release (0.2.6 and later)
 
-Once the bridge and its manifest are available, the later Mac release uses:
+From 0.2.6 every Mac build is signed with Aula's **Developer ID Application** identity (team `87BM9KFJZW`), with the
+hardened runtime and Apple's secure timestamp, notarized, and stapled before electron-builder makes the ZIP and the
+DMG. The Mac part of `electron-builder.yml`:
 
-```bash
-scripts/release-local.sh --only mac --bridge-dir /path/to/original-v0.2.5
+```yaml
+mac:
+  # no `identity` (release-local.sh pins it by SHA-1), no `sign` hook, no `timestamp` (unset = Apple's secure timestamp)
+  hardenedRuntime: true
+  forceCodeSigning: true                          # under mac only: the Windows installer stays unsigned
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist      # allow-jit: Electron, its helpers and the OCR's WASM need it
+  entitlementsInherit: build/entitlements.mac.plist
+dmg:
+  sign: false     # an unsigned DMG holding the stapled app; a signed but un-notarized DMG would be worse
 ```
 
-Configure an explicit Developer ID Application identity for team `87BM9KFJZW`, remove the local `mac.sign` hook and
-ad-hoc `identity`, and enable hardened runtime and timestamp signing. The installed builder supports
-`APPLE_KEYCHAIN_PROFILE` for stored notarization credentials. A missing credential, omitted notarization or a warning
-from the builder is **not** a successful notarized release: the final archive verifier must pass. Staple the app before
-creating its ZIP. Any final changes to the DMG must happen before calculating its metadata, blockmap and signatures.
+What the Mac that runs `scripts/release-local.sh` needs:
+
+- **Exactly one valid** `Developer ID Application: … (87BM9KFJZW)` identity in the keychain
+  (`security find-identity -v -p codesigning`). The script passes its 40-hex SHA-1 as `-c.mac.identity=<sha1>`: given
+  a name, electron-builder can fall back to the `Apple Distribution` identity of the same team. When a renewed
+  certificate sits next to the old one, remove the old one from the keychain first.
+- A **notarytool keychain profile**: `faro-notary`, or the one named in `AULA_NOTARY_PROFILE`. Create one with
+  `xcrun notarytool store-credentials <name> --apple-id <Apple ID> --team-id 87BM9KFJZW` (it asks for an app-specific
+  password and keeps it in the keychain).
+- The five original files of the published v0.2.5 bridge, for `--bridge-dir`:
+
+```bash
+B=$(mktemp -d); gh release download v0.2.5 -R luumlabs/aula -p latest-mac.yml -p 'Aula-0.2.5-mac.*' -D "$B"
+node scripts/release-mac-bridge.mjs check-baseline "$B"
+scripts/release-local.sh --only mac --bridge-dir "$B"
+```
+
+Before the build (about 10 minutes, plus the notarization), the script stops when:
+
+- `electron-builder.yml` has a `mac.identity` (`null` skips signing, `"-"` signs ad hoc, a name can pick the wrong
+  certificate), a `mac.sign` hook, a `mac.timestamp`, `notarize: false`, a `type` other than distribution, a signed DMG,
+  `hardenedRuntime` or `forceCodeSigning` other than `true`, or an entitlements file without `allow-jit` or with
+  `get-task-allow` (`node scripts/release-mac-config.mjs check`);
+- the bridge files don't match `resources/updates/mac-bridge-0.2.5.json` (`check-baseline`);
+- there isn't exactly one Developer ID identity, `xcrun notarytool history --keychain-profile <profile>` fails, or
+  `xcrun --find stapler` finds nothing.
+
+The script exports only `APPLE_KEYCHAIN_PROFILE` and unsets `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_API_KEY`,
+`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_KEYCHAIN`, `CSC_LINK`, `CSC_NAME`, `CSC_KEY_PASSWORD` and `CSC_KEYCHAIN`:
+electron-builder would prefer them over the profile, or sign from another keychain. Without any notarization
+credential electron-builder only *warns* and skips notarization; the pre-flight and the verifier make that a failure.
+
+After the build, and again on `--upload`, `scripts/release-mac-verify.mjs` checks the final ZIP (extracted with `ditto`)
+**and** the final DMG (attached with `hdiutil attach -readonly -nobrowse`, always detached afterwards), because new
+users install from the DMG and updates download the ZIP. On the `Aula.app` inside each:
+
+- `CFBundleIdentifier` `com.luumlabs.aula`, the version, `CFBundleExecutable` `Aula` (0.2.5's watchdog reopens the app
+  by that name) and `LSMinimumSystemVersion` no higher than 13.0 (0.2.5 copies on macOS 13 must be able to install it);
+  universal arm64 + x86_64;
+- `codesign --verify --deep --strict` against the Developer ID requirement of `src/main/services/updates/mac-trust.ts`;
+- for the app, every nested `.app` and **every Mach-O** (helpers, frameworks, dylibs, `chrome_crashpad_handler`,
+  `app_shim_loader`, `ShipIt`, `aula-tsnet`): the team requirement, and per architecture the hardened-runtime flag, a
+  secure `Timestamp=`, `TeamIdentifier=87BM9KFJZW` and `Authority=Developer ID Application`; no `get-task-allow`, and
+  `allow-jit` on the app and its helpers;
+- `xcrun stapler validate` and `spctl --assess --type execute` reporting `source=Notarized Developer ID`.
+
+The carried `Aula-0.2.5-mac.zip` is re-verified against the old local pin; the other bridge files are checked by hash.
+
+`AULA_MAC_ADHOC=1` builds a **test-only** app: ad hoc (checked after the build), without the hardened runtime or
+notarization (`-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false -c.mac.forceCodeSigning=false`),
+and with no Apple credentials in the environment. The verifier and `--upload` refuse it, and no installed copy accepts
+it as an update.
 
 The new app policy is one-way: only the pinned Aula local identity may move to Aula's Apple Developer ID Application
 identity, with Apple's signing chain, the expected certificate type, team and bundle identifier checked. Once running
@@ -592,16 +670,35 @@ signer.
 
 The publication script keeps `latest-mac.yml` and its original artifacts fixed to the committed bridge manifest,
 while `developer-id-mac.yml` and the new artifacts must match the current release. A missing manifest, changed bridge
-byte, unexpected version, unverified final ZIP or absent notarization must stop publication. Do not relax the general
-clean-tree and build-provenance checks to accommodate old bridge files.
+byte, unexpected version, unverified final ZIP or DMG, or absent notarization must stop publication. Do not relax the
+general clean-tree and build-provenance checks to accommodate old bridge files.
 
-Before publishing that later version, rehearse 0.2.4 → 0.2.5 → Developer ID against the fake GitHub server, including a
-client that first connects after the later release is latest, restart/quit installation and rollback. Use isolated
-test data and a mock keychain for automation. `AULA_HOME` alone does not isolate macOS Keychain: checking preservation
-of real Safe Storage authorization and first-launch Gatekeeper behavior requires a separate macOS test account. Do
-not claim those checks from a mock-keychain rehearsal, or promise that changing signing identity causes no macOS
-authorization prompts. Copies from 0.1.x still need the manual update already documented below because their update
-keys were replaced before this bridge.
+**For every future release**, because 0.2.5 and the 0.2.4 copies that still have to reach it are frozen:
+
+- **Every Latest release must carry the five bridge files** (`latest-mac.yml`, `Aula-0.2.5-mac.zip`, `.zip.blockmap`,
+  `.dmg` and `.dmg.blockmap`), byte for byte, next to its own `developer-id-mac.yml`. `release-local.sh` requires
+  `--bridge-dir` for every Mac release after 0.2.5, and `--upload` refuses a release without both Mac feeds (never
+  use `--partial` for the release you publish).
+- **Never delete the v0.2.5 release or its assets**, and never edit them.
+- Never change the bundle id (`com.luumlabs.aula`), the executable name (`Aula`) or the Apple team, never raise
+  `LSMinimumSystemVersion` above 13.0 for a release 0.2.5 copies can be offered, and never rotate the Ed25519 update
+  keys except as described in [Keeping the keys](#keeping-the-keys).
+- If something goes wrong after publishing, the **kill switch** is to mark v0.2.5 as *Latest* again (or turn the new
+  release back into a draft): v0.2.5 carries both Mac channels, and installed copies never downgrade.
+- After publishing, `node scripts/dev/check-public-feed.mjs luumlabs/aula <version>` checks what every system sees and
+  downloads `latest-mac.yml` and `Aula-0.2.5-mac.*` from the new tag (about 530 MB) to compare them with the manifest.
+
+Before publishing, rehearse 0.2.4 → 0.2.5 → Developer ID with the
+[high-fidelity rehearsal](#rehearsing-an-update-locally), using the **published** 0.2.4 and 0.2.5 apps unchanged:
+`R/releases.json` = `[{"tag":"v0.2.6"},{"tag":"v0.2.5"},{"tag":"v0.2.4"}]`, `R/v0.2.6/` = `release/0.2.6` exactly as
+`release-local.sh` built it (the new files and the five bridge originals; no extra signing), `R/v0.2.5/` = the public
+originals. Cover a 0.2.4 client that first connects after 0.2.6 is latest, restart and quit installation, 0.2.5 →
+0.2.6 directly, rollback through 0.2.5's watchdog, and the kill switch. Use isolated test data and a mock keychain for
+automation. `AULA_HOME` alone does not isolate macOS Keychain: checking preservation of real Safe Storage authorization,
+App Management when the app replaces itself in `/Applications`, and first-launch Gatekeeper behavior from a downloaded
+DMG requires a separate macOS test account. Do not claim those checks from a mock-keychain rehearsal, or promise that
+changing signing identity causes no macOS authorization prompts. Copies from 0.1.x still need the manual update already
+documented below because their update keys were replaced before this bridge.
 
 ## Update signatures (Ed25519)
 
@@ -683,6 +780,10 @@ The printed line (SPKI DER in base64) is the public key for `UPDATE_PUBLIC_KEYS`
 - Electron fuses (`electron-builder.yml → electronFuses`): no `NODE_OPTIONS`, no `--inspect`, the app only loads from
   its integrity-checked `app.asar`, cookies are encrypted with the system key. `runAsNode` stays on because the MCP
   bridge (`out/main/aula-mcp.js`) is started by the terminal agents with `ELECTRON_RUN_AS_NODE`.
+- macOS (from 0.2.6): Developer ID signature with the **hardened runtime** on every executable and library
+  (entitlements: `allow-jit` and `allow-unsigned-executable-memory`, which Electron needs, and `network.client`; never
+  `get-task-allow`), Apple's secure timestamp, and **notarization** stapled to the app
+  ([The Developer ID release](#the-developer-id-release-026-and-later)).
 - The renderer runs with `contextIsolation`, `sandbox` and a strict CSP; IPC only answers the app's own page
   (`src/main/electron/rpc.ts`).
 - API keys and private calendar links are encrypted with `safeStorage` (`secrets.enc`: Keychain on macOS, DPAPI on
@@ -711,6 +812,10 @@ logos, add it to `THIRD_PARTY_NOTICES.md`.
 npm run dist:linux            # or dist:mac / dist:win on that system
 ./release/Aula-0.1.0-linux-x86_64.AppImage --no-sandbox
 ```
+
+On a Mac, `npm run dist:mac` signs with the Developer ID identity it finds, and notarizes if `APPLE_KEYCHAIN_PROFILE`
+or another Apple credential is set. For a local smoke build, make it ad hoc instead:
+`npm run dist:mac -- -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false -c.mac.forceCodeSigning=false`.
 
 Playwright cannot drive the packaged app (the fuses disable the inspector): test it by hand or with screenshots
 (`scripts/dev/packaged-shot.sh`). A copy built with `electron-builder --dir` has no `app-update.yml`; it still checks
