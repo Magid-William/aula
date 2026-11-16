@@ -77,6 +77,8 @@ test('Crear documento: lo que el curso no tiene sale apagado, y varias vistas pr
     pages.push(await preview())
   }
   expect(pages.every((p) => /\d+ pages?/.test(p))).toBe(true)
+  // la chuleta cumple lo que promete: una sola página (antes salían 4, con la primera en blanco)
+  expect(pages[0]).toBe('1 page')
   await app.close()
 })
 

@@ -8,7 +8,12 @@ import { cx } from './cx'
 import { spring } from './tokens'
 import { placePopover } from './popover'
 
-const field = 'w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition focus:border-[color:var(--focus)] focus:shadow-[0_0_0_1.5px_var(--focus)]'
+/** Anillo de foco de un campo (borde de 0,5 px + sombra de 1,5 px = 2 px de `--focus`). Lo usan también herramientas y bloques. */
+export const focusRing = 'focus:border-[color:var(--focus)] focus:shadow-[0_0_0_1.5px_var(--focus)]'
+/** El mismo anillo en una caja que envuelve un campo sin borde propio. */
+export const focusWithinRing = 'focus-within:border-[color:var(--focus)] focus-within:shadow-[0_0_0_1.5px_var(--focus)]'
+
+const field = `w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition ${focusRing}`
 
 export const TextField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { icon?: ReactNode; trailing?: ReactNode; label?: ReactNode; hint?: ReactNode }>(function TextField(
   { icon, trailing, label, hint, className, ...rest },

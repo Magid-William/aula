@@ -6,7 +6,7 @@ import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from '
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Copy, Search, X } from 'lucide-react'
-import { Card, IconButton, SegmentedTabs, Select, Slider, Sprite, cx, spring, useTheme } from '@renderer/design'
+import { Card, IconButton, SegmentedTabs, Select, Slider, Sprite, cx, focusRing, spring, useTheme } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import { ALL_ELEMENTS, ELEMENT_CATEGORIES, PeriodicTable, localizedCategoryTitle, localizedElementName, localizedStateTitle, phaseAt, type Element, type ElementCategory, type StandardState } from '@engine/chem/elements'
 import { ElectronConfiguration } from '@engine/chem/electron-config'
@@ -105,7 +105,7 @@ export default function PeriodicTool(_props: ToolProps) {
               }}
               placeholder={t('periodic.search')}
               aria-label={t('periodic.search')}
-              className="w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 pl-9 pr-8 text-[14px] outline-none focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)]"
+              className={`w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 pl-9 pr-8 text-[14px] outline-none ${focusRing}`}
             />
             {query && (
               <button onClick={() => setQuery('')} className="absolute right-2 text-text3 hover:text-text" aria-label={t('periodic.clear')}>

@@ -82,6 +82,8 @@ export default function RunScreen() {
   if (!run)
     return (
       <div className="grid flex-1 place-items-center">
+        {/* la barra no pone el título en escritorio y el vacío lleva un h3: el h1 de la página, solo para los lectores */}
+        <h1 className="sr-only">{t('title')}</h1>
         <EmptyState mark="paused" title={t('notFound')} body={t('notFoundBody')} action={<Button variant="primary" onClick={() => navigate({ name: 'home' })}>{t('notFoundAction')}</Button>} />
       </div>
     )

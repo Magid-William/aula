@@ -43,11 +43,12 @@ export function Library() {
   return (
     <div className="@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pt-1 pb-24">
       <Stagger className="grid grid-cols-12 gap-4" gap={0.05}>
-        {/* lado a lado solo si la zona para soltar cabe en una fila; si no, una debajo de otra */}
-        <StaggerItem className="col-span-12 @4xl:col-span-7 @5xl:col-span-8">
+        {/* lado a lado solo con ancho de sobra (la tarjeta de soltar, de unos 350 px o más, con su texto en pocas líneas);
+            si no, una debajo de otra y a todo lo ancho */}
+        <StaggerItem className="col-span-12 @5xl:col-span-7 @6xl:col-span-8">
           <SearchCard lib={lib} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
         </StaggerItem>
-        <StaggerItem className="col-span-12 @4xl:col-span-5 @5xl:col-span-4">
+        <StaggerItem className="col-span-12 @5xl:col-span-5 @6xl:col-span-4">
           <DropCard onCreate={() => setExportOpen(true)} hasCourses={lib.courses.length > 0} />
         </StaggerItem>
 

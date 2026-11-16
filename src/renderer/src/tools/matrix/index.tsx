@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronLeft, ChevronRight, Dice5, Eraser, Pause, Play, SkipBack, SkipForward, SquareDot } from 'lucide-react'
-import { Button, Card, IconButton, cx, spring } from '@renderer/design'
+import { Button, Card, IconButton, cx, focusRing, spring } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { formatNumber } from '../shared/lib/num'
 import { CardTitle, ErrorLine, useComma, useStored } from '../shared/ui'
@@ -142,7 +142,7 @@ function MatrixEditor({ name, cells, onChange }: { name: string; cells: string[]
                   onChange={(e) => set(i, j, e.target.value)}
                   onFocus={(e) => e.currentTarget.select()}
                   aria-label={`${name}${i + 1},${j + 1}`}
-                  className={cx('h-9 w-full rounded-[8px] bg-field border-[0.5px] text-center text-[14px] tabular outline-none focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)]', bad ? 'border-danger/60 text-danger' : 'border-line-strong/40')}
+                  className={cx('h-9 w-full rounded-[8px] bg-field border-[0.5px] text-center text-[14px] tabular outline-none', focusRing, bad ? 'border-danger/60 text-danger' : 'border-line-strong/40')}
                 />
               )
             })
