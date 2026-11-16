@@ -1,5 +1,5 @@
 // Chart completo: referencia DOM/píxeles del producto vivo, independiente de la escena privada.
-import { test, expect, type ElectronApplication, type Locator, type Page, type TestInfo } from 'playwright/test'
+import { test, expect, type CDPSession, type ElectronApplication, type Locator, type Page, type TestInfo } from 'playwright/test'
 import { _electron as electron } from 'playwright'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -9,7 +9,7 @@ import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { CHART_FIXTURES, type ChartFixture } from './chart-fixtures'
 import { waitForPieHover } from './chart-hover-readiness'
 import { compareDiagramPixels } from './diagram-pixels'
-import { assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, setChartReferencePageZoom, snapshotChartReference } from './chart-reference'
+import { assertChartCaptureInvariant, assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, requireContainedChartClip, setChartReferencePageZoom, snapshotChartReference } from './chart-reference'
 import { assertChartRasterConsistency, compareChartRasterConsistency, type ChartRasterConsistency } from './chart-raster-consistency'
 import { go, homeWithDemoCourse } from './helpers'
 
@@ -42,7 +42,7 @@ function prepare(fixture: ChartFixture, theme: 'light' | 'dark'): { home: string
   return { home, skillPath, skillBytes: readFileSync(skillPath, 'utf8') }
 }
 
-async function start(home: string, dpr2: boolean, pageZoom = 1): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
+async function start(home: string, dpr2: boolean, pageZoom = 1, nativeViewport = false): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
   const sourceDpr = dpr2 ? 2 : 1
   const app = await electron.launch({ args: [resolve(__dirname, '../..'), ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--use-mock-keychain', `--force-device-scale-factor=${sourceDpr}`], env: { ...process.env, AULA_HOME: home, AULA_FAKE_AI: '1', AULA_SKIP_ONBOARDING: '1', AULA_HIDDEN: '1', AULA_NO_UPDATES: '1', AULA_NO_LOGIN_ITEM: '1' } })
   try {
@@ -76,8 +76,25 @@ async function start(home: string, dpr2: boolean, pageZoom = 1): Promise<{ app: 
     })
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
     await assertNativeChartContext(app, page, sourceDpr)
-    await page.setViewportSize({ width: 1440, height: 1100 })
-    await initializeChartReference(page, sourceDpr)
+    if (nativeViewport) {
+      // Sólo el diagnóstico de raster: ningún override de Playwright/CDP antes de su control nativo.
+      if (pageZoom !== 1) throw new Error('Native raster diagnostic requires page zoom one')
+      await app.evaluate(({ BrowserWindow }) => {
+        const windows = BrowserWindow.getAllWindows()
+        if (windows.length !== 1) throw new Error('Native raster diagnostic requires its single source window')
+        windows[0].setContentSize(1440, 1100)
+      })
+      await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+      const actual = await app.evaluate(({ BrowserWindow }) => {
+        const bounds = BrowserWindow.getAllWindows()[0].getContentBounds()
+        return { width: bounds.width, height: bounds.height }
+      })
+      if (![actual.width, actual.height].every(n => Number.isInteger(n) && n > 0 && n <= 4096)) throw new Error('Native diagnostic viewport is invalid: ' + JSON.stringify(actual))
+      await expect.poll(() => page.evaluate('({width:innerWidth,height:innerHeight})'), { timeout: 5000 }).toEqual(actual)
+    } else {
+      await page.setViewportSize({ width: 1440, height: 1100 })
+      await initializeChartReference(page, sourceDpr)
+    }
     if (pageZoom !== 1) await setChartReferencePageZoom(app, page, pageZoom)
     return { app, page, errors }
   } catch (error) { await app.close().catch(() => undefined); throw error }
@@ -399,6 +416,122 @@ test('Chart PNG: fuente mono, raíz ampliada y zoom CSS anidado conservan la geo
     expect(scene.metrics).toMatchObject({ bodyFont: 'mono', bodyItalic: false, rootFontPx: 18, cssZoom: 1.75 })
     expect(readFileSync(source.skillPath, 'utf8')).toBe(source.skillBytes); expect(errors).toEqual([])
   } finally { await closeWithAudit(app, info) }
+})
+
+// Colección causal, no aprobación de fidelidad: el caso mono original y su oráculo permanecen intactos.
+test('Chart diagnóstico de raster: mono nativo, emulación y filtros externos', async ({}, info) => {
+  test.setTimeout(90_000)
+  const source = prepare(CHART_FIXTURES[0], 'light'), { app, page, errors } = await start(source.home, false, 1, true)
+  const records: unknown[] = [], cleanupErrors: string[] = [], leaseKey = '__chartRasterFilters_' + randomUUID()
+  let session: CDPSession | undefined, emulated = false, leaseInstalled = false, failed = false, failure: unknown
+  const detail = (error: unknown) => error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
+  try {
+    await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
+    const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
+    await expect(body).toBeVisible()
+    await evaluateElement<void>(figure, `root=>{document.documentElement.style.fontSize='18px';root.style.fontFamily='var(--font-mono)';root.style.zoom='1.25';root.querySelector('[data-chart-export-body]').style.zoom='1.4';}`)
+    await page.evaluate('document.fonts.ready'); await body.scrollIntoViewIfNeeded(); await page.mouse.move(8, 8); await page.waitForTimeout(300)
+    const baseline = await snapshotChartReference(body)
+    const settle = () => page.evaluate('document.fonts.ready.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))')
+    const native = async () => ({
+      main: await app.evaluate(({ app: main, BrowserWindow, screen }) => {
+        const windows = BrowserWindow.getAllWindows()
+        if (windows.length !== 1) throw new Error('Raster diagnostic lost its source window')
+        const win = windows[0], bounds = win.getContentBounds()
+        return { id: win.webContents.id, startupFactor: main.commandLine.getSwitchValue('force-device-scale-factor'), screenFactor: screen.getDisplayMatching(win.getBounds()).scaleFactor, pageZoom: win.webContents.getZoomFactor(), width: bounds.width, height: bounds.height, visible: win.isVisible(), backgroundThrottling: win.webContents.getBackgroundThrottling() }
+      }),
+      dom: await page.evaluate('({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,scrollX,scrollY,visibilityState:document.visibilityState,hidden:document.hidden,visual:visualViewport?{width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale,offsetLeft:visualViewport.offsetLeft,offsetTop:visualViewport.offsetTop}:null})'),
+      playwrightViewport: page.viewportSize()
+    })
+    const nativeBaseline = await native()
+    const viewport = { width: nativeBaseline.main.width, height: nativeBaseline.main.height }
+    records.push({ stage: 'native-viewport', requested: { width: 1440, height: 1100 }, actual: viewport, nativeBaseline })
+    expect(nativeBaseline.main).toMatchObject({ startupFactor: '1', screenFactor: 1, pageZoom: 1, visible: false, backgroundThrottling: true })
+    expect(nativeBaseline.dom).toMatchObject({ ...viewport, dpr: 1, scrollX: 0, scrollY: 0, visual: { ...viewport, scale: 1, offsetLeft: 0, offsetTop: 0 } })
+    expect(nativeBaseline.playwrightViewport).toBeNull()
+    const filters = await evaluateElement<unknown>(body, `(root)=>{
+      const key=` + JSON.stringify(leaseKey) + `;
+      const rect=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}};
+      const nodes=[root,...root.querySelectorAll('*')];if(nodes.length>5000)throw new Error('Diagnostic Chart is unexpectedly large');
+      const boxes=nodes.map(rect).filter(b=>b.width>0&&b.height>0);
+      const ink={left:Math.min(...boxes.map(b=>b.x)),top:Math.min(...boxes.map(b=>b.y)),right:Math.max(...boxes.map(b=>b.x+b.width)),bottom:Math.max(...boxes.map(b=>b.y+b.height))};
+      const path=e=>{const a=[];for(let n=e;n&&n!==document.documentElement;n=n.parentElement)a.unshift(n.tagName+':'+Array.from(n.parentElement?.children||[]).indexOf(n));return a.join('/')};
+      const inventory=[],targets=[],candidates=[...document.querySelectorAll('.material-bar')];if(candidates.length>16)throw new Error('Too many external filters for the fixed diagnostic');
+      for(const e of candidates){
+        if(!(e instanceof HTMLElement))throw new Error('Unexpected external filter element');
+        const c=getComputedStyle(e),b=rect(e),external=!root.contains(e)&&!e.contains(root),visible=c.display!=='none'&&c.visibility==='visible'&&Number(c.opacity)>0&&b.width>0&&b.height>0;
+        const overlap=Math.max(0,Math.min(b.x+b.width,ink.right)-Math.max(b.x,ink.left))*Math.max(0,Math.min(b.y+b.height,ink.bottom)-Math.max(b.y,ink.top));
+        const entry={path:path(e),tag:e.tagName,className:e.getAttribute('class'),box:b,filter:c.backdropFilter,display:c.display,visibility:c.visibility,opacity:c.opacity,position:c.position,zIndex:c.zIndex,external,visible,overlap,style:e.getAttribute('style')};
+        inventory.push(entry);
+        if(visible&&c.backdropFilter!=='none'&&external&&overlap===0)targets.push({e,entry,value:e.style.getPropertyValue('backdrop-filter'),priority:e.style.getPropertyPriority('backdrop-filter'),modified:null});
+      }
+      let disabled=false;
+      const state=()=>targets.map(t=>({path:t.entry.path,connected:t.e.isConnected,box:rect(t.e),filter:getComputedStyle(t.e).backdropFilter,style:t.e.getAttribute('style'),value:t.e.style.getPropertyValue('backdrop-filter'),priority:t.e.style.getPropertyPriority('backdrop-filter')}));
+      globalThis[key]={
+        state,
+        disable(){if(disabled||!targets.length)throw new Error('No fixed external disjoint filter set');for(const t of targets){if(!t.e.isConnected||t.e.getAttribute('style')!==t.entry.style||getComputedStyle(t.e).backdropFilter!==t.entry.filter||JSON.stringify(rect(t.e))!==JSON.stringify(t.entry.box))throw new Error('External filter changed before control');}disabled=true;for(const t of targets){t.e.style.setProperty('backdrop-filter','none','important');t.modified=t.e.getAttribute('style');if(getComputedStyle(t.e).backdropFilter!=='none'||JSON.stringify(rect(t.e))!==JSON.stringify(t.entry.box))throw new Error('External filter control changed geometry');}return state();},
+        restore(){const errors=[];for(const t of targets){if(disabled){if(t.e.getAttribute('style')!==t.modified){errors.push('Concurrent external style mutation: '+t.entry.path);t.value?t.e.style.setProperty('backdrop-filter',t.value,t.priority):t.e.style.removeProperty('backdrop-filter');}else{t.entry.style===null?t.e.removeAttribute('style'):t.e.setAttribute('style',t.entry.style);}}if(!t.e.isConnected||t.e.style.getPropertyValue('backdrop-filter')!==t.value||t.e.style.getPropertyPriority('backdrop-filter')!==t.priority||t.e.getAttribute('style')!==t.entry.style||getComputedStyle(t.e).backdropFilter!==t.entry.filter||JSON.stringify(rect(t.e))!==JSON.stringify(t.entry.box))errors.push('External filter did not restore: '+t.entry.path);}disabled=false;return{errors,state:state()};}
+      };return{scope:'Only observed disjoint external .material-bar filters; all other filters remain uncontrolled',ink,inventory,selected:targets.map(t=>t.entry)};
+    }`)
+    leaseInstalled = true
+    records.push({ stage: 'setup', baseline, nativeBaseline, filters })
+    session = await page.context().newCDPSession(page)
+    const captureStage = async (stage: string, clip?: { x: number; y: number; width: number; height: number; scale: number }): Promise<void> => {
+      const before = await snapshotChartReference(body), contextBefore = await native()
+      const svg = await evaluateElement<unknown>(body, `root=>{const texts=[...root.querySelectorAll('svg text')].filter(e=>e.textContent==='−7');if(texts.length!==1)throw new Error('Diagnostic SVG text is not unique');const e=texts[0],r=e.getBoundingClientRect(),b=e.getBBox(),m=e.getScreenCTM(),range=document.createRange();range.selectNodeContents(e);return{box:{x:r.x,y:r.y,width:r.width,height:r.height},svgBox:{x:b.x,y:b.y,width:b.width,height:b.height},ctm:m?{a:m.a,b:m.b,c:m.c,d:m.d,e:m.e,f:m.f}:null,ranges:[...range.getClientRects()].map(r=>({x:r.x,y:r.y,width:r.width,height:r.height})),filters:globalThis[` + JSON.stringify(leaseKey) + `].state()}}`)
+      const args = { format: 'png' as const, fromSurface: true, captureBeyondViewport: false, ...(clip ? { clip } : {}) }
+      const started = performance.now(), response = await session!.send('Page.captureScreenshot', args), ended = performance.now()
+      const png = Buffer.from(response.data, 'base64'), path = info.outputPath(stage + '.png')
+      writeFileSync(path, png)
+      const after = await snapshotChartReference(body), contextAfter = await native()
+      const dimensions = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
+      records.push({ stage, diagnosticOnly: true, args, started, ended, before, after, contextBefore, contextAfter, svg, dimensions, sha256: pngHash(png) })
+      await info.attach(stage + '.png', { path, contentType: 'image/png' })
+      assertChartCaptureInvariant(baseline, before); assertChartCaptureInvariant(before, after)
+      expect(contextBefore).toEqual(nativeBaseline); expect(contextAfter).toEqual(nativeBaseline)
+      expect(dimensions).toEqual(clip ? { width: Math.round(clip.width * clip.scale), height: Math.round(clip.height * clip.scale) } : viewport)
+    }
+    await captureStage('A-native-full')
+    emulated = true
+    await session.send('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 1, mobile: false }); await settle()
+    await captureStage('B-matched-full')
+    const b = baseline.body.box, x = Math.floor(b.x - 8), y = Math.floor(b.y - 8)
+    const clip = { x, y, width: Math.ceil(b.x + b.width + 8) - x, height: Math.ceil(b.y + b.height + 8) - y }
+    requireContainedChartClip(clip, viewport)
+    expect(baseline.body.scaleX).toBe(1.75); expect(baseline.body.scaleY).toBe(1.75)
+    await captureStage('C-matched-calibration', { ...clip, scale: 1 })
+    await captureStage('C-matched-dense', { ...clip, scale: 2 / baseline.body.scaleX })
+    await session.send('Emulation.clearDeviceMetricsOverride'); emulated = false; await settle()
+    await captureStage('D-cleared-native-full')
+    records.push({ stage: 'filter-disabled', state: await page.evaluate('globalThis[' + JSON.stringify(leaseKey) + '].disable()') }); await settle()
+    await captureStage('E-external-backdrop-none')
+    const restored = await page.evaluate<{ errors: string[]; state: unknown }>('globalThis[' + JSON.stringify(leaseKey) + '].restore()')
+    records.push({ stage: 'filter-restored', ...restored }); expect(restored.errors).toEqual([]); await settle()
+    await captureStage('F-restored-native-full')
+    const path = join(source.home, 'mono-raster-context-export.png')
+    await save(app, page, figure, path); await inspect(page, path, info, 'mono-raster-context-export')
+    records.push({ stage: 'product-export', diagnosticOnly: true, sha256: pngHash(readFileSync(path)), audit: await app.evaluate(() => (globalThis as unknown as MainAudit).chartAudit) })
+    expect(readFileSync(source.skillPath, 'utf8')).toBe(source.skillBytes); expect(errors).toEqual([])
+  } catch (error) { failed = true; failure = error; records.push({ stage: 'failure', error: detail(error) }) }
+  finally {
+    if (leaseInstalled) {
+      try {
+        const restored = await page.evaluate<{ errors: string[]; state: unknown }>('globalThis[' + JSON.stringify(leaseKey) + '].restore()')
+        records.push({ stage: 'cleanup-filters', ...restored }); cleanupErrors.push(...restored.errors)
+        await page.evaluate(key => { delete (globalThis as unknown as Record<string, unknown>)[key] }, leaseKey)
+      } catch (error) { cleanupErrors.push('filters: ' + String(error)) }
+    }
+    if (session) {
+      try { if (emulated) await session.send('Emulation.clearDeviceMetricsOverride') } catch (error) { cleanupErrors.push('metrics: ' + String(error)) }
+      try { await session.detach() } catch (error) { cleanupErrors.push('session: ' + String(error)) }
+    }
+    // Conserva lo obtenido incluso si el cierre de Electron agota el plazo de la prueba.
+    writeFileSync(info.outputPath('mono-raster-context-diagnostic.json'), JSON.stringify({ diagnosticCollectionPassed: false, fidelityConclusion: 'pending-analysis; original mono oracle is unchanged', cleanupPending: true, records, cleanupErrors }, null, 2))
+    try { await closeWithAudit(app, info) } catch (error) { cleanupErrors.push('app: ' + String(error)) }
+    writeFileSync(info.outputPath('mono-raster-context-diagnostic.json'), JSON.stringify({ diagnosticCollectionPassed: !failed && cleanupErrors.length === 0, fidelityConclusion: 'pending-analysis; original mono oracle is unchanged', records, cleanupErrors }, null, 2))
+  }
+  if (failed) throw failure
+  expect(cleanupErrors).toEqual([])
 })
 
 test('Chart PNG: idioma árabe y dirección DOM efectiva se conservan', async ({}, info) => {

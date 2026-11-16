@@ -13,7 +13,21 @@ import { go, homeWithDemoCourse } from './helpers'
 const PACK = 'exam-2-math112', SKILL = 'reference-angles'
 interface CaptureAudit { scene: ChartRenderSceneV1; destroyed: boolean; shown: number; error?: string; resource?: { events: number; status: string; rejected: boolean } }
 interface StateAudit { captures: CaptureAudit[]; hold: boolean; release?: () => void; failResourceOnce?: boolean }
-interface Started { app: ElectronApplication; page: Page; figure: Locator; body: Locator; home: string; skillPath: string; skillBytes: string; errors: string[] }
+interface SourceBackgroundState { windowId: number; webContentsId: number; backgroundThrottling: boolean; visible: boolean }
+interface SourceAnimationPolicy { before: SourceBackgroundState; during?: SourceBackgroundState; after?: SourceBackgroundState }
+interface Started { app: ElectronApplication; page: Page; figure: Locator; body: Locator; home: string; skillPath: string; skillBytes: string; errors: string[]; animationPolicy?: SourceAnimationPolicy }
+
+/** Sólo la fuente del fixture: sigue oculta, pero entrega frames nativos sin limitación de fondo. */
+async function sourceBackgroundThrottling(app: ElectronApplication, expected: SourceBackgroundState, allowed: boolean): Promise<SourceBackgroundState> {
+  return app.evaluate(({ BrowserWindow }, { expected, allowed }) => {
+    const win = BrowserWindow.fromId(expected.windowId)
+    if (!win || win.isDestroyed() || win.webContents.id !== expected.webContentsId || win.isVisible() !== expected.visible) throw new Error('Pie source window changed before its background policy update')
+    win.webContents.setBackgroundThrottling(allowed)
+    const state = { windowId: win.id, webContentsId: win.webContents.id, backgroundThrottling: win.webContents.getBackgroundThrottling(), visible: win.isVisible() }
+    if (state.backgroundThrottling !== allowed || state.visible !== expected.visible) throw new Error('Pie source background policy or native visibility differs from the requested state')
+    return state
+  }, { expected, allowed })
+}
 
 // Clock de Playwright abarca todo el BrowserContext. Este reloj de RAF se instala sólo en la fuente;
 // el renderer privado sigue recibiendo frames reales y sus deadlines no cambian.
@@ -28,8 +42,10 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
     args: [resolve(__dirname, '../..'), ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--use-mock-keychain', '--force-device-scale-factor=1'],
     env: { ...process.env, AULA_HOME: home, AULA_FAKE_AI: '1', AULA_SKIP_ONBOARDING: '1', AULA_HIDDEN: '1', AULA_NO_UPDATES: '1', AULA_NO_LOGIN_ITEM: '1' }
   })
+  let sourcePage: Page | undefined, animationPolicy: SourceAnimationPolicy | undefined
   try {
     const page = await app.firstWindow(), errors: string[] = []
+    sourcePage = page
     page.on('pageerror', error => errors.push(error.message))
     // Mientras carga settings, motion='system' debe permitir la misma entrada que 'full'.
     if (entrance) await page.emulateMedia({ reducedMotion: 'no-preference' })
@@ -71,6 +87,13 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
     await assertNativeChartContext(app, page, 1)
     await page.setViewportSize({ width: 1440, height: 1100 })
     if (entrance) {
+      const sourceWindow = await app.browserWindow(page)
+      try {
+        const before = await sourceWindow.evaluate(win => ({ windowId: win.id as number, webContentsId: win.webContents.id as number, backgroundThrottling: win.webContents.getBackgroundThrottling() as boolean, visible: win.isVisible() as boolean }))
+        animationPolicy = { before }
+        if (before.visible) throw new Error('Pie source fixture must remain hidden')
+        animationPolicy.during = await sourceBackgroundThrottling(app, before, false)
+      } finally { await sourceWindow.dispose() }
       expect(await page.evaluate<boolean>("matchMedia('(prefers-reduced-motion: reduce)').matches")).toBe(false)
       await expect(page.locator('html')).not.toHaveClass(/(?:^|\s)reduce-motion(?:\s|$)/)
       await page.evaluate(pieEntranceClockExpression)
@@ -78,8 +101,15 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
     await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
     const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
     await expect(body).toBeVisible(); await page.evaluate('document.fonts.ready'); await page.mouse.move(8, 8)
-    return { app, page, figure, body, home, skillPath, skillBytes, errors }
-  } catch (error) { await app.close(); throw error }
+    return { app, page, figure, body, home, skillPath, skillBytes, errors, animationPolicy }
+  } catch (error) {
+    try { await sourcePage?.evaluate('window.__chartEntranceClock?.restore()') }
+    finally {
+      try { if (animationPolicy) await sourceBackgroundThrottling(app, animationPolicy.before, animationPolicy.before.backgroundThrottling) }
+      finally { await app.close() }
+    }
+    throw error
+  }
 }
 
 async function release(app: ElectronApplication): Promise<void> {
@@ -93,7 +123,19 @@ async function close(source: Started, info: TestInfo): Promise<void> {
     await release(source.app)
     const audit = await source.app.evaluate(() => (globalThis as unknown as { chartStateAudit: StateAudit }).chartStateAudit.captures)
     writeFileSync(info.outputPath('chart-state-audit.json'), JSON.stringify(audit, null, 2))
-  } finally { await source.app.close() }
+  } finally {
+    try {
+      if (source.animationPolicy) {
+        // La restauración del reloj precede siempre a la política nativa, también al fallar el test.
+        try { await source.page.evaluate('window.__chartEntranceClock?.restore()') }
+        finally {
+          const policy = source.animationPolicy
+          policy.after = await sourceBackgroundThrottling(source.app, policy.before, policy.before.backgroundThrottling)
+          writeFileSync(info.outputPath('source-animation-policy.json'), JSON.stringify(policy, null, 2))
+        }
+      }
+    } finally { await source.app.close() }
+  }
 }
 async function choose(source: Started, output: string): Promise<void> {
   await source.app.evaluate(({ dialog }, path) => { dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as typeof dialog.showSaveDialog }, output)
