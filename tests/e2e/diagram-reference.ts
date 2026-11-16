@@ -83,6 +83,7 @@ interface SourceProtocol { session: CDPSession; baselineDpr: number; nativeDpr: 
 interface SourceSnapshot {
   dom: {
     dpr: number; viewport: { width: number; height: number }; absoluteViewport: unknown
+    scrollAncestors: unknown; windowScroll: unknown; visualViewport: unknown
     bodyStyle: string | null; canvasTransform: string; fonts: unknown; ranges: unknown; fractions: unknown
   }
   geometry: LiveDiagramGeometry
@@ -107,7 +108,9 @@ async function sourceSnapshot(figure: Locator, expectedEmpty: boolean): Promise<
     const ranges=[],walker=document.createTreeWalker(canvas,NodeFilter.SHOW_TEXT),range=document.createRange();
     for(let n=walker.nextNode();n;n=walker.nextNode()){if(!n.textContent?.trim()||n.parentElement?.closest('.katex-mathml'))continue;range.selectNodeContents(n);ranges.push({text:n.textContent,rects:[...range.getClientRects()].map(relative)})}range.detach();
     const fractions=[...canvas.querySelectorAll('.katex .frac-line')].map(n=>{const c=getComputedStyle(n);return{rect:relative(n.getBoundingClientRect()),borderBottomWidth:c.borderBottomWidth,minHeight:c.minHeight,fontSize:c.fontSize}});
-    return{dpr:devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},absoluteViewport:origin.toJSON(),bodyStyle:document.body.getAttribute('style'),canvasTransform:getComputedStyle(canvas).transform,fonts,ranges,fractions};
+    const scrollAncestors=[];
+    for(let node=viewport;node;node=node.parentElement){const css=getComputedStyle(node);scrollAncestors.push({tag:node.tagName,overflowX:css.overflowX,overflowY:css.overflowY,scrollLeft:node.scrollLeft,scrollTop:node.scrollTop,scrollWidth:node.scrollWidth,scrollHeight:node.scrollHeight,clientWidth:node.clientWidth,clientHeight:node.clientHeight})}
+    return{dpr:devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},absoluteViewport:origin.toJSON(),scrollAncestors,windowScroll:{x:scrollX,y:scrollY},visualViewport:visualViewport?{width:visualViewport.width,height:visualViewport.height,offsetLeft:visualViewport.offsetLeft,offsetTop:visualViewport.offsetTop,pageLeft:visualViewport.pageLeft,pageTop:visualViewport.pageTop,scale:visualViewport.scale}:null,bodyStyle:document.body.getAttribute('style'),canvasTransform:getComputedStyle(canvas).transform,fonts,ranges,fractions};
   }`)
   return { dom, geometry: await liveGeometry(figure, expectedEmpty) }
 }
@@ -138,9 +141,18 @@ export function diagramReferenceDifference(reference: unknown, candidate: unknow
   }
   return Object.is(candidate, reference) ? undefined : `${path}: literal difference`
 }
-function invariantFields(snapshot: SourceSnapshot, includeDpr = true): unknown {
-  const { dpr, viewport, canvasTransform, fonts, ranges, fractions } = snapshot.dom
-  return { ...(includeDpr ? { dpr } : {}), viewport, canvasTransform, fonts, ranges, fractions, geometry: snapshot.geometry }
+export function invariantFields(snapshot: SourceSnapshot, includeDpr = true): unknown {
+  const { dpr, viewport, absoluteViewport, scrollAncestors, windowScroll, visualViewport, canvasTransform, fonts, ranges, fractions } = snapshot.dom
+  return { ...(includeDpr ? { dpr } : {}), viewport, absoluteViewport, scrollAncestors, windowScroll, visualViewport, canvasTransform, fonts, ranges, fractions, geometry: snapshot.geometry }
+}
+
+/** El clip original debe caber en el viewport real; no se desplaza ni se recorta para capturarlo. */
+export function requireContainedDiagramClip(clip: { x: number; y: number; width: number; height: number }, viewport: { width: number; height: number }): void {
+  if (![clip.x, clip.y, clip.width, clip.height, viewport.width, viewport.height].every(Number.isFinite)
+    || clip.x < 0 || clip.y < 0 || clip.width <= 0 || clip.height <= 0 || viewport.width <= 0 || viewport.height <= 0
+    || clip.x + clip.width > viewport.width || clip.y + clip.height > viewport.height) {
+    throw new Error('The original Diagram clip must fit entirely inside the actual viewport')
+  }
 }
 
 /** Calibra la densidad con píxeles devueltos por CDP, sin inferirla del DPR declarado. */
@@ -168,7 +180,9 @@ export async function captureDiagramReference(page: Page, figure: Locator, info:
     const before = await sourceSnapshot(figure, expectedEmpty)
     let bytes: Buffer | undefined, afterCapture: SourceSnapshot | undefined, failure: unknown
     try {
-      const response = await session.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: true, clip: { ...clip, scale } })
+      requireContainedDiagramClip(clip, before.dom.viewport)
+      // Evita el viewport temporal 1×1 de captureBeyondViewport, que puede activar reflow y ResizeObserver.
+      const response = await session.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false, clip: { ...clip, scale } })
       bytes = Buffer.from(response.data, 'base64')
       writeFileSync(info.outputPath(`${name}-${label}.png`), bytes)
       afterCapture = await sourceSnapshot(figure, expectedEmpty)

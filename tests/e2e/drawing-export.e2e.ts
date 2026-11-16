@@ -11,7 +11,7 @@ import { compareDrawingPixels, type LiveDrawingGeometry } from './drawing-pixels
 
 const PACK = 'exam-2-math112'
 const SKILLS = ['reference-angles', 'degree-radian-conversion', 'arc-length-sector-area']
-interface RenderAudit { captures: Array<{ dip: number[]; windowBounds: { x: number; y: number; width: number; height: number }; contentBounds: { x: number; y: number; width: number; height: number }; viewport: { width: number; height: number; scale: number }; native: { width: number; height: number }; png: { width: number; height: number }; chunks: string[]; stayHidden: boolean }>; id: number; shown: number; destroyed: boolean; defaultSession: boolean; calls: Array<{ method: string; args?: unknown; result?: unknown; error?: string }>; isolation?: unknown }
+interface RenderAudit { protocol: Array<{ event: 'attach' | 'capture' | 'detach'; version?: string; method?: string; params?: unknown; response?: unknown; png?: { width: number; height: number }; hidden?: boolean; error?: string }>; captures: Array<{ dip: number[]; windowBounds: { x: number; y: number; width: number; height: number }; contentBounds: { x: number; y: number; width: number; height: number }; viewport: { width: number; height: number; scale: number }; native: { width: number; height: number }; png: { width: number; height: number }; chunks: string[]; stayHidden: boolean }>; id: number; shown: number; destroyed: boolean; defaultSession: boolean; calls: Array<{ method: string; args?: unknown; result?: unknown; error?: string }>; isolation?: unknown }
 const STATIC: BlockOf<'drawing'> = {
   id: 'export-drawing-static', type: 'drawing', title: 'Drawing export fixture', width: 480, height: 320, style: 'hand',
   items: [
@@ -77,10 +77,23 @@ async function start(home: string, dark: boolean): Promise<{ app: ElectronApplic
     state.drawingQa = []
     mainApp.on('browser-window-created', (_event, window) => {
       const wc = window.webContents
-      const audit: RenderAudit = { id: wc.id, shown: 0, destroyed: false, defaultSession: wc.session === session.defaultSession, calls: [], captures: [] }
+      const audit: RenderAudit = { id: wc.id, shown: 0, destroyed: false, defaultSession: wc.session === session.defaultSession, calls: [], captures: [], protocol: [] }
       state.drawingQa.push(audit)
       window.on('show', () => { audit.shown++ })
       wc.once('destroyed', () => { audit.destroyed = true })
+      const debuggerClient = wc.debugger, attach = debuggerClient.attach.bind(debuggerClient), send = debuggerClient.sendCommand.bind(debuggerClient)
+      debuggerClient.attach = (...args: Parameters<typeof debuggerClient.attach>) => {
+        attach(...args); audit.protocol.push({ event: 'attach', version: args[0] })
+      }
+      debuggerClient.on('detach', () => { audit.protocol.push({ event: 'detach' }) })
+      debuggerClient.sendCommand = (...args: Parameters<typeof debuggerClient.sendCommand>) => {
+        // Conserva la Promise original: la observación no añade lecturas DOM ni barreras antes de capturar.
+        const promise = send(...args)
+        const call: RenderAudit['protocol'][number] = { event: 'capture', method: args[0], params: args[1], hidden: !window.isVisible() }
+        audit.protocol.push(call)
+        void promise.then(response => { call.response = response }, error => { call.error = String(error) })
+        return promise
+      }
       const capturePage = wc.capturePage.bind(wc)
       wc.capturePage = async (...args: Parameters<typeof wc.capturePage>) => {
         const dip = window.getContentSize(), windowBounds = window.getBounds(), contentBounds = window.getContentBounds()
@@ -123,7 +136,15 @@ async function start(home: string, dark: boolean): Promise<{ app: ElectronApplic
   return { app, page, errors }
 }
 async function audit(app: ElectronApplication, info: TestInfo, home: string, name: string): Promise<RenderAudit[]> {
-  const result = await app.evaluate(() => (globalThis as unknown as { drawingQa: RenderAudit[] }).drawingQa)
+  const result = await app.evaluate(() => (globalThis as unknown as { drawingQa: RenderAudit[] }).drawingQa.map(entry => ({
+    ...entry,
+    protocol: entry.protocol.map(({ response, ...call }) => {
+      if (!response || typeof response !== 'object' || !('data' in response) || typeof response.data !== 'string') return call
+      // La respuesta se inspecciona al recoger el audit, después de terminar la exportación.
+      const png = Buffer.from(response.data, 'base64')
+      return { ...call, png: { width: png.readUInt32BE(16), height: png.readUInt32BE(20) } }
+    })
+  })))
   const path = join(home, `${name}-render-audit.json`)
   writeFileSync(path, JSON.stringify(result, null, 2))
   await info.attach(`${name}-render-audit.json`, { path, contentType: 'application/json' })
@@ -243,7 +264,14 @@ for (const theme of ['light', 'dark'] as const) {
         expect(capture.isolation).toMatchObject({ aula: false, node: false, links: 0, images: 0, frames: 0 })
         expect(capture.calls.map(c => c.method)).toEqual(['render', 'resize', 'normalize'])
         expect(capture.calls.every(c => !c.error)).toBe(true)
-        expect(capture.captures).toHaveLength(2)
+        expect(capture.captures).toHaveLength(1)
+        expect(capture.protocol.map(c => c.event)).toEqual(['attach', 'capture', 'detach'])
+        expect(capture.protocol[0].version).toBe('1.3')
+        expect(capture.protocol[1]).toMatchObject({ method: 'Page.captureScreenshot', hidden: true })
+        expect(capture.protocol[1].params).toEqual({ format: 'png', fromSurface: true, captureBeyondViewport: false })
+        expect(capture.protocol[1].error).toBeUndefined()
+        expect(capture.protocol[1].png?.width).toBeGreaterThan(0)
+        expect(capture.protocol[1].png?.height).toBeGreaterThan(0)
         expect(capture.captures[0].dip).toEqual([128, 128])
         expect(capture.captures.every(c => c.stayHidden && c.png.width > 0 && c.png.height > 0)).toBe(true)
         expect(JSON.stringify(capture)).not.toContain('HIDDEN_')

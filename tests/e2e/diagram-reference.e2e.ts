@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test'
-import { diagramReferenceDifference } from './diagram-reference'
+import { diagramReferenceDifference, invariantFields, requireContainedDiagramClip } from './diagram-reference'
 
 test('referencia Diagram: compara snapshots completos con una sola aserción y precisión V6', () => {
   const cases: Array<{ reference: unknown; candidate: unknown; accepted: boolean }> = [
@@ -46,4 +46,43 @@ test('referencia Diagram: rechaza reflow, cambios de Range y barras de fracción
   expect(variants.map(candidate => diagramReferenceDifference(reference, candidate)?.split(':')[0])).toEqual([
     'independent.viewport.width', 'independent.fonts[0].rects[0].width', 'independent.ranges[0].rects[0].y', 'independent.fractions[0].borderBottomWidth'
   ])
+})
+
+test('referencia Diagram: exige el clip original dentro del viewport real sin ajustar sus bordes', () => {
+  const viewport = Object.freeze({ width: 800, height: 1100 }), clip = Object.freeze({ x: 10, y: 100, width: 790, height: 1000 })
+  expect(() => requireContainedDiagramClip(clip, viewport)).not.toThrow()
+  expect(() => requireContainedDiagramClip({ x: .25, y: .5, width: 1439.75, height: 1099.5 }, { width: 1440, height: 1100 })).not.toThrow()
+  for (const invalid of [
+    { ...clip, x: -.000001 }, { ...clip, y: -.000001 }, { ...clip, x: 10.000001 }, { ...clip, height: 1000.000001 },
+    { ...clip, width: 0 }, { ...clip, height: -1 }, { ...clip, x: NaN }, { ...clip, width: Infinity }
+  ]) expect(() => requireContainedDiagramClip(invalid, viewport)).toThrow(/entirely/)
+  for (const invalid of [{ width: 799, height: 1100 }, { width: 800, height: 1099 }, { width: 0, height: 1100 }, { width: 800, height: NaN }, { width: Infinity, height: 1100 }]) {
+    expect(() => requireContainedDiagramClip(clip, invalid)).toThrow(/entirely/)
+  }
+  expect(clip).toEqual({ x: 10, y: 100, width: 790, height: 1000 })
+})
+
+test('referencia Diagram: detecta deriva absoluta y scroll aunque la geometría relativa no cambie', () => {
+  const snapshot: Parameters<typeof invariantFields>[0] = {
+    dom: {
+      dpr: 1, viewport: { width: 800, height: 1100 }, absoluteViewport: { x: 15.5, y: 650 },
+      scrollAncestors: [{ scrollTop: 35, scrollLeft: 0 }], windowScroll: { x: 0, y: 0 }, visualViewport: { pageTop: 0, scale: 1 },
+      bodyStyle: null, canvasTransform: 'none', fonts: [], ranges: [], fractions: []
+    },
+    geometry: { width: 600, height: 400, canvas: { x: 0, y: 0, width: 600, height: 400, naturalWidth: 600, naturalHeight: 400, scale: 1 }, background: [255, 255, 255], exclusions: [], labels: [] }
+  }
+  const variants = [
+    { ...snapshot, dom: { ...snapshot.dom, absoluteViewport: { x: 15.5, y: 674 } } },
+    { ...snapshot, dom: { ...snapshot.dom, scrollAncestors: [{ scrollTop: 36, scrollLeft: 0 }] } },
+    { ...snapshot, dom: { ...snapshot.dom, windowScroll: { x: 0, y: .002 } } },
+    { ...snapshot, dom: { ...snapshot.dom, visualViewport: { pageTop: .002, scale: 1 } } }
+  ]
+  const expected = ['independent.absoluteViewport.y', 'independent.scrollAncestors[0].scrollTop', 'independent.windowScroll.y', 'independent.visualViewport.pageTop']
+  // La captura puede restablecer sólo el DPR; eso no autoriza perder el origen ni el scroll.
+  for (const includeDpr of [true, false]) {
+    expect(variants.map(value => diagramReferenceDifference(invariantFields(snapshot, includeDpr), invariantFields(value, includeDpr))?.split(':')[0])).toEqual(expected)
+  }
+  const changedDpr = { ...snapshot, dom: { ...snapshot.dom, dpr: 2 } }
+  expect(diagramReferenceDifference(invariantFields(snapshot), invariantFields(changedDpr))).toBe('independent.dpr: numeric difference')
+  expect(diagramReferenceDifference(invariantFields(snapshot, false), invariantFields(changedDpr, false))).toBeUndefined()
 })

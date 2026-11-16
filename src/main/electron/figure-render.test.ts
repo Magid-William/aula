@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pngChunk, pngFixture } from '@main/services/figures/testing'
 import type { DrawingRenderSceneV1 } from '@shared/figuresDrawing'
 import { chartSceneFixture, diagramSceneFixture } from '@engine/figures/testing'
+import { FIGURE_LIMITS } from '@shared/figures'
 
-const state = vi.hoisted(() => ({ windows: [] as unknown[], sessions: [] as unknown[], normalized: 'good', displayScale: 2, calibrationFailures: 0, calls: [] as string[], renderInputs: [] as unknown[], layoutWidth: 100, layoutHeight: 80, renderGate: undefined as Promise<void> | undefined, cleanup: vi.fn(async () => undefined) }))
+const state = vi.hoisted(() => ({ screenshot: undefined as unknown, screenshotGate: undefined as Promise<void> | undefined, attachError: false, alreadyAttached: false, screenshotError: false, windows: [] as unknown[], sessions: [] as unknown[], normalized: 'good', displayScale: 2, calibrationFailures: 0, calls: [] as string[], renderInputs: [] as unknown[], layoutWidth: 100, layoutHeight: 80, renderGate: undefined as Promise<void> | undefined, cleanup: vi.fn(async () => undefined) }))
 vi.mock('@main/services/figures/render-assets', async original => ({ ...await original<object>(), loadFigureAssets: async () => new Map([['figure-render.html', { file: '/fixture/figure-render.html', mime: 'text/html' }], ['assets/scene.js', { file: '/fixture/assets/scene.js', mime: 'text/javascript' }]]) }))
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
@@ -23,12 +24,33 @@ vi.mock('electron', async () => {
     clearCache = vi.fn(async () => undefined)
     closeAllConnections = vi.fn(async () => undefined)
   }
+  class FakeDebugger extends EventEmitter {
+    attached = state.alreadyAttached
+    constructor(private readonly size: () => { width: number; height: number }) { super() }
+    isAttached(): boolean { return this.attached }
+    attach(version: string): void {
+      state.calls.push('attach'); expect(version).toBe('1.3')
+      if (state.attachError) throw new Error('Attach failed')
+      this.attached = true
+    }
+    detach(): void { state.calls.push('detach'); this.attached = false; this.emit('detach', {}, 'target closed') }
+    async sendCommand(method: string, params: unknown): Promise<unknown> {
+      state.calls.push('screenshot')
+      expect(this.attached).toBe(true)
+      expect(method).toBe('Page.captureScreenshot')
+      expect(params).toEqual({ format: 'png', fromSurface: true, captureBeyondViewport: false })
+      await state.screenshotGate
+      if (state.screenshotError) throw new Error('Screenshot failed')
+      return state.screenshot ?? { data: pngFixture({ ...this.size(), before: [pngChunk('iCCP', Buffer.from('private-ICC'))] }).toString('base64') }
+    }
+  }
   class FakeWindow extends EventEmitter {
     destroyed = false
     width = 128; height = 128
     options: Record<string, unknown>
     captures: Array<{ rect: unknown; opts: unknown }> = []
     webContents = Object.assign(new EventEmitter(), {
+      debugger: new FakeDebugger(() => ({ width: this.width * 2, height: this.height * 2 })),
       setWindowOpenHandler: vi.fn(),
       executeJavaScript: async (script: string) => {
         if (script.startsWith('Boolean')) return true
@@ -62,7 +84,7 @@ vi.mock('electron', async () => {
 })
 class Owner extends EventEmitter { isDestroyed(): boolean { return false } }
 const scene = (): DrawingRenderSceneV1 => ({ version: 1, canvas: { width: 100, height: 80 }, metrics: { pixelWidth: 100, layoutWidth: 100, textK: 1, unitsPerPx: 1, rootFontPx: 16, bodyFont: 'sans', bodyItalic: false, cssZoom: 1 }, appearance: { theme: 'light', language: 'es', direction: 'ltr', palette: { paper: '#ffffff', text: '#000000', text2: '#111111', text3: '#222222', brick: '#aa2211', accent: '#aa2211', link: '#aa2211' } }, items: [], output: { scale: 2 } })
-beforeEach(() => { vi.resetModules(); vi.stubEnv('ELECTRON_RENDERER_URL', ''); state.windows = []; state.sessions = []; state.calls = []; state.renderInputs = []; state.layoutWidth = 100; state.layoutHeight = 80; state.renderGate = undefined; state.normalized = 'good'; state.displayScale = 2; state.calibrationFailures = 0; state.cleanup.mockClear() })
+beforeEach(() => { vi.resetModules(); vi.stubEnv('ELECTRON_RENDERER_URL', ''); state.windows = []; state.sessions = []; state.calls = []; state.renderInputs = []; state.layoutWidth = 100; state.layoutHeight = 80; state.renderGate = undefined; state.normalized = 'good'; state.displayScale = 2; state.calibrationFailures = 0; state.screenshot = undefined; state.screenshotGate = undefined; state.attachError = false; state.alreadyAttached = false; state.screenshotError = false; state.cleanup.mockClear() })
 
 describe('pipeline aislado de figuras', () => {
   it('contrasta el layout aislado con el ancho CSS, conservando la medida original de preparación', async () => {
@@ -76,11 +98,13 @@ describe('pipeline aislado de figuras', () => {
     const { renderDrawingPng } = await import('./figure-render')
     const result = await renderDrawingPng({ jobId: 'one', scene: scene() }, new Owner())
     expect(result).toMatchObject({ width: 200, height: 160 }); expect(Buffer.from(result.data).includes(Buffer.from('iCCP'))).toBe(false)
-    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'capture', 'normalize'])
-    const win = state.windows[0] as { destroyed: boolean; options: { show: boolean; webPreferences: Record<string, unknown> }; captures: Array<{ opts: unknown }> }
+    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'attach', 'screenshot', 'normalize', 'detach'])
+    const win = state.windows[0] as { destroyed: boolean; options: { show: boolean; webPreferences: Record<string, unknown> }; captures: Array<{ rect: unknown; opts: unknown }>; webContents: { debugger: { isAttached(): boolean; listenerCount(event: string): number } } }
     expect(win.destroyed).toBe(true); expect(win.options).toMatchObject({ show: false, width: 128, height: 128, useContentSize: true, frame: false, thickFrame: false })
     expect(win.options.webPreferences).toMatchObject({ sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, devTools: false })
     expect(win.options.webPreferences).not.toHaveProperty('preload')
+    expect(win.captures).toHaveLength(1); expect(win.captures[0].rect).toEqual({ x: 0, y: 0, width: 128, height: 128 })
+    expect(win.webContents.debugger.isAttached()).toBe(false); expect(win.webContents.debugger.listenerCount('detach')).toBe(0)
     expect(win.captures.every(c => JSON.stringify(c.opts) === JSON.stringify({ stayHidden: true, stayAwake: false }))).toBe(true)
     expect(state.cleanup).toHaveBeenCalledTimes(1)
     await renderDrawingPng({ jobId: 'two', scene: scene() }, new Owner())
@@ -92,7 +116,7 @@ describe('pipeline aislado de figuras', () => {
     const diagram = diagramSceneFixture()
     await expect(renderDiagramPng({ jobId: 'diagram', scene: diagram }, new Owner())).resolves.toMatchObject({ width: 200, height: 160 })
     expect(state.renderInputs[0]).toEqual({ kind: 'diagram', scene: diagram })
-    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'capture', 'normalize'])
+    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'attach', 'screenshot', 'normalize', 'detach'])
     await renderDrawingPng({ jobId: 'drawing', scene: scene() }, new Owner())
     expect(state.sessions).toHaveLength(1); expect(state.cleanup).toHaveBeenCalledTimes(2)
     expect(state.windows.every(win => (win as { destroyed: boolean }).destroyed)).toBe(true)
@@ -102,7 +126,7 @@ describe('pipeline aislado de figuras', () => {
     const chart = chartSceneFixture()
     await expect(renderChartPng({ jobId: 'chart', scene: chart }, new Owner())).resolves.toMatchObject({ width: 200, height: 160 })
     expect(state.renderInputs[0]).toEqual({ kind: 'chart', scene: chart })
-    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'capture', 'normalize'])
+    expect(state.calls).toEqual(['load', 'render', 'capture', 'resizeWindow', 'resize', 'attach', 'screenshot', 'normalize', 'detach'])
     await renderDiagramPng({ jobId: 'diagram', scene: diagramSceneFixture() }, new Owner())
     await renderDrawingPng({ jobId: 'drawing', scene: scene() }, new Owner())
     expect(state.sessions).toHaveLength(1); expect(state.cleanup).toHaveBeenCalledTimes(3)
@@ -151,6 +175,61 @@ describe('pipeline aislado de figuras', () => {
     expect(state.calls).not.toContain('resizeWindow')
     expect((state.windows[0] as { destroyed: boolean }).destroyed).toBe(true)
   })
+  it.each([
+    { data: '', extra: true }, { data: 42 }, { data: 'AA=A' }, { data: 'AAB=' }, { data: 'AB==' },
+    { data: pngFixture({ width: 202, height: 160 }).toString('base64') }
+  ])('rechaza la respuesta CDP inválida antes de normalizar: %j', async response => {
+    state.screenshot = response
+    const { renderDrawingPng } = await import('./figure-render')
+    await expect(renderDrawingPng({ jobId: 'bad-cdp', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+    expect(state.calls).not.toContain('normalize'); expect(state.calls.at(-1)).toBe('detach')
+    expect((state.windows[0] as { destroyed: boolean }).destroyed).toBe(true)
+  })
+  it('no se apropia de un debugger adjunto y limpia attach/send fallidos', async () => {
+    const { renderDrawingPng } = await import('./figure-render')
+    state.alreadyAttached = true
+    await expect(renderDrawingPng({ jobId: 'attached', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+    expect(state.calls).not.toContain('attach'); expect(state.calls).not.toContain('detach')
+    state.alreadyAttached = false; state.attachError = true; state.calls = []
+    await expect(renderDrawingPng({ jobId: 'attach-error', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+    expect(state.calls).not.toContain('screenshot')
+    state.attachError = false; state.screenshotError = true; state.calls = []
+    await expect(renderDrawingPng({ jobId: 'send-error', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+    expect(state.calls.at(-1)).toBe('detach')
+    expect(state.windows.every(win => (win as { destroyed: boolean }).destroyed)).toBe(true)
+  })
+  it('aplica presupuesto base64 y límites PNG antes de enviar bytes al normalizador', async () => {
+    const { renderDrawingPng } = await import('./figure-render')
+    for (const data of ['A'.repeat(Math.ceil(FIGURE_LIMITS.maxPngBytes / 3) * 4 + 4), Buffer.from('not a PNG').toString('base64'), pngFixture({ width: FIGURE_LIMITS.maxDimension + 1, height: 1 }).toString('base64')]) {
+      state.screenshot = { data }; state.calls = []
+      await expect(renderDrawingPng({ jobId: 'cdp-budget', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
+      expect(state.calls).not.toContain('normalize'); expect(state.calls.at(-1)).toBe('detach')
+    }
+    expect(state.windows.every(win => (win as { destroyed: boolean }).destroyed)).toBe(true)
+  })
+  it.each(['cancel', 'detach', 'timeout'] as const)('interrumpe CDP pendiente por %s, libera recursos y permite el siguiente trabajo', async interruption => {
+    const { renderDrawingPng, cancelFigureRender } = await import('./figure-render')
+    let release!: () => void
+    state.screenshotGate = new Promise<void>(resolve => { release = resolve })
+    const owner = new Owner(), pending = renderDrawingPng({ jobId: 'pending', scene: scene() }, owner)
+    const rejected = expect(pending).rejects.toMatchObject({ code: interruption === 'cancel' ? 'cancelled' : interruption === 'timeout' ? 'render_timeout' : 'render_failed' })
+    await vi.waitFor(() => expect(state.calls).toContain('screenshot'))
+    const win = state.windows[0] as { destroyed: boolean; webContents: { debugger: EventEmitter & { isAttached(): boolean } } }
+    if (interruption === 'cancel') cancelFigureRender({ jobId: 'pending' }, owner)
+    else if (interruption === 'detach') win.webContents.debugger.emit('detach', {}, 'target closed')
+    else {
+      // El mismo plazo monotónico del trabajo, sin esperar 19 segundos en el test.
+      const originalNow = performance.now.bind(performance), now = originalNow()
+      const clock = vi.spyOn(performance, 'now').mockReturnValue(now + 20_001)
+      release()
+      try { await rejected } finally { clock.mockRestore() }
+    }
+    await rejected
+    expect(win.destroyed).toBe(true); expect(win.webContents.debugger.isAttached()).toBe(false)
+    expect(win.webContents.debugger.listenerCount('detach')).toBe(0); expect(state.calls).not.toContain('normalize')
+    release(); state.screenshotGate = undefined
+    await expect(renderDrawingPng({ jobId: 'next-after-cdp', scene: scene() }, new Owner())).resolves.toMatchObject({ width: 200, height: 160 })
+  })
   it('el único slot y la cancelación por dueño se comparten entre Diagram y Drawing', async () => {
     const { renderDrawingPng, renderDiagramPng, cancelFigureRender } = await import('./figure-render')
     let release!: () => void
@@ -171,7 +250,7 @@ describe('pipeline aislado de figuras', () => {
     const { renderDrawingPng } = await import('./figure-render')
     state.calibrationFailures = 1
     await expect(renderDrawingPng({ jobId: 'retry', scene: scene() }, new Owner())).resolves.toMatchObject({ width: 200, height: 160 })
-    expect(state.calls).toEqual(['load', 'render', 'capture', 'paint', 'capture', 'resizeWindow', 'resize', 'capture', 'normalize'])
+    expect(state.calls).toEqual(['load', 'render', 'capture', 'paint', 'capture', 'resizeWindow', 'resize', 'attach', 'screenshot', 'normalize', 'detach'])
     state.calls = []; state.calibrationFailures = 2
     await expect(renderDrawingPng({ jobId: 'failed', scene: scene() }, new Owner())).rejects.toMatchObject({ code: 'render_failed' })
     expect(state.calls).toEqual(['load', 'render', 'capture', 'paint', 'capture'])

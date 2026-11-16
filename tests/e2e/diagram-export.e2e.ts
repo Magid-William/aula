@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import type { DiagramPrimitive, DiagramRenderSceneV1 } from '../../src/shared/figuresDiagram'
 import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { DIAGRAM_FIXTURES, EMPTY_DIAGRAM } from './diagram-fixtures'
+import { decodeDiagramFramePng, diagramHoverFramePixels } from './diagram-frame'
 import { compareDiagramPixels, type LiveDiagramGeometry } from './diagram-pixels'
 import { go, homeWithDemoCourse } from './helpers'
 import { captureDiagramReference, initializeDiagramReference, evaluateLiveElement, liveGeometry } from './diagram-reference'
@@ -882,7 +883,17 @@ for (const theme of ['light', 'dark'] as const) for (const edgeCount of [40, 41]
       await page.waitForTimeout(350)
       const sourceHover = await evaluateLiveElement<string[]>(figure, 'figure => [...figure.querySelectorAll("[data-diagram-canvas] [data-ask-part]:hover")].map(node => node.getAttribute("data-ask-part"))')
       expect(sourceHover).toContain(fixture.block.nodes[0].id)
-      await captureWithLiveComparison(app, page, figure, join(home, 'hovered-node.png'), info, 'hovered-node', { keyboard: true, requireMath: true })
+      const hoveredFile = join(home, 'hovered-node.png')
+      const { natural } = await captureWithLiveComparison(app, page, figure, hoveredFile, info, 'hovered-node', { keyboard: true, requireMath: true })
+      if (theme === 'dark' && edgeCount === 40) {
+        let framing: ReturnType<typeof diagramHoverFramePixels> | { accepted: false; error: string }
+        try { framing = diagramHoverFramePixels(decodeDiagramFramePng(readFileSync(hoveredFile)), natural) }
+        catch (error) { framing = { accepted: false, error: String(error) } }
+        const report = info.outputPath('hovered-node-absolute-frame.json')
+        writeFileSync(report, JSON.stringify({ natural, framing }, null, 2))
+        await info.attach('hovered-node-absolute-frame', { path: report, contentType: 'application/json' })
+        expect(framing.accepted, 'The hovered graph must retain its absolute framing, margins and dot phase').toBe(true)
+      }
       const hovered = await scene(app, 1), before = lifecycleLeaves(baseline.primitives), after = lifecycleLeaves(hovered.primitives)
       const labels = (items: typeof before) => items.filter((item): item is Extract<DiagramPrimitive, { kind: 'label' }> => item.kind === 'label' && item.lines.some(line => line.text === fixture.block.nodes[0].label))
       expect(labels(before)).toHaveLength(1); expect(labels(after)).toHaveLength(1)
