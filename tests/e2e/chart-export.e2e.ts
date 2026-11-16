@@ -1,5 +1,5 @@
 // Chart completo: referencia DOM/píxeles del producto vivo, independiente de la escena privada.
-import { test, expect, type CDPSession, type ElectronApplication, type Locator, type Page, type TestInfo } from 'playwright/test'
+import { test, expect, type ElectronApplication, type Locator, type Page, type TestInfo } from 'playwright/test'
 import { _electron as electron } from 'playwright'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -8,11 +8,10 @@ import type { ChartRenderSceneV1 } from '../../src/shared/figuresChart'
 import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { CHART_FIXTURES, type ChartFixture } from './chart-fixtures'
 import { waitForPieHover } from './chart-hover-readiness'
-import { compareDiagramPixels } from './diagram-pixels'
-import { assertChartCaptureInvariant, assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, requireContainedChartClip, setChartReferencePageZoom, snapshotChartReference } from './chart-reference'
+import { compareDiagramPixels, type DiagramPixelOptions } from './diagram-pixels'
+import { assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, setChartReferencePageZoom, snapshotChartReference } from './chart-reference'
 import { assertChartRasterConsistency, compareChartRasterConsistency, type ChartRasterConsistency } from './chart-raster-consistency'
 import { go, homeWithDemoCourse } from './helpers'
-import { beginChartCompositorObservation, compareCompositorSourcePixels } from './chart-compositor-observation'
 import { finishChartSaveObservation, installChartSaveObservation, type ChartSaveObservation } from './chart-save-observation'
 
 const PACK = 'exam-2-math112', SKILL = 'reference-angles'
@@ -44,7 +43,7 @@ function prepare(fixture: ChartFixture, theme: 'light' | 'dark'): { home: string
   return { home, skillPath, skillBytes: readFileSync(skillPath, 'utf8') }
 }
 
-async function start(home: string, dpr2: boolean, pageZoom = 1, nativeViewport = false): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
+async function start(home: string, dpr2: boolean, pageZoom = 1): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
   const sourceDpr = dpr2 ? 2 : 1
   const app = await electron.launch({ args: [resolve(__dirname, '../..'), ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--use-mock-keychain', `--force-device-scale-factor=${sourceDpr}`], env: { ...process.env, AULA_HOME: home, AULA_FAKE_AI: '1', AULA_SKIP_ONBOARDING: '1', AULA_HIDDEN: '1', AULA_NO_UPDATES: '1', AULA_NO_LOGIN_ITEM: '1' } })
   try {
@@ -81,25 +80,8 @@ async function start(home: string, dpr2: boolean, pageZoom = 1, nativeViewport =
     })
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
     await assertNativeChartContext(app, page, sourceDpr)
-    if (nativeViewport) {
-      // Sólo el diagnóstico de raster: ningún override de Playwright/CDP antes de su control nativo.
-      if (pageZoom !== 1) throw new Error('Native raster diagnostic requires page zoom one')
-      await app.evaluate(({ BrowserWindow }) => {
-        const windows = BrowserWindow.getAllWindows()
-        if (windows.length !== 1) throw new Error('Native raster diagnostic requires its single source window')
-        windows[0].setContentSize(1440, 1100)
-      })
-      await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
-      const actual = await app.evaluate(({ BrowserWindow }) => {
-        const bounds = BrowserWindow.getAllWindows()[0].getContentBounds()
-        return { width: bounds.width, height: bounds.height }
-      })
-      if (![actual.width, actual.height].every(n => Number.isInteger(n) && n > 0 && n <= 4096)) throw new Error('Native diagnostic viewport is invalid: ' + JSON.stringify(actual))
-      await expect.poll(() => page.evaluate('({width:innerWidth,height:innerHeight})'), { timeout: 5000 }).toEqual(actual)
-    } else {
-      await page.setViewportSize({ width: 1440, height: 1100 })
-      await initializeChartReference(page, sourceDpr)
-    }
+    await page.setViewportSize({ width: 1440, height: 1100 })
+    await initializeChartReference(page, sourceDpr)
     if (pageZoom !== 1) await setChartReferencePageZoom(app, page, pageZoom)
     return { app, page, errors }
   } catch (error) { await app.close().catch(() => undefined); throw error }
@@ -151,7 +133,10 @@ async function sameExportRaster(page: Page, original: Buffer, repeated: Buffer, 
   writeFileSync(info.outputPath(`${name}-consistency.json`), JSON.stringify({ hashes, byteIdentical: hashes.original === hashes.repeated, comparison }, null, 2))
   if (comparison) assertChartRasterConsistency(comparison)
 }
-async function capture(app: ElectronApplication, page: Page, figure: Locator, home: string, info: TestInfo, name: string): Promise<ChartRenderSceneV1> {
+// Etiquetas en gris: el renderer privado (compartido con #41) pinta texto con antialias LCD/ClearType en
+// Windows y Linux y la app viva en gris. La forma del glifo se exige igual; el color lo vigila la figura en RGB.
+const CHART_ORACLE: DiagramPixelOptions = { labelInk: 'gray' }
+async function capture(app: ElectronApplication, page: Page, figure: Locator, home: string, info: TestInfo, name: string, oracle: DiagramPixelOptions = CHART_ORACLE): Promise<ChartRenderSceneV1> {
   const body = figure.locator('[data-chart-export-body]'), path = join(home, `${name}.png`)
   const context = await evaluateElement<unknown>(body, `root=>{const css=getComputedStyle(root);return{family:css.fontFamily,style:css.fontStyle,direction:css.direction,language:root.closest('[lang]')?.getAttribute('lang')||document.documentElement.lang||'en'}}`)
   const expectedText = await body.textContent() ?? ''
@@ -182,7 +167,7 @@ async function capture(app: ElectronApplication, page: Page, figure: Locator, ho
     expect({ ...canonical, scene: { ...canonical.scene, layers } }).toEqual(original)
     await sameExportRaster(page, readFileSync(path), readFileSync(canonicalPath), reference.geometry.background, info, name)
     writeFileSync(info.outputPath(`${name}-placement.json`), JSON.stringify({ before: placement.before, after: placement.after, displacement: placement.displacement, target: placement.target, quantum: placement.quantum, residual: placement.residual, method: placement.method, geometryTolerance }, null, 2))
-    await compareDiagramPixels(page, reference.png, readFileSync(path), reference.geometry, info, name, 'dense')
+    await compareDiagramPixels(page, reference.png, readFileSync(path), reference.geometry, info, name, 'dense', oracle)
     for (const audit of [originalAudits.at(-1)!, audits.at(-1)!]) {
       expect(audit.shown).toBe(0); expect(audit.destroyed).toBe(true); expect(audit.defaultSession).toBe(false)
       expect(audit.isolation).toMatchObject({ bridge: false, node: false, links: 0, images: 0, frames: 0, context })
@@ -413,114 +398,26 @@ for (const variant of [{ theme: 'light' as const, dpr2: true }, { theme: 'dark' 
     } finally { await closeWithAudit(app, info) }
   })
 
-test('Chart PNG: fuente mono, raíz ampliada y zoom CSS anidado conservan la geometría', async ({}, info) => {
+// Mono no existe como tema de Slides; se fuerza en el fixture, como el diagram-mono-context de #41.
+for (const variant of [
+  { key: 'mono-root-18', zoom: undefined, cssZoom: 1 },
+  { key: 'mono-nested-css-zoom', zoom: { figure: 1.25, body: 1.4 }, cssZoom: 1.75 }
+]) test(`Chart PNG: fuente mono y raíz de 18px${variant.zoom ? ' con zoom CSS anidado' : ''} conservan la geometría`, async ({}, info) => {
   const source = prepare(CHART_FIXTURES[0], 'light'), { app, page, errors } = await start(source.home, false)
   try {
     await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
     const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
     await expect(body).toBeVisible()
-    await evaluateElement<void>(figure, `root=>{document.documentElement.style.fontSize='18px';root.style.fontFamily='var(--font-mono)';root.style.zoom='1.25';root.querySelector('[data-chart-export-body]').style.zoom='1.4';}`)
+    const zoom = variant.zoom ? `root.style.zoom='${variant.zoom.figure}';root.querySelector('[data-chart-export-body]').style.zoom='${variant.zoom.body}';` : ''
+    await evaluateElement<void>(figure, `root=>{document.documentElement.style.fontSize='18px';root.style.fontFamily='var(--font-mono)';${zoom}}`)
     await page.evaluate('document.fonts.ready'); await body.scrollIntoViewIfNeeded(); await page.mouse.move(8, 8); await page.waitForTimeout(300)
-    const scene = await capture(app, page, figure, source.home, info, 'mono-nested-css-zoom')
-    expect(scene.metrics).toMatchObject({ bodyFont: 'mono', bodyItalic: false, rootFontPx: 18, cssZoom: 1.75 })
+    // Zoom CSS fraccionario: la app viva pinta a 1,75× y el PNG a 2× reducido, así que cada glifo cae en otra
+    // fase subpíxel (≤0,6px CSS). Se exigen DTO, invariantes de captura y figura completa, sin suelos por glifo.
+    const oracle: DiagramPixelOptions = variant.zoom ? { ...CHART_ORACLE, labelFloors: false } : CHART_ORACLE
+    const scene = await capture(app, page, figure, source.home, info, variant.key, oracle)
+    expect(scene.metrics).toMatchObject({ bodyFont: 'mono', bodyItalic: false, rootFontPx: 18, cssZoom: variant.cssZoom })
     expect(readFileSync(source.skillPath, 'utf8')).toBe(source.skillBytes); expect(errors).toEqual([])
   } finally { await closeWithAudit(app, info) }
-})
-
-// Colección del motivo real del compositor, no aprobación de fidelidad ni cambio de política AA.
-test('Chart diagnóstico de raster: mono y motivo real del compositor', async ({}, info) => {
-  test.setTimeout(90_000)
-  const source = prepare(CHART_FIXTURES[0], 'light'), { app, page, errors } = await start(source.home, false, 1, true)
-  const records: unknown[] = [], cleanupErrors: string[] = []
-  let session: CDPSession | undefined, observation: Awaited<ReturnType<typeof beginChartCompositorObservation>> | undefined
-  let failed = false, failure: unknown, observationResult: unknown
-  const detail = (error: unknown) => error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
-  try {
-    await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
-    const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
-    await expect(body).toBeVisible()
-    await evaluateElement<void>(figure, `root=>{document.documentElement.style.fontSize='18px';root.style.fontFamily='var(--font-mono)';root.style.zoom='1.25';root.querySelector('[data-chart-export-body]').style.zoom='1.4';}`)
-    await page.evaluate('document.fonts.ready'); await body.scrollIntoViewIfNeeded(); await page.mouse.move(8, 8); await page.waitForTimeout(300)
-    const baseline = await snapshotChartReference(body)
-    const native = async () => ({
-      main: await app.evaluate(({ app: main, BrowserWindow, screen }) => {
-        const windows = BrowserWindow.getAllWindows()
-        if (windows.length !== 1) throw new Error('Raster diagnostic lost its source window')
-        const win = windows[0], bounds = win.getContentBounds()
-        return { id: win.webContents.id, startupFactor: main.commandLine.getSwitchValue('force-device-scale-factor'), screenFactor: screen.getDisplayMatching(win.getBounds()).scaleFactor, pageZoom: win.webContents.getZoomFactor(), width: bounds.width, height: bounds.height, visible: win.isVisible(), backgroundThrottling: win.webContents.getBackgroundThrottling() }
-      }),
-      dom: await page.evaluate('({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,scrollX,scrollY,visibilityState:document.visibilityState,hidden:document.hidden,visual:visualViewport?{width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale,offsetLeft:visualViewport.offsetLeft,offsetTop:visualViewport.offsetTop}:null})'),
-      playwrightViewport: page.viewportSize()
-    })
-    const nativeBaseline = await native(), viewport = { width: nativeBaseline.main.width, height: nativeBaseline.main.height }
-    records.push({ stage: 'native-viewport', requested: { width: 1440, height: 1100 }, actual: viewport, nativeBaseline })
-    expect(nativeBaseline.main).toMatchObject({ startupFactor: '1', screenFactor: 1, pageZoom: 1, visible: false, backgroundThrottling: true })
-    expect(nativeBaseline.dom).toMatchObject({ ...viewport, dpr: 1, scrollX: 0, scrollY: 0, visual: { ...viewport, scale: 1, offsetLeft: 0, offsetTop: 0 } })
-    expect(nativeBaseline.playwrightViewport).toBeNull()
-    type Box = { x: number; y: number; width: number; height: number }
-    type Svg = { box: Box; svgBox: Box; ctm: unknown; ranges: Box[] }
-    const context = await evaluateElement<{ ink: Box; ancestors: unknown[]; externalMaterials: unknown[] }>(body, `root=>{
-      const rect=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}};
-      const nodes=[root,...root.querySelectorAll('*')];if(nodes.length>5000)throw new Error('Diagnostic Chart is unexpectedly large');
-      const boxes=nodes.map(rect).filter(b=>b.width>0&&b.height>0);
-      const left=Math.min(...boxes.map(b=>b.x)),top=Math.min(...boxes.map(b=>b.y)),right=Math.max(...boxes.map(b=>b.x+b.width)),bottom=Math.max(...boxes.map(b=>b.y+b.height));
-      const read=e=>{const c=getComputedStyle(e);return{tag:e.tagName,id:e.id,className:e.getAttribute('class'),box:rect(e),style:e.getAttribute('style'),opacity:c.opacity,transform:c.transform,willChange:c.willChange,filter:c.filter,backdropFilter:c.backdropFilter,contain:c.contain,isolation:c.isolation,mixBlendMode:c.mixBlendMode,backgroundColor:c.backgroundColor,backgroundImage:c.backgroundImage,borderRadius:c.borderRadius,overflowX:c.overflowX,overflowY:c.overflowY,maskImage:c.maskImage,animationName:c.animationName,animationPlayState:c.animationPlayState}};
-      const ancestors=[];for(let at=root;at;at=at.parentElement){if(ancestors.length===64)throw new Error('Diagnostic ancestor bound');ancestors.push(read(at));}
-      const external=[...document.querySelectorAll('.material-bar,.material-menu,.material-sidebar')];if(external.length>16)throw new Error('Diagnostic material bound');
-      return{ink:{x:left,y:top,width:right-left,height:bottom-top},ancestors,externalMaterials:external.map(read)};
-    }`)
-    requireContainedChartClip(context.ink, viewport)
-    records.push({ stage: 'setup', baseline, nativeBaseline, context })
-    session = await page.context().newCDPSession(page)
-    const captureStage = async (stage: string): Promise<{ png: Buffer; svg: Svg }> => {
-      const before = await snapshotChartReference(body), contextBefore = await native()
-      const svg = await evaluateElement<Svg>(body, `root=>{const texts=[...root.querySelectorAll('svg text')].filter(e=>e.textContent==='−7');if(texts.length!==1)throw new Error('Diagnostic SVG text is not unique');const e=texts[0],r=e.getBoundingClientRect(),b=e.getBBox(),m=e.getScreenCTM(),range=document.createRange();range.selectNodeContents(e);return{box:{x:r.x,y:r.y,width:r.width,height:r.height},svgBox:{x:b.x,y:b.y,width:b.width,height:b.height},ctm:m?{a:m.a,b:m.b,c:m.c,d:m.d,e:m.e,f:m.f}:null,ranges:[...range.getClientRects()].map(r=>({x:r.x,y:r.y,width:r.width,height:r.height}))}}`)
-      const args = { format: 'png' as const, fromSurface: true, captureBeyondViewport: false }
-      // Estos tiempos sólo delimitan llamadas en el runner; jamás se comparan con trace.ts.
-      const started = performance.now(), response = await session!.send('Page.captureScreenshot', args), ended = performance.now()
-      const png = Buffer.from(response.data, 'base64'), path = info.outputPath(stage + '.png')
-      writeFileSync(path, png)
-      const after = await snapshotChartReference(body), contextAfter = await native(), dimensions = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
-      records.push({ stage, diagnosticOnly: true, args, started, ended, before, after, contextBefore, contextAfter, svg, dimensions, sha256: pngHash(png) })
-      await info.attach(stage + '.png', { path, contentType: 'image/png' })
-      assertChartCaptureInvariant(baseline, before); assertChartCaptureInvariant(before, after)
-      expect(contextBefore).toEqual(nativeBaseline); expect(contextAfter).toEqual(nativeBaseline); expect(dimensions).toEqual(viewport)
-      return { png, svg }
-    }
-    const a = await captureStage('A-native-untraced')
-    observation = await beginChartCompositorObservation(app, session, info.outputPath('mono-compositor-trace.json'), a.svg.box)
-    const b = await captureStage('B-native-traced')
-    const path = join(source.home, 'mono-compositor-export.png')
-    await save(app, page, figure, path)
-    // Se termina el trace antes de decodificar/comparar PNGs o efectuar lecturas adicionales.
-    observationResult = await observation.finish()
-    records.push({ stage: 'compositor-observation', result: observationResult })
-    await inspect(page, path, info, 'mono-compositor-export')
-    records.push({ stage: 'product-export', diagnosticOnly: true, sha256: pngHash(readFileSync(path)), audit: await app.evaluate(() => (globalThis as unknown as MainAudit).chartAudit) })
-    await expect(page.getByRole('menuitem', { includeHidden: true })).toHaveCount(0)
-    const c = await captureStage('C-native-after-trace')
-    const comparisons = { instrumented: await compareCompositorSourcePixels(page, a.png, b.png, context.ink, a.svg.box), restored: await compareCompositorSourcePixels(page, a.png, c.png, context.ink, a.svg.box) }
-    records.push({ stage: 'source-pixel-controls', comparisons })
-    expect(b.svg).toEqual(a.svg); expect(c.svg).toEqual(a.svg)
-    expect(observationResult).toMatchObject({ collectionComplete: true })
-    // La igualdad verifica sólo el efecto observador en la fuente; la política AA sigue pendiente.
-    expect(comparisons.instrumented).toMatchObject({ chart: { rgbaEqual: true }, glyph: { rgbaEqual: true } })
-    expect(comparisons.restored).toMatchObject({ chart: { rgbaEqual: true }, glyph: { rgbaEqual: true } })
-    expect(readFileSync(source.skillPath, 'utf8')).toBe(source.skillBytes); expect(errors).toEqual([])
-  } catch (error) { failed = true; failure = error; records.push({ stage: 'failure', error: detail(error) }) }
-  finally {
-    if (observation) {
-      try { observationResult = await observation.finish(); records.push({ stage: 'compositor-cleanup', result: observationResult }) }
-      catch (error) { cleanupErrors.push('compositor: ' + String(error)) }
-    }
-    if (session) { try { await session.detach() } catch (error) { cleanupErrors.push('session: ' + String(error)) } }
-    const output = info.outputPath('mono-compositor-diagnostic.json')
-    writeFileSync(output, JSON.stringify({ diagnosticCollectionPassed: false, fidelityConclusion: 'unapproved; original mono oracle unchanged', cleanupPending: true, records, cleanupErrors }, null, 2))
-    try { await closeWithAudit(app, info) } catch (error) { cleanupErrors.push('app: ' + String(error)) }
-    writeFileSync(output, JSON.stringify({ diagnosticCollectionPassed: !failed && cleanupErrors.length === 0, fidelityConclusion: 'unapproved; stored layer state is not a per-glyph guarantee', records, cleanupErrors }, null, 2))
-  }
-  if (failed) throw failure
-  expect(cleanupErrors).toEqual([])
 })
 
 test('Chart PNG: idioma árabe y dirección DOM efectiva se conservan', async ({}, info) => {

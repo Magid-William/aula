@@ -1,6 +1,6 @@
 // Pruebas puras del oráculo: rasters sintéticos, sin Electron, navegador ni datos del usuario.
 import { test, expect } from 'playwright/test'
-import { assertDiagramPixelComparison, diagramPixelOracle, resampleDiagramPixels, type LiveDiagramGeometry, type PixelRaster } from './diagram-pixels'
+import { assertDiagramPixelComparison, diagramPixelOracle, resampleDiagramPixels, type DiagramPixelOptions, type LiveDiagramGeometry, type PixelRaster } from './diagram-pixels'
 
 type RGB = [number, number, number]
 interface Rect { x: number; y: number; width: number; height: number; color: RGB }
@@ -22,19 +22,23 @@ for (let i = 0; i < 5; i++) {
 function blank(width = WIDTH, height = HEIGHT): PixelRaster {
   return { width, height, data: Uint8ClampedArray.from({ length: width * height * 4 }, (_, i) => i % 4 === 3 ? 255 : PAPER[i % 4]) }
 }
-/** Cobertura analítica de rectángulos: no usa el resampler ni la presentación del exportador. */
-function paint(raster: PixelRaster, rect: Rect): void {
+/** Cobertura analítica de rectángulos: no usa el resampler ni la presentación del exportador.
+ * `subpixel` desplaza R y B ±subpixel píxeles respecto de G, como el antialias LCD/ClearType. */
+function paint(raster: PixelRaster, rect: Rect, subpixel = 0): void {
   const data = raster.data as Uint8ClampedArray
-  for (let y = Math.max(0, Math.floor(rect.y)); y < Math.min(raster.height, Math.ceil(rect.y + rect.height)); y++) {
-    for (let x = Math.max(0, Math.floor(rect.x)); x < Math.min(raster.width, Math.ceil(rect.x + rect.width)); x++) {
-      const area = Math.max(0, Math.min(x + 1, rect.x + rect.width) - Math.max(x, rect.x)) * Math.max(0, Math.min(y + 1, rect.y + rect.height) - Math.max(y, rect.y))
-      for (let c = 0; c < 3; c++) { const at = (y * raster.width + x) * 4 + c; data[at] = data[at] * (1 - area) + rect.color[c] * area }
+  for (let c = 0; c < 3; c++) {
+    const left = rect.x + (c - 1) * subpixel
+    for (let y = Math.max(0, Math.floor(rect.y)); y < Math.min(raster.height, Math.ceil(rect.y + rect.height)); y++) {
+      for (let x = Math.max(0, Math.floor(left)); x < Math.min(raster.width, Math.ceil(left + rect.width)); x++) {
+        const area = Math.max(0, Math.min(x + 1, left + rect.width) - Math.max(x, left)) * Math.max(0, Math.min(y + 1, rect.y + rect.height) - Math.max(y, rect.y))
+        const at = (y * raster.width + x) * 4 + c; data[at] = data[at] * (1 - area) + rect.color[c] * area
+      }
     }
   }
 }
-function fixture(dx = 0, dy = 0, width = WIDTH, height = HEIGHT): PixelRaster {
+function fixture(dx = 0, dy = 0, width = WIDTH, height = HEIGHT, inkSubpixel = 0): PixelRaster {
   const raster = blank(width, height)
-  for (const mark of marks) paint(raster, { ...mark, x: mark.x + dx, y: mark.y + dy })
+  for (const mark of marks) paint(raster, { ...mark, x: mark.x + dx, y: mark.y + dy }, mark.color === INK ? inkSubpixel : 0)
   return raster
 }
 function changed(raster: PixelRaster, rect: Rect): PixelRaster {
@@ -43,9 +47,9 @@ function changed(raster: PixelRaster, rect: Rect): PixelRaster {
 function geometry(): LiveDiagramGeometry {
   return { width: WIDTH, height: HEIGHT, canvas: { x: 0, y: 0, width: WIDTH, height: HEIGHT, naturalWidth: WIDTH, naturalHeight: HEIGHT, scale: 1 }, background: PAPER, exclusions: [], labels: [FORMULA, GLYPH] }
 }
-function verify(source: PixelRaster, exported: PixelRaster, live = geometry()) {
-  const result = diagramPixelOracle(source, exported, live)
-  assertDiagramPixelComparison(result, live)
+function verify(source: PixelRaster, exported: PixelRaster, live = geometry(), options: DiagramPixelOptions = {}) {
+  const result = diagramPixelOracle(source, exported, live, options)
+  assertDiagramPixelComparison(result, live, options)
   return result
 }
 
@@ -150,4 +154,31 @@ test('oráculo Diagram: una fórmula tenue sigue protegida si el filtro borra su
   expect(baseline.raw.labels[1].recall.total).toBe(12)
   const missing = changed(exported, { x: 180, y: 45, width: 1, height: 12, color: PANEL })
   expect(() => verify(source, missing, live)).toThrow(/Missing math pixels/)
+})
+
+test('oráculo Diagram: etiquetas en gris toleran antialias LCD sin aceptar glifos perdidos, extra o desplazados', () => {
+  const source = fixture(), padded = fixture(4, 6, WIDTH + 8, HEIGHT + 12), gray: DiagramPixelOptions = { labelInk: 'gray' }
+  // Tinta con R y B a ±1/3 de píxel: misma cobertura media, franjas de color en los bordes.
+  const lcd = fixture(4, 6, WIDTH + 8, HEIGHT + 12, 1 / 3)
+  expect(() => verify(source, lcd)).toThrow(/Missing math pixels/)
+  const result = verify(source, lcd, geometry(), gray)
+  expect(result.labelInk).toBe('gray')
+  for (const label of result.labels) { expect(label.recall.ratio).toBeGreaterThan(.99); expect(label.precision.ratio).toBeGreaterThan(.99) }
+  expect(() => verify(source, changed(padded, { x: 180, y: 47, width: 3, height: 4, color: PANEL }), geometry(), gray)).toThrow(/Missing math pixels/)
+  expect(() => verify(source, changed(padded, { x: 57, y: 41, width: 15, height: 22, color: INK }), geometry(), gray)).toThrow(/math pixels/)
+  const shifted = changed(padded, { x: 30, y: 39, width: 170, height: 32, color: PANEL })
+  for (const mark of marks.filter(mark => mark.color === INK)) paint(shifted, { ...mark, x: mark.x + 10, y: mark.y + 6 })
+  expect(() => verify(source, shifted, geometry(), gray)).toThrow()
+  // El gris no mira el tono: un texto de otro color con la misma media lo rechaza la figura completa, en RGB.
+  const recolored = blank(WIDTH + 8, HEIGHT + 12)
+  for (const mark of marks) paint(recolored, { ...mark, x: mark.x + 4, y: mark.y + 6, color: mark.color === INK ? [95, 5, 0] : mark.color })
+  expect(() => verify(source, recolored, geometry(), gray)).toThrow(/Diagram foreground recall/)
+})
+
+test('oráculo Diagram: sin suelos por etiqueta sigue exigiendo la figura completa', () => {
+  const source = fixture(), padded = fixture(4, 6, WIDTH + 8, HEIGHT + 12), report: DiagramPixelOptions = { labelInk: 'gray', labelFloors: false }
+  // Sin suelos finos sigue el de presencia: una etiqueta que desaparece entera no pasa.
+  expect(() => verify(source, changed(padded, { x: 180, y: 47, width: 3, height: 4, color: PANEL }), geometry(), report)).toThrow(/Missing .* pixels \(0\.0000\)/)
+  expect(() => verify(source, changed(padded, { x: 30, y: 104, width: 170, height: 4, color: PANEL }), geometry(), report)).toThrow(/Diagram foreground recall/)
+  expect(() => verify(source, changed(padded, { x: 30, y: 39, width: 170, height: 32, color: PANEL }), geometry(), report)).toThrow(/Diagram foreground recall/)
 })

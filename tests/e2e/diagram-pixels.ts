@@ -19,6 +19,15 @@ export interface LiveDiagramGeometry {
   expectedEmpty?: boolean
 }
 export interface PixelRaster { width: number; height: number; data: ArrayLike<number> }
+/** Opt-in del oráculo. Sin opciones mide igual que #41: etiquetas en RGB y con suelos por etiqueta. */
+export interface DiagramPixelOptions {
+  /** 'gray': la tinta de cada etiqueta se compara por la media de sus tres canales, es decir, la cobertura media
+   * de los subpíxeles. Así el antialias LCD/ClearType de un raster no cuenta como otro color. Las marcas completas
+   * (all, alineación) siguen en RGB, y ahí se detecta un color equivocado. */
+  labelInk?: 'rgb' | 'gray'
+  /** false: las etiquetas se miden e informan en el JSON, pero sin suelos por etiqueta. */
+  labelFloors?: boolean
+}
 interface MatchScore { total: number; matched: number; ratio: number }
 interface LabelScore { text: string; kind: 'text' | 'math'; exposedPixels: number; background: number[]; recall: MatchScore; precision: MatchScore; skipped: boolean }
 export interface DiagramPixelComparison {
@@ -28,6 +37,7 @@ export interface DiagramPixelComparison {
   alignment: { dx: number; dy: number; samples: number; averageColorError: number; search: { minX: number; maxX: number; minY: number; maxY: number } }
   all: { recall: MatchScore; precision: MatchScore }
   labels: LabelScore[]
+  labelInk: 'rgb' | 'gray'
   raw: { all: { recall: MatchScore; precision: MatchScore }; labels: LabelScore[]; exportedForeground: number; alignment: DiagramPixelComparison['alignment'] }
 }
 
@@ -49,7 +59,10 @@ export function resampleDiagramPixels(raster: PixelRaster, width: number, height
 }
 
 /** Función pura, autocontenida también al serializarla para ejecutarla junto al decoder del navegador. */
-export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, geometry: LiveDiagramGeometry): DiagramPixelComparison {
+export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, geometry: LiveDiagramGeometry, options: DiagramPixelOptions = {}): DiagramPixelComparison {
+  const labelInk = options.labelInk === 'gray' ? 'gray' as const : 'rgb' as const
+  // Lineal: salvo redondeo, equivale a pasar a gris antes del filtro, del remuestreo y de la interpolación bilineal.
+  const labelTone = (c: number[]): number[] => { if (labelInk === 'rgb') return c; const m = (c[0] + c[1] + c[2]) / 3; return [m, m, m] }
   // El mismo filtro binomial 3×3 (σ≈0,707 píxeles CSS) en ambos rasters; radio y umbrales intactos.
   function normalize(raster: PixelRaster): PixelRaster {
     const horizontal = new Float64Array(raster.data.length), data = new Uint8ClampedArray(raster.data.length)
@@ -63,7 +76,7 @@ export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, g
     }
     return { width: raster.width, height: raster.height, data }
   }
-  function measureRasters(source: PixelRaster, exported: PixelRaster): Omit<DiagramPixelComparison, 'raw'> {
+  function measureRasters(source: PixelRaster, exported: PixelRaster): Omit<DiagramPixelComparison, 'raw' | 'labelInk'> {
     const maxChannel = (a: number[], b: number[]): number => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]))
     const distance = (a: number[], b: number[]): number => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])
     const rgb = (r: PixelRaster, x: number, y: number): number[] => {
@@ -138,28 +151,30 @@ export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, g
         for (let y = centerY - reach; y <= centerY + reach; y += step) for (let x = centerX - reach; x <= centerX + reach; x += step) if (x >= minX && x <= maxX && y >= minY && y <= maxY) tryOffset(x, y)
       }
     }
-    const matched = (r: PixelRaster, x: number, y: number, color: number[], background: number[]): boolean => {
+    const same = (c: number[]): number[] => c
+    const matched = (r: PixelRaster, x: number, y: number, color: number[], background: number[], tone: (c: number[]) => number[]): boolean => {
       // Un solo píxel de tolerancia para antialias/subpixel; no puede ocultar el desplazamiento de una línea completa.
       for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
         const xx = x + ox, yy = y + oy
         if (!inside(r, xx, yy)) continue
-        const other = rgb(r, xx, yy)
+        const other = tone(rgb(r, xx, yy))
         if (foreground(other, background, 18) && distance(color, other) <= 54 && maxChannel(color, other) <= 30) return true
       }
       return false
     }
-    function measure(box: PixelRect, background: number[]): { recall: MatchScore; precision: MatchScore; exposedPixels: number } {
+    // `tone` se aplica a ambos rasters y al fondo; umbrales y radio no cambian.
+    function measure(box: PixelRect, background: number[], tone: (c: number[]) => number[] = same): { recall: MatchScore; precision: MatchScore; exposedPixels: number } {
       let sourceTotal = 0, sourceMatched = 0, outputTotal = 0, outputMatched = 0, exposedPixels = 0
       const left = Math.max(0, Math.floor(box.x)), top = Math.max(0, Math.floor(box.y)), right = Math.min(source.width, Math.ceil(box.x + box.width)), bottom = Math.min(source.height, Math.ceil(box.y + box.height))
       for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) {
         if (!exposed(x, y)) continue
         exposedPixels++
-        const color = rgb(source, x, y)
-        if (foreground(color, background)) { sourceTotal++; if (matched(exported, x + dx, y + dy, color, background)) sourceMatched++ }
+        const color = tone(rgb(source, x, y))
+        if (foreground(color, background)) { sourceTotal++; if (matched(exported, x + dx, y + dy, color, background, tone)) sourceMatched++ }
         const ex = Math.round(x + dx), ey = Math.round(y + dy)
         if (!inside(exported, ex, ey)) continue
-        const other = rgb(exported, ex, ey)
-        if (foreground(other, background)) { outputTotal++; if (matched(source, ex - dx, ey - dy, other, background)) outputMatched++ }
+        const other = tone(rgb(exported, ex, ey))
+        if (foreground(other, background)) { outputTotal++; if (matched(source, ex - dx, ey - dy, other, background, tone)) outputMatched++ }
       }
       return { recall: score(sourceTotal, sourceMatched), precision: score(outputTotal, outputMatched), exposedPixels }
     }
@@ -177,7 +192,7 @@ export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, g
     }
     const all = measure({ x: 0, y: 0, width: source.width, height: source.height }, geometry.background)
     const labels = geometry.labels.map(label => {
-      const background = modalBackground(label), result = measure(label, background)
+      const background = labelTone(modalBackground(label)), result = measure(label, background, labelTone)
       return { text: label.text, kind: label.kind ?? 'text' as const, background, ...result, skipped: result.exposedPixels < 24 }
     })
     let exportedForeground = 0
@@ -190,11 +205,11 @@ export function diagramPixelOracle(source: PixelRaster, exported: PixelRaster, g
     }
   }
   const raw = measureRasters(source, exported), normalized = measureRasters(normalize(source), normalize(exported))
-  return { ...normalized, raw: { all: raw.all, labels: raw.labels, exportedForeground: raw.exported.foreground, alignment: raw.alignment } }
+  return { ...normalized, labelInk, raw: { all: raw.all, labels: raw.labels, exportedForeground: raw.exported.foreground, alignment: raw.alignment } }
 
 }
 
-export function assertDiagramPixelComparison(result: DiagramPixelComparison, geometry: LiveDiagramGeometry): void {
+export function assertDiagramPixelComparison(result: DiagramPixelComparison, geometry: LiveDiagramGeometry, options: DiagramPixelOptions = {}): void {
   const check = (ok: boolean, message: string): void => { if (!ok) throw new Error(message) }
   if (geometry.expectedEmpty) {
     check(result.raw.all.recall.total < 24 && result.raw.exportedForeground < 24, `Blank fixture contains foreground: source=${result.raw.all.recall.total}, complete output=${result.raw.exportedForeground}`)
@@ -211,14 +226,16 @@ export function assertDiagramPixelComparison(result: DiagramPixelComparison, geo
     // Si el filtro elimina toda la tinta tenue, su 0/0 no demuestra que siga presente.
     // El contraste crudo ya validado conserva la misma exigencia local para ambos sentidos.
     const ink = label.recall.total === 0 ? result.raw.labels[index] : label
-    check(ink.recall.ratio >= .86, `Missing ${label.kind} pixels (${ink.recall.ratio.toFixed(4)}): ${label.text}`)
-    check(ink.precision.ratio >= .82, `Extra ${label.kind} pixels (${ink.precision.ratio.toFixed(4)}): ${label.text}`)
+    // Sin suelos finos (zoom fraccionario): aún se exige que cada etiqueta esté y no sobre tinta ajena.
+    const [minRecall, minPrecision] = options.labelFloors === false ? [.5, .5] : [.86, .82]
+    check(ink.recall.ratio >= minRecall, `Missing ${label.kind} pixels (${ink.recall.ratio.toFixed(4)}): ${label.text}`)
+    check(ink.precision.ratio >= minPrecision, `Extra ${label.kind} pixels (${ink.precision.ratio.toFixed(4)}): ${label.text}`)
   }
 }
 
 /** PNG decodificado por Image/Canvas del navegador; el cálculo usa sólo sus píxeles finales. */
-export async function compareDiagramPixels(page: Page, live: Buffer, saved: Buffer, geometry: LiveDiagramGeometry, info: TestInfo, name: string, sourceRaster: 'css' | 'dense' = 'css'): Promise<DiagramPixelComparison> {
-  const input = { before: live.toString('base64'), after: saved.toString('base64'), geometry, sourceRaster }
+export async function compareDiagramPixels(page: Page, live: Buffer, saved: Buffer, geometry: LiveDiagramGeometry, info: TestInfo, name: string, sourceRaster: 'css' | 'dense' = 'css', options: DiagramPixelOptions = {}): Promise<DiagramPixelComparison> {
+  const input = { before: live.toString('base64'), after: saved.toString('base64'), geometry, sourceRaster, options }
   // Se inserta nuestra función pura, nunca contenido ejecutable suministrado por el documento.
   const script = `(async () => {
     const input = ${JSON.stringify(input).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')};
@@ -233,12 +250,12 @@ export async function compareDiagramPixels(page: Page, live: Buffer, saved: Buff
     }
     const compare = ${diagramPixelOracle.toString()};
     // La fuente densa vuelve al viewport DOM exacto: la calibración CDP puede redondear un píxel.
-    return compare(await decode(input.before, 1, input.sourceRaster === 'dense' ? input.geometry : undefined), await decode(input.after, input.geometry.canvas.scale / 2), input.geometry);
+    return compare(await decode(input.before, 1, input.sourceRaster === 'dense' ? input.geometry : undefined), await decode(input.after, input.geometry.canvas.scale / 2), input.geometry, input.options);
   })()`
   const result = await page.evaluate<DiagramPixelComparison>(script)
   const path = info.outputPath(`${name}-live-comparison.json`)
-  writeFileSync(path, JSON.stringify(result, null, 2))
+  writeFileSync(path, JSON.stringify({ labelFloors: options.labelFloors !== false, ...result }, null, 2))
   await info.attach(`${name}-live-comparison.json`, { path, contentType: 'application/json' })
-  assertDiagramPixelComparison(result, geometry)
+  assertDiagramPixelComparison(result, geometry, options)
   return result
 }
