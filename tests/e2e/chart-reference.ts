@@ -2,7 +2,7 @@
 // No lee escenas DTO, atributos de exportación en las hojas ni helpers de bounds del producto.
 import { writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import type { CDPSession, JSHandle, Locator, Page, TestInfo } from 'playwright/test'
+import type { CDPSession, ElectronApplication, JSHandle, Locator, Page, TestInfo } from 'playwright/test'
 import type { LiveDiagramGeometry, PixelRect } from './diagram-pixels'
 
 export interface ChartReferenceSnapshot {
@@ -43,6 +43,7 @@ export interface ChartReference {
     isolation: { matte: PixelRect; hidden: Array<{ tag: string; className: string }>; maskedInk: false }
     capture: {
       api: 'Page.captureScreenshot'; sourceDpr: number; raster: 'dense'; width: number; height: number
+      nativeContext: ChartNativeContext
       calibration: { width: number; height: number; pixelsPerCss: number }; requestedScale: number; desiredPixelsPerCss: number
       observations: Array<{ stage: string; before: ChartReferenceSnapshot; after: ChartReferenceSnapshot }>
     }
@@ -55,11 +56,30 @@ export interface ChartReference {
 // Texto/estilos/atributos siguen exactos; sólo BCR admite su precisión observacional Float32.
 const INVARIANT_TOLERANCE = 1e-6
 const placements = new WeakMap<Locator, ChartPlacementObservation>()
+interface ChartNativeContext { startupFactor: string; screenFactor: number; pageZoom: number; dpr: number }
+const nativeContexts = new WeakMap<Page, ChartNativeContext>()
 const protocols = new WeakMap<Page, { session: CDPSession; sourceDpr: number }>()
+
+/** Antes del viewport/CDP, comprueba el factor nativo real: el DPR emulado no identifica la rejilla de layout. */
+export async function assertNativeChartContext(app: ElectronApplication, page: Page, sourceDpr: 1 | 2): Promise<void> {
+  if (nativeContexts.has(page) || protocols.has(page)) throw new Error('Chart native context must be checked once before emulation')
+  const native = await app.evaluate(({ app: main, BrowserWindow, screen }) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length !== 1) throw new Error('Chart native context requires its single source window')
+    const win = windows[0]
+    return { startupFactor: main.commandLine.getSwitchValue('force-device-scale-factor'), screenFactor: screen.getDisplayMatching(win.getBounds()).scaleFactor, pageZoom: win.webContents.getZoomFactor() }
+  })
+  const dpr = await page.evaluate<number>('devicePixelRatio')
+  if (native.startupFactor !== String(sourceDpr) || native.screenFactor !== sourceDpr || native.pageZoom !== 1 || dpr !== sourceDpr) {
+    throw new Error(`Chart native context differs from requested factor ${sourceDpr}: ${JSON.stringify({ ...native, dpr })}`)
+  }
+  nativeContexts.set(page, { ...native, dpr })
+}
 
 /** El viewport de Playwright restablece DPR=1; fijamos y comprobamos la densidad real antes del caso. */
 export async function initializeChartReference(page: Page, sourceDpr: 1 | 2): Promise<void> {
   if (protocols.has(page)) throw new Error('Chart reference protocol is already initialized')
+  if (nativeContexts.get(page)?.dpr !== sourceDpr) throw new Error('Verify the matching native Chart context before emulation')
   const viewport = page.viewportSize()
   if (!viewport) throw new Error('Chart reference needs an explicit viewport')
   const session = await page.context().newCDPSession(page)
@@ -536,7 +556,7 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
     }
     const metadata: ChartReference['metadata'] = {
       clip, ink, canvasOffset: { x: geometry.canvas.x, y: geometry.canvas.y }, isolation: await isolation.evaluate(state => state.metadata),
-      capture: { api: 'Page.captureScreenshot', sourceDpr: protocol.sourceDpr, raster: 'dense', width, height, calibration: { width: calibrationWidth, height: calibrationHeight, pixelsPerCss }, requestedScale, desiredPixelsPerCss, observations },
+      capture: { api: 'Page.captureScreenshot', sourceDpr: protocol.sourceDpr, raster: 'dense', nativeContext: nativeContexts.get(body.page())!, width, height, calibration: { width: calibrationWidth, height: calibrationHeight, pixelsPerCss }, requestedScale, desiredPixelsPerCss, observations },
       invariantTolerance: INVARIANT_TOLERANCE, geometryTolerance, placement
     }
     if (info) {

@@ -9,7 +9,7 @@ import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { CHART_FIXTURES, type ChartFixture } from './chart-fixtures'
 import { waitForPieHover } from './chart-hover-readiness'
 import { compareDiagramPixels } from './diagram-pixels'
-import { assertChartReferenceInvariant, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, snapshotChartReference } from './chart-reference'
+import { assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, snapshotChartReference } from './chart-reference'
 import { assertChartRasterConsistency, compareChartRasterConsistency, type ChartRasterConsistency } from './chart-raster-consistency'
 import { go, homeWithDemoCourse } from './helpers'
 
@@ -74,8 +74,9 @@ async function start(home: string, dpr2: boolean): Promise<{ app: ElectronApplic
         }) as typeof wc.executeJavaScript
       })
     })
-    await page.setViewportSize({ width: 1440, height: 1100 })
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
+    await assertNativeChartContext(app, page, sourceDpr)
+    await page.setViewportSize({ width: 1440, height: 1100 })
     await initializeChartReference(page, sourceDpr)
     return { app, page, errors }
   } catch (error) { await app.close().catch(() => undefined); throw error }

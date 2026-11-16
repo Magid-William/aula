@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import type { BlockOf } from '../../src/shared/schema/blocks'
 import type { ChartRenderSceneV1 } from '../../src/shared/figuresChart'
 import { CHART_FIXTURES } from './chart-fixtures'
-import { assertChartReferenceInvariant, snapshotChartReference } from './chart-reference'
+import { assertChartReferenceInvariant, assertNativeChartContext, snapshotChartReference } from './chart-reference'
 import { pieEntranceClockExpression, type PieEntranceReport } from './chart-entrance-clock'
 import { go, homeWithDemoCourse } from './helpers'
 
@@ -65,8 +65,9 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
         }) as typeof win.webContents.executeJavaScript
       })
     })
-    await page.setViewportSize({ width: 1440, height: 1100 })
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
+    await assertNativeChartContext(app, page, 1)
+    await page.setViewportSize({ width: 1440, height: 1100 })
     if (entrance) await page.evaluate(pieEntranceClockExpression)
     await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
     const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
