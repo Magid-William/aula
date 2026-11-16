@@ -11,6 +11,7 @@ export interface PieEntranceCommit { body: object; paths: string[] }
 export interface PieEntranceReport {
   phase: string
   firstPaths: string[]
+  firstCommitNativeTimestamp: number | null
   frozenTimestamp: number | null
   elapsedToCommit: number | null
   coherentPaths: string[]
@@ -33,7 +34,7 @@ export function installPieEntranceClock(
   const rafDescriptor = Object.getOwnPropertyDescriptor(host, 'requestAnimationFrame')
   const nowDescriptor = Object.getOwnPropertyDescriptor(host.performance, 'now')
   const started = realNow()
-  const state: PieEntranceReport = { phase: 'native', firstPaths: [], frozenTimestamp: null, elapsedToCommit: null, coherentPaths: [], deliveriesAfterFreeze: 0, steps: [] }
+  const state: PieEntranceReport = { phase: 'native', firstPaths: [], firstCommitNativeTimestamp: null, frozenTimestamp: null, elapsedToCommit: null, coherentPaths: [], deliveriesAfterFreeze: 0, steps: [] }
   let disposed = false, frozen = false, lastTimestamp: number | null = null, logicalTime = 0
   let first: PieEntranceCommit | null = null, disconnect: (() => void) | undefined
   let timer: number | undefined, frame: number | undefined, deadline = started + deadlineMs
@@ -98,11 +99,13 @@ export function installPieEntranceClock(
       const current = read()
       withinDeadline()
       if (!current || current.paths.length === 0) return
-      if (current.paths.length >= 8) throw new Error('Pie first nonempty commit is already complete; no partial entrance was captured')
+      state.firstPaths = [...current.paths]; state.firstCommitNativeTimestamp = lastTimestamp
+      state.elapsedToCommit = realNow() - started
+      // Ocho sectores pueden estar todavía animándose: el test exige el primer commit de 1..7.
+      if (current.paths.length >= 8) throw new Error('Pie first nonempty commit already contains all sectors; no 1..7 sector entrance was captured')
       if (lastTimestamp === null) throw new Error('Pie partial commit has no preceding native RAF delivery')
       first = { body: current.body, paths: [...current.paths] }
-      state.firstPaths = [...current.paths]; state.frozenTimestamp = lastTimestamp
-      state.elapsedToCommit = realNow() - started; state.phase = 'frozen'
+      state.frozenTimestamp = lastTimestamp; state.phase = 'frozen'
       frozen = true; logicalTime = lastTimestamp
       disconnect?.(); disconnect = undefined
       barrier = { kind: 'checkpoint', milliseconds: 0, resolve: () => undefined, reject: () => undefined }
@@ -143,6 +146,8 @@ export function installPieEntranceClock(
 export const pieEntranceClockExpression = `(() => {
   if (window.__chartEntranceClock) throw new Error('Pie entrance clock is already installed');
   const read = () => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('reduce-motion'))
+      throw new Error('Pie entrance requires enabled source motion');
     const bodies = [...document.querySelectorAll('[data-chart-export-body]')];
     if (bodies.length > 1) throw new Error('Pie entrance requires one Chart fixture');
     const body = bodies[0]; if (!body) return null;

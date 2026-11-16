@@ -70,7 +70,9 @@ export interface ChartRenderSceneV1 {
   chartKind: 'bar' | 'line' | 'area' | 'pie' | 'scatter' | 'histogram'
   branch: 'empty' | 'vertical-bars' | 'horizontal-bars' | 'cartesian' | 'donut'
   canvas: { width: number; height: number }
-  metrics: { rootFontPx: number } & FigureTypography
+  // EffectiveZoom Float32 de Blink: incluye InitialZoom nativo y los zoom CSS de origen.
+  // cssZoom conserva el significado tipográfico compartido; no sustituye este valor.
+  metrics: { rootFontPx: number; rawEffectiveZoom: number } & FigureTypography
   appearance: {
     theme: 'light' | 'dark'
     language: string

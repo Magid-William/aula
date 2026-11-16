@@ -2,6 +2,7 @@
 import type { ChartBox, ChartLayer, ChartPaint, ChartRenderSceneV1, ChartSvgPrimitive } from '@shared/figuresChart'
 import { FIGURE_RENDER_LIMITS } from '@shared/figuresRender'
 import { FIGURE_CSS_ZOOM_LIMITS } from '@shared/figuresTypography'
+import { CHART_LAYOUT_LIMITS, resolveWrapperZoom } from '@shared/chartLayout'
 import { FigureSceneReader, failFigure as fail } from './render-reader'
 
 export const CHART_LIMITS = {
@@ -11,7 +12,7 @@ export const CHART_LIMITS = {
 
 /** Incluye todos los elementos y nodos de texto, incluso líneas vacías, antes de crear DOM. */
 export function chartGeometryNodes(scene: ChartRenderSceneV1): number {
-  return 1 + (scene.metrics.cssZoom === 1 ? 0 : 1) + scene.layers.reduce((sum, layer) => sum + (layer.kind === 'svg'
+  return 2 + scene.layers.reduce((sum, layer) => sum + (layer.kind === 'svg'
     ? 1 + layer.primitives.reduce((n, primitive) => n + (primitive.kind === 'text' ? 1 + primitive.lines.length * 2 : 1), 0)
     : layer.kind === 'html-text' ? 2 : 1), 0)
 }
@@ -19,10 +20,10 @@ export function chartGeometryNodes(scene: ChartRenderSceneV1): number {
 const paintKeys = ['fill', 'stroke', 'fillOpacity', 'strokeOpacity', 'strokeWidth', 'strokeLinecap', 'strokeLinejoin', 'opacity', 'dash'] as const
 class Reader extends FigureSceneReader {
   private resourceZoom = 1
-  constructor() { super({ ...CHART_LIMITS, strictArrays: true }) }
+  constructor(private readonly wrapperZoom = 1) { super({ ...CHART_LIMITS, strictArrays: true }) }
   zoom(value: unknown): number {
     const zoom = this.number(value, FIGURE_CSS_ZOOM_LIMITS.min, FIGURE_CSS_ZOOM_LIMITS.max)
-    this.resourceZoom = Math.max(1, zoom)
+    this.resourceZoom = Math.max(1, zoom, this.wrapperZoom)
     return zoom
   }
   override color(value: unknown, none = false): string {
@@ -149,17 +150,19 @@ class Reader extends FigureSceneReader {
   }
 }
 
-export function validateChartRenderScene(value: unknown): ChartRenderSceneV1 {
-  const r = new Reader(), v = r.object(value, ['version', 'family', 'chartKind', 'branch', 'canvas', 'metrics', 'appearance', 'layers', 'output'])
-  const c = r.object(v.canvas, ['width', 'height']), m = r.object(v.metrics, ['rootFontPx', 'bodyFont', 'bodyItalic', 'cssZoom']), o = r.object(v.output, ['scale'])
+function validateAtWrapperZoom(value: unknown, wrapperZoom: number): ChartRenderSceneV1 {
+  const r = new Reader(wrapperZoom), v = r.object(value, ['version', 'family', 'chartKind', 'branch', 'canvas', 'metrics', 'appearance', 'layers', 'output'])
+  const c = r.object(v.canvas, ['width', 'height']), m = r.object(v.metrics, ['rootFontPx', 'bodyFont', 'bodyItalic', 'cssZoom', 'rawEffectiveZoom']), o = r.object(v.output, ['scale'])
   // El zoom se valida antes de leer dimensiones, trazos o métricas de texto.
   const cssZoom = r.zoom(m.cssZoom)
+  const rawEffectiveZoom = r.number(m.rawEffectiveZoom, CHART_LAYOUT_LIMITS.minRawZoom, CHART_LAYOUT_LIMITS.maxRawZoom)
+  if (Math.fround(rawEffectiveZoom) !== rawEffectiveZoom) fail()
   const a = r.object(v.appearance, ['theme', 'language', 'direction', 'palette']), p = r.object(a.palette, ['paper', 'text', 'text2', 'text3', 'link', 'accent', 'brick'])
   const language = r.string(a.language, 32), paper = r.color(p.paper)
   if (!/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(language) || paper.length !== 7) fail()
   const scene: ChartRenderSceneV1 = {
     version: r.enum(v.version, [1]), family: r.enum(v.family, ['chart']), chartKind: r.enum(v.chartKind, ['bar', 'line', 'area', 'pie', 'scatter', 'histogram']), branch: r.enum(v.branch, ['empty', 'vertical-bars', 'horizontal-bars', 'cartesian', 'donut']),
-    canvas: { width: r.dimension(c.width, 1), height: r.dimension(c.height, 1) }, metrics: { rootFontPx: r.metric(m.rootFontPx, 8, 64, 256), bodyFont: r.enum(m.bodyFont, ['sans', 'serif', 'mono', 'rounded']), bodyItalic: r.bool(m.bodyItalic), cssZoom },
+    canvas: { width: r.dimension(c.width, 1), height: r.dimension(c.height, 1) }, metrics: { rootFontPx: r.metric(m.rootFontPx, 8, 64, 256), bodyFont: r.enum(m.bodyFont, ['sans', 'serif', 'mono', 'rounded']), bodyItalic: r.bool(m.bodyItalic), cssZoom, rawEffectiveZoom },
     appearance: { theme: r.enum(a.theme, ['light', 'dark']), language, direction: r.enum(a.direction, ['ltr', 'rtl']), palette: { paper, text: r.color(p.text), text2: r.color(p.text2), text3: r.color(p.text3), link: r.color(p.link), accent: r.color(p.accent), brick: r.color(p.brick) } },
     layers: r.array(v.layers, CHART_LIMITS.maxPrimitives, layer => r.layer(layer)), output: { scale: r.enum(o.scale, [2]) }
   }
@@ -169,4 +172,25 @@ export function validateChartRenderScene(value: unknown): ChartRenderSceneV1 {
   if (svgs !== (scene.branch === 'empty' ? 0 : 1)) fail()
   if (chartGeometryNodes(scene) > CHART_LIMITS.maxDomNodes) fail(true)
   return scene
+}
+
+export function validateChartRenderScene(value: unknown): ChartRenderSceneV1 {
+  return validateAtWrapperZoom(value, 1)
+}
+
+export interface ChartRenderContext {
+  readonly initialZoom: number
+  readonly wrapperZoom: number
+  readonly paintScale: number
+  readonly effectiveZoom: number
+}
+
+/** Antes del montaje: el presupuesto cuenta el wrapper real, sin descontar su compensación. */
+export function prepareChartRenderContext(scene: ChartRenderSceneV1, initialZoom: number): ChartRenderContext {
+  const effectiveZoom = scene.metrics.rawEffectiveZoom
+  const wrapperZoom = resolveWrapperZoom(initialZoom, effectiveZoom)
+  validateAtWrapperZoom(scene, wrapperZoom)
+  // ScaleTransformOperation conserva el coeficiente double y Apply lo convierte a float.
+  // I/E es la inversa algebraica; 1/W puede caer en otro Float32 aunque f32(I*W)===E.
+  return Object.freeze({ initialZoom, effectiveZoom, wrapperZoom, paintScale: initialZoom / effectiveZoom })
 }

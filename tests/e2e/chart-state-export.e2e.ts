@@ -31,6 +31,8 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
   try {
     const page = await app.firstWindow(), errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
+    // Mientras carga settings, motion='system' debe permitir la misma entrada que 'full'.
+    if (entrance) await page.emulateMedia({ reducedMotion: 'no-preference' })
     await app.evaluate(({ app: main }) => {
       const state: StateAudit = { captures: [], hold: false }; (globalThis as unknown as { chartStateAudit: StateAudit }).chartStateAudit = state
       main.on('browser-window-created', (_event, win) => {
@@ -68,7 +70,11 @@ async function start(block: BlockOf<'chart'>, entrance = false): Promise<Started
     await page.waitForFunction(() => !!(globalThis as unknown as { __aula?: unknown }).__aula)
     await assertNativeChartContext(app, page, 1)
     await page.setViewportSize({ width: 1440, height: 1100 })
-    if (entrance) await page.evaluate(pieEntranceClockExpression)
+    if (entrance) {
+      expect(await page.evaluate<boolean>("matchMedia('(prefers-reduced-motion: reduce)').matches")).toBe(false)
+      await expect(page.locator('html')).not.toHaveClass(/(?:^|\s)reduce-motion(?:\s|$)/)
+      await page.evaluate(pieEntranceClockExpression)
+    }
     await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
     const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')
     await expect(body).toBeVisible(); await page.evaluate('document.fonts.ready'); await page.mouse.move(8, 8)

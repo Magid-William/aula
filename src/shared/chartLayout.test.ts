@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addIntervals, decodeLayoutUnit, divideIntervals, emitLayoutUnit, float32Cell,
+  addIntervals, computedChartPixelsRange, decodeLayoutUnit, divideIntervals, emitLayoutUnit, float32Cell,
   multiplyIntervals, nextFloat32, nextFloat64, recoverEffectiveZoom, recoverLayoutUnit,
+  recoverComputedLayoutUnit, recoverComputedLineHeightUnit, recoverComputedUsedUnit,
   resolveWrapperZoom, subtractIntervals, type LayoutInterval
 } from './chartLayout'
 
@@ -191,6 +192,50 @@ describe('EffectiveZoom y representante CSS', () => {
 })
 
 describe('emisión de unidades HTML conocidas', () => {
+  it('invierte px calculados después de dividir por E, sin perder la unidad inferior', () => {
+    const nested = 1.959999918937683
+    expect(decodeLayoutUnit(0.5102040767669678, nested)).toBe(63)
+    expect(() => recoverComputedLayoutUnit(0.5102040767669678, nested)).toThrow(/ambigua/)
+    expect(recoverComputedUsedUnit(0.5102040767669678, nested)).toBe(64)
+    expect(decodeLayoutUnit(0.2767857015132904, 1.75)).toBe(30)
+    // Los mismos px calculados pueden venir de Length float a ambos lados de
+    // una unidad: sólo una procedencia ya usada permite recuperar el lattice.
+    expect(() => recoverComputedLayoutUnit(0.2767857015132904, 1.75)).toThrow(/ambigua/)
+    expect(() => recoverComputedLayoutUnit(-0.2767857015132904, 1.75)).toThrow(/ambigua/)
+    expect(recoverComputedUsedUnit(0.2767857015132904, 1.75)).toBe(31)
+    expect(recoverComputedUsedUnit(-0.2767857015132904, 1.75)).toBe(-31)
+    expect(recoverComputedLayoutUnit(0, 64)).toBe(0)
+  })
+  it('conserva todos los raw posibles, incluidos los que cambian la unidad usada', () => {
+    const observed = Math.fround(3.875 / 1.25)
+    expect(computedChartPixelsRange(observed, 1.25)).toEqual({ lo: 3.874999761581421, hi: 3.875 })
+    expect(() => recoverComputedLayoutUnit(observed, 1.25)).toThrow(/ambigua/)
+    for (const e of [0.0625, Math.fround(1.4), 1.75, Math.fround(1.8), 2.1875, 64]) {
+      for (const raw of [-(2 ** -149), -123.125, -1, 0, 2 ** -149, 31 / 64, 17.5, 255.875]) {
+        const value = Math.fround(raw / e)
+        const range = computedChartPixelsRange(value, e)
+        expect(range.lo).toBeLessThanOrEqual(raw); expect(range.hi).toBeGreaterThanOrEqual(raw)
+        expect(Math.fround(range.lo / e) === value).toBe(true)
+        expect(Math.fround(range.hi / e) === value).toBe(true)
+      }
+    }
+  })
+  it('conserva la unidad usada de los Length actuales y redondea line-height por su propia procedencia', () => {
+    const zooms = [1, 1.75, Math.fround(Math.fround(1.2) * 1.75), Math.fround(Math.fround(5 / 6) * 1.75), 2, 3.5, Math.fround(Math.fround(2.4) * 1.75), Math.fround(Math.fround(5 / 3) * 1.75)]
+    for (const e of zooms) for (const authored of [6, 12]) {
+      const raw = Math.fround(authored * e), observed = Math.fround(raw / e)
+      expect(recoverComputedLayoutUnit(observed, e)).toBe(Math.trunc(raw * 64))
+    }
+    const e = Math.fround(Math.fround(5 / 6) * 1.75)
+    const raw = Math.fround(16 * e), observed = Math.fround(raw / e)
+    expect(raw).toBe(23.333332061767578)
+    expect(recoverComputedLineHeightUnit(observed, e) / 64).toBe(23.328125)
+    expect(recoverComputedLineHeightUnit(1 / 128, 1)).toBe(1)
+    expect(recoverComputedLineHeightUnit(-1 / 128, 1)).toBe(-1)
+    const ambiguousZoom = Math.fround(1.8)
+    expect(computedChartPixelsRange(0.2734375, ambiguousZoom)).toEqual({ lo: 0.4921874701976776, hi: 0.4921875 })
+    expect(() => recoverComputedLineHeightUnit(0.2734375, ambiguousZoom)).toThrow(/ambigua/)
+  })
   it('trunca hacia cero, incluyendo las celdas negativas y cero', () => {
     expect(decodeLayoutUnit(-1.5 / 64, 1)).toBe(-1)
     expect(decodeLayoutUnit(1.5 / 64, 1)).toBe(1)

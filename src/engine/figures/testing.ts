@@ -9,7 +9,7 @@ export function chartTextFixture(): ChartTextBox {
 }
 export function chartSceneFixture(): ChartRenderSceneV1 {
   return {
-    version: 1, family: 'chart', chartKind: 'bar', branch: 'vertical-bars', canvas: { width: 100, height: 80 }, metrics: { rootFontPx: 16, bodyFont: 'sans', bodyItalic: false, cssZoom: 1 },
+    version: 1, family: 'chart', chartKind: 'bar', branch: 'vertical-bars', canvas: { width: 100, height: 80 }, metrics: { rootFontPx: 16, bodyFont: 'sans', bodyItalic: false, cssZoom: 1, rawEffectiveZoom: 1 },
     appearance: { theme: 'light', language: 'es', direction: 'ltr', palette: { paper: '#ffffff', text: '#000000', text2: '#111111', text3: '#222222', brick: '#aa2211', accent: '#aa2211', link: '#aa2211' } },
     layers: [
       { kind: 'svg', box: { x: 0, y: 0, width: 100, height: 80 }, overflow: 'visible', primitives: [

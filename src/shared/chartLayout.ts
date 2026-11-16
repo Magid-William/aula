@@ -166,6 +166,47 @@ export function decodeLayoutUnit(cssPixels: number, effectiveZoom: number): numb
   return unit === 0 ? 0 : unit
 }
 
+/** Typed OM puede exponer f32(raw/E), no el CSS original. Conserva sus extremos Float32 posibles. */
+export function computedChartPixelsRange(observed: number, effectiveZoom: number): LayoutInterval {
+  float32(observed)
+  rawZoom(effectiveZoom)
+  const possible = multiplyIntervals(float32Cell(observed), { lo: effectiveZoom, hi: effectiveZoom })
+  const max = (2 - 2 ** -23) * 2 ** 127
+  const lower = Math.max(-max, possible.lo), upper = Math.min(max, possible.hi)
+  if (lower > upper) return fail('Longitud calculada sin preimagen Float32')
+  let first = Math.fround(lower), last = Math.fround(upper)
+  if (first < lower) first = nextFloat32(first, 1)
+  if (last > upper) last = nextFloat32(last, -1)
+  // Sólo los extremos pueden proceder de un empate cerrado de la celda. Se
+  // comprueba la división real; no se buscan posiciones ni se ajusta un epsilon.
+  if (first <= last && Math.fround(first / effectiveZoom) !== observed) first = nextFloat32(first, 1)
+  if (first <= last && Math.fround(last / effectiveZoom) !== observed) last = nextFloat32(last, -1)
+  if (first > last || Math.fround(first / effectiveZoom) !== observed || Math.fround(last / effectiveZoom) !== observed) return fail('Longitud calculada sin preimagen Float32')
+  return { lo: first === 0 ? 0 : first, hi: last === 0 ? 0 : last }
+}
+
+/** Padding/gap usan Length float antes de LayoutUnit; todos los candidatos deben dar la misma unidad. */
+export function recoverComputedLayoutUnit(observed: number, effectiveZoom: number): number {
+  const range = computedChartPixelsRange(observed, effectiveZoom)
+  const first = Math.trunc(range.lo * 64), last = Math.trunc(range.hi * 64)
+  if (first !== last || !Number.isSafeInteger(first) || Math.abs(first) > CHART_LAYOUT_LIMITS.maxUnit) return fail('Longitud de layout calculada ausente o ambigua')
+  return first === 0 ? 0 : first
+}
+
+/** Sólo para valores cuya procedencia ya es LayoutUnit, no para Length float. */
+export function recoverComputedUsedUnit(observed: number, effectiveZoom: number): number {
+  return recoverLayoutUnit(multiplyIntervals(computedChartPixelsRange(observed, effectiveZoom), { lo: 64, hi: 64 }))
+}
+
+/** ComputedLineHeightAsFixed usa FromFloatRound, con empates alejándose de cero. */
+export function recoverComputedLineHeightUnit(observed: number, effectiveZoom: number): number {
+  const range = computedChartPixelsRange(observed, effectiveZoom)
+  const round = (n: number): number => Math.sign(n) * Math.floor(Math.abs(n) * 64 + 0.5)
+  const first = round(range.lo), last = round(range.hi)
+  if (first !== last || !Number.isSafeInteger(first) || Math.abs(first) > CHART_LAYOUT_LIMITS.maxUnit) return fail('Altura de línea calculada ausente o ambigua')
+  return first === 0 ? 0 : first
+}
+
 /** Emite una unidad conocida, no redondea una posición arbitraria ni una medida inline. */
 export function emitLayoutUnit(unit: number, effectiveZoom: number): number {
   rawZoom(effectiveZoom)

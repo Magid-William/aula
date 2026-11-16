@@ -1,6 +1,7 @@
 // Pintor pasivo de la presentación comprometida: sin stores, interacción ni decisiones de layout.
 import type { CSSProperties } from 'react'
 import type { ChartBox, ChartLayer, ChartPaint, ChartRenderSceneV1, ChartSvgPrimitive } from '@shared/figuresChart'
+import type { ChartRenderContext } from '@engine/figures/chart'
 import { FIGURE_FONTS } from '@renderer/lib/figureExport/figureTypography'
 
 const boxStyle = (box: ChartBox): CSSProperties => ({ position: 'absolute', left: box.x, top: box.y, width: box.width, height: box.height })
@@ -43,11 +44,11 @@ function Layer({ item }: { item: ChartLayer }) {
   }
 }
 
-export function ChartExportScene({ scene }: { scene: ChartRenderSceneV1 }) {
+export function ChartExportScene({ scene, context }: { scene: ChartRenderSceneV1; context: ChartRenderContext }) {
   const content = scene.layers.map((item, i) => <Layer key={i} item={item} />)
   return <div data-chart-scene lang={scene.appearance.language} dir={scene.appearance.direction} style={{ position: 'relative', width: scene.canvas.width, height: scene.canvas.height, color: scene.appearance.palette.text, fontFamily: FIGURE_FONTS[scene.metrics.bodyFont], fontStyle: scene.metrics.bodyItalic ? 'italic' : 'normal' }}>
-    {scene.metrics.cssZoom === 1 ? content : <div data-figure-css-zoom style={{ position: 'absolute', left: 0, top: 0, width: scene.canvas.width, height: scene.canvas.height, zoom: scene.metrics.cssZoom, transformOrigin: '0 0', transform: `scale(${1 / scene.metrics.cssZoom})` }}>
+    <div data-figure-css-zoom style={{ position: 'absolute', left: 0, top: 0, width: scene.canvas.width, height: scene.canvas.height, zoom: context.wrapperZoom, transformOrigin: '0 0', transform: `scale(${context.paintScale})` }}>
       {content}
-    </div>}
+    </div>
   </div>
 }

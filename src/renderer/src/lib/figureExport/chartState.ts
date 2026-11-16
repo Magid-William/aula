@@ -3,6 +3,7 @@ import type { ChartBox, ChartLayer, ChartPanel, ChartRenderSceneV1, ChartTextBox
 import { projectChartSvg, type CommittedChartSvg } from '@renderer/blocks/chart/presentation'
 import { assertDrawingFontsReady } from './drawingFonts'
 import { chartTypography } from './chartTypography'
+import { chartCssPixels, createChartGeometry } from './chartGeometry'
 
 export interface ChartCommittedState {
   chartKind: ChartRenderSceneV1['chartKind']
@@ -10,9 +11,8 @@ export interface ChartCommittedState {
   dark: boolean
 }
 const fail = (): never => { throw new Error('Chart presentation is unavailable') }
-const px = (value: string): number => { const n = parseFloat(value); return Number.isFinite(n) ? n : fail() }
+const radiusOf = (css: CSSStyleDeclaration): number => { const n = parseFloat(css.borderTopLeftRadius); return Number.isFinite(n) ? n : fail() }
 const weightOf = (value: string): 400 | 500 | 600 => { const n = Number(value); return n === 400 || n === 500 || n === 600 ? n : fail() }
-const normalize = (value: number): number => Math.abs(value) < 1e-8 ? 0 : value
 
 /** La dirección y lang del curso no giran las figuras: se conserva el contexto DOM efectivo. */
 export function chartLanguage(element: HTMLElement): string {
@@ -25,19 +25,8 @@ export function freezeChartExportState(state: ChartCommittedState, body: HTMLEle
   if (!body.isConnected || state.empty === !!svg || svg && (!svg.element.isConnected || !body.contains(svg.element))) return fail()
   assertDrawingFontsReady(body)
   const document = body.ownerDocument, rootStyle = getComputedStyle(body)
-  const width = px(rootStyle.width), height = px(rootStyle.height), origin = body.getBoundingClientRect()
-  if (width <= 0 || height <= 0 || width > 16_384 || height > 16_384) return fail()
-  const sx = origin.width / width, sy = origin.height / height
-  if (![sx, sy].every(k => Number.isFinite(k) && k > 0)) return fail()
+  const geometry = createChartGeometry(body, svg?.element ?? null), { width, height } = geometry
   if (svg && Math.abs(width - svg.layoutWidth) > 1.1) return fail()
-  // Los contextos de diapositiva pueden escalar/trasladar. Una rotación/perspectiva no admite estas cajas ortogonales.
-  for (let ancestor: Element | null = body; ancestor; ancestor = ancestor.parentElement) {
-    const transform = getComputedStyle(ancestor).transform
-    if (transform !== 'none') {
-      const m = new DOMMatrixReadOnly(transform)
-      if (!m.is2D || m.b !== 0 || m.c !== 0 || m.a <= 0 || m.d <= 0) return fail()
-    }
-  }
   const probe = document.createElement('span'), canvas = document.createElement('canvas')
   probe.style.display = 'none'; body.appendChild(probe)
   canvas.width = canvas.height = 1
@@ -56,29 +45,6 @@ export function freezeChartExportState(state: ChartCommittedState, body: HTMLEle
     const hex = '#' + rgba.slice(0, rgba[3] === 255 ? 3 : 4).map(n => n.toString(16).padStart(2, '0')).join('')
     colors.set(value, hex); return hex
   }
-  const boxOf = (element: Element): ChartBox => {
-    const r = element.getBoundingClientRect()
-    let dx = 0
-    // Sólo las filas Pie trasladan sus hojas al entrar. El destino conocido es x=0, sin tocar la animación viva.
-    for (let a: Element | null = element; a && a !== body; a = a.parentElement) {
-      const transform = getComputedStyle(a).transform
-      if (transform === 'none') continue
-      const m = new DOMMatrixReadOnly(transform)
-      if (!a.hasAttribute('data-chart-enter-x')) {
-        if (!m.is2D || m.a !== 1 || m.d !== 1 || m.b || m.c || m.m41 || m.m42) return fail()
-        continue
-      }
-      if (!m.is2D || m.a !== 1 || m.d !== 1 || m.b || m.c || m.m42) return fail()
-      dx += m.m41
-    }
-    return { x: normalize((r.x - origin.x) / sx - dx), y: normalize((r.y - origin.y) / sy), width: r.width / sx, height: r.height / sy }
-  }
-  const contentBox = (element: HTMLElement, css: CSSStyleDeclaration): ChartBox => {
-    const box = boxOf(element)
-    const left = px(css.paddingLeft) + px(css.borderLeftWidth), right = px(css.paddingRight) + px(css.borderRightWidth)
-    const top = px(css.paddingTop) + px(css.borderTopWidth), bottom = px(css.paddingBottom) + px(css.borderBottomWidth)
-    return { x: box.x + left, y: box.y + top, width: Math.max(0, box.width - left - right), height: Math.max(0, box.height - top - bottom) }
-  }
   const text = (element: HTMLElement, value: string, box?: ChartBox): ChartTextBox => {
     const css = getComputedStyle(element), font = chartTypography(element)
     const whiteSpace = css.whiteSpace === 'nowrap' ? 'nowrap' : css.whiteSpace === 'normal' ? 'normal' : fail()
@@ -86,8 +52,8 @@ export function freezeChartExportState(state: ChartCommittedState, body: HTMLEle
     const align = css.textAlign
     if (!['left', 'right', 'center', 'start', 'end'].includes(align)) return fail()
     return {
-      kind: 'html-text', box: box ?? contentBox(element, css), text: value, color: resolve(css.color), font: font.bodyFont, italic: font.bodyItalic,
-      size: px(css.fontSize), lineHeight: px(css.lineHeight), weight: weightOf(css.fontWeight), letterSpacing: css.letterSpacing === 'normal' ? 0 : px(css.letterSpacing),
+      kind: 'html-text', box: box ?? geometry.contentBox(element), text: value, color: resolve(css.color), font: font.bodyFont, italic: font.bodyItalic,
+      size: chartCssPixels(element, 'font-size'), lineHeight: geometry.lineHeight(element), weight: weightOf(css.fontWeight), letterSpacing: chartCssPixels(element, 'letter-spacing', true),
       tabular: css.fontVariantNumeric.includes('tabular-nums'), direction: css.direction === 'rtl' ? 'rtl' : 'ltr', align: align as ChartTextBox['align'],
       whiteSpace, overflow, truncate: css.textOverflow === 'ellipsis', opacity: 1
     }
@@ -95,7 +61,7 @@ export function freezeChartExportState(state: ChartCommittedState, body: HTMLEle
   try {
     const layers: ChartLayer[] = []
     if (svg) {
-      const box = boxOf(svg.element)
+      const box = geometry.boxOf(svg.element)
       if (Math.abs(box.width - svg.width) > 1 || Math.abs(box.height - svg.height) > 1) return fail()
       layers.push({ kind: 'svg', box: { ...box, width: svg.width, height: svg.height }, overflow: svg.overflow, primitives: projectChartSvg(svg.children, resolve, { weight: weightOf(rootStyle.fontWeight) }) })
     }
@@ -106,10 +72,10 @@ export function freezeChartExportState(state: ChartCommittedState, body: HTMLEle
       const css = getComputedStyle(element)
       if (css.display === 'none' || css.visibility !== 'visible') return fail()
       if (element.hasAttribute('data-chart-panel')) {
-        const box = boxOf(element), borderWidth = px(css.borderTopWidth), background = element.dataset.chartBackground ?? css.backgroundColor
+        const box = geometry.boxOf(element), borderWidth = geometry.borderWidth(element), background = element.dataset.chartBackground ?? css.backgroundColor
         const panel: ChartPanel = {
           kind: 'panel', box, background: resolve(background), border: borderWidth ? resolve(css.borderTopColor) : 'none', borderWidth,
-          radius: Math.min(px(css.borderTopLeftRadius), box.width / 2, box.height / 2), shadow: element.dataset.chartShadow === 'e2' ? 'e2' : 'none', opacity: 1
+          radius: Math.min(radiusOf(css), box.width / 2, box.height / 2), shadow: element.dataset.chartShadow === 'e2' ? 'e2' : 'none', opacity: 1
         }
         layers.push(panel)
       }
@@ -130,19 +96,19 @@ export function freezeChartExportState(state: ChartCommittedState, body: HTMLEle
         range.selectNodeContents(nodes[0])
         const rects = [...range.getClientRects()]; range.detach()
         const rows = new Set(rects.map(r => Math.round(r.y * 100))).size || 1
-        const own = contentBox(element, css), swatchBox = boxOf(swatch), gap = px(css.columnGap), lineHeight = px(css.lineHeight)
-        const available = Math.max(0, own.width - swatchBox.width - gap)
-        const textWidth = Math.max(available, ...rects.map(r => r.width / sx))
+        const legend = geometry.legend(element, swatch), lineHeight = geometry.lineHeight(element)
+        const textWidth = Math.max(legend.available, ...rects.map(r => r.width / geometry.scaleX))
         const rtl = css.direction === 'rtl'
-        const box = { x: rtl ? own.x : swatchBox.x + swatchBox.width + gap, y: own.y + (own.height - rows * lineHeight) / 2, width: textWidth, height: rows * lineHeight }
+        const box = { x: rtl ? legend.left : legend.start, y: legend.textY(rows), width: textWidth, height: rows * lineHeight }
         textBytes += new TextEncoder().encode(value).length
         if (textBytes > 65_536 || value.length > 8192) return fail()
         layers.push(text(element, value, box))
       }
     }
+    geometry.assertCurrent()
     return {
       version: 1, family: 'chart', chartKind: state.chartKind, branch: svg?.branch ?? 'empty', canvas: { width, height },
-      metrics: { rootFontPx: px(getComputedStyle(document.documentElement).fontSize), ...chartTypography(body) },
+      metrics: { rootFontPx: chartCssPixels(document.documentElement, 'font-size'), ...chartTypography(body), rawEffectiveZoom: geometry.effectiveZoom },
       appearance: { theme: state.dark ? 'dark' : 'light', language: chartLanguage(body), direction: rootStyle.direction === 'rtl' ? 'rtl' : 'ltr', palette: {
         paper: resolve('var(--surface)'), text: resolve('var(--text)'), text2: resolve('var(--text2)'), text3: resolve('var(--text3)'), link: resolve('var(--accent-text)'), accent: resolve('var(--accent)'), brick: resolve('var(--pigment-brick)')
       } },

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chartExportBounds } from './chartBounds'
+import { assertChartRenderContext, chartExportBounds } from './chartBounds'
+import { prepareChartRenderContext } from '@engine/figures/chart'
+import { chartSceneFixture } from '@engine/figures/testing'
 
 const rect = (x: number, y: number, width: number, height: number): DOMRect => ({ x, y, width, height, left: x, top: y, right: x + width, bottom: y + height, toJSON: () => ({ x, y, width, height }) })
 function fixture() {
@@ -29,6 +31,32 @@ function fixture() {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('encuadre natural Chart', () => {
+  it('comprueba la CTM Float32 prevista sin exigir identidad ni usar 1/W', () => {
+    const input = chartSceneFixture(); input.metrics.rawEffectiveZoom = 3.875
+    const context = prepareChartRenderContext(input, 1.25)
+    const window = { devicePixelRatio: 1.25 }
+    const matrix = { a: 0.9999999701976776, b: 0, c: 0, d: 0.9999999701976776 }
+    const svg = { getScreenCTM: () => matrix }
+    const wrapper = { currentCSSZoom: Math.fround(3.875 / 1.25), querySelectorAll: () => [svg] }
+    const scene = { ownerDocument: { defaultView: window }, querySelector: () => wrapper } as unknown as HTMLElement
+    expect(() => assertChartRenderContext(scene, context)).not.toThrow()
+    matrix.a = matrix.d = 1.9999999403953552
+    expect(() => assertChartRenderContext(scene, context, 2)).not.toThrow()
+    expect(() => assertChartRenderContext(scene, context)).toThrow('paint transform')
+    matrix.a = matrix.d = 1.0000000856816769
+    expect(() => assertChartRenderContext(scene, context)).toThrow('paint transform')
+    matrix.a = matrix.d = 0.9999999701976776
+    window.devicePixelRatio = 2
+    expect(() => assertChartRenderContext(scene, context)).toThrow('native zoom')
+    window.devicePixelRatio = 1.25; wrapper.currentCSSZoom = 1
+    expect(() => assertChartRenderContext(scene, context)).toThrow('wrapper zoom')
+  })
+  it('el panel vacío conserva el contexto aunque no necesite SVG', () => {
+    const input = chartSceneFixture(); input.metrics.rawEffectiveZoom = 3.5
+    const context = prepareChartRenderContext(input, 2)
+    const scene = { ownerDocument: { defaultView: { devicePixelRatio: 2 } }, querySelector: () => ({ currentCSSZoom: 1.75, querySelectorAll: () => [] }) } as unknown as HTMLElement
+    expect(() => assertChartRenderContext(scene, context)).not.toThrow()
+  })
   it('incluye miter de cuatro semigrosores, resta el origen y conserva cajas nominales', () => {
     const { scene } = fixture()
     expect(chartExportBounds(scene, { width: 100, height: 80 })).toEqual({ x: -30, y: -32, width: 162, height: 134 })

@@ -9,7 +9,7 @@ import type { FigureRenderInput } from '../../src/shared/figuresRender'
 import { CHART_FIXTURES, type ChartFixture } from './chart-fixtures'
 import { waitForPieHover } from './chart-hover-readiness'
 import { compareDiagramPixels } from './diagram-pixels'
-import { assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, snapshotChartReference } from './chart-reference'
+import { assertChartReferenceInvariant, assertNativeChartContext, canonicalizeChartReference, captureChartReference, chartReferenceGeometryTolerance, initializeChartReference, setChartReferencePageZoom, snapshotChartReference } from './chart-reference'
 import { assertChartRasterConsistency, compareChartRasterConsistency, type ChartRasterConsistency } from './chart-raster-consistency'
 import { go, homeWithDemoCourse } from './helpers'
 
@@ -42,7 +42,7 @@ function prepare(fixture: ChartFixture, theme: 'light' | 'dark'): { home: string
   return { home, skillPath, skillBytes: readFileSync(skillPath, 'utf8') }
 }
 
-async function start(home: string, dpr2: boolean): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
+async function start(home: string, dpr2: boolean, pageZoom = 1): Promise<{ app: ElectronApplication; page: Page; errors: string[] }> {
   const sourceDpr = dpr2 ? 2 : 1
   const app = await electron.launch({ args: [resolve(__dirname, '../..'), ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--use-mock-keychain', `--force-device-scale-factor=${sourceDpr}`], env: { ...process.env, AULA_HOME: home, AULA_FAKE_AI: '1', AULA_SKIP_ONBOARDING: '1', AULA_HIDDEN: '1', AULA_NO_UPDATES: '1', AULA_NO_LOGIN_ITEM: '1' } })
   try {
@@ -78,6 +78,7 @@ async function start(home: string, dpr2: boolean): Promise<{ app: ElectronApplic
     await assertNativeChartContext(app, page, sourceDpr)
     await page.setViewportSize({ width: 1440, height: 1100 })
     await initializeChartReference(page, sourceDpr)
+    if (pageZoom !== 1) await setChartReferencePageZoom(app, page, pageZoom)
     return { app, page, errors }
   } catch (error) { await app.close().catch(() => undefined); throw error }
 }
@@ -306,9 +307,13 @@ test('Chart PNG: cuatro fases subpíxel externas producen la misma escena e imag
 })
 
 for (const variant of [
-  { key: 'academic', theme: 'academic', layout: 'content' as const, font: 'serif', italic: false },
-  { key: 'chalk', theme: 'chalk', layout: 'content' as const, font: 'rounded', italic: false },
-  { key: 'quote', theme: 'aula', layout: 'quote' as const, font: 'serif', italic: true }
+  { key: 'academic', theme: 'academic', layout: 'content' as const, font: 'serif', italic: false, dpr2: false, pageZoom: 1 },
+  { key: 'chalk', theme: 'chalk', layout: 'content' as const, font: 'rounded', italic: false, dpr2: false, pageZoom: 1 },
+  { key: 'quote', theme: 'aula', layout: 'quote' as const, font: 'serif', italic: true, dpr2: false, pageZoom: 1 },
+  ...[false, true].flatMap(dpr2 => [{ label: 'in', factor: 1.2 }, { label: 'out', factor: 5 / 6 }].map(zoom => ({
+    key: `academic-page-zoom-${zoom.label}-dpr${dpr2 ? 2 : 1}`, theme: 'academic', layout: 'content' as const,
+    font: 'serif', italic: false, dpr2, pageZoom: zoom.factor
+  })))
 ]) test(`Chart PNG: tipografía de Slides reales ${variant.key}`, async ({}, info) => {
   const fixture = CHART_FIXTURES[0], source = prepare(fixture, 'light')
   // Quote reserva menos altura; esta prueba de fuentes usa una serie que cabe completa.
@@ -317,7 +322,7 @@ for (const variant of [
   const skill = JSON.parse(source.skillBytes)
   skill.lesson = [{ id: `deck-${variant.key}`, type: 'slides', theme: variant.theme, transition: 'none', slides: [slide] }]
   source.skillBytes = JSON.stringify(skill); writeFileSync(source.skillPath, source.skillBytes)
-  const { app, page, errors } = await start(source.home, false)
+  const { app, page, errors } = await start(source.home, variant.dpr2, variant.pageZoom)
   try {
     await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILL })
     const figure = page.locator('[data-block="chart"]').first(), body = figure.locator('[data-chart-export-body]')

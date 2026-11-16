@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { chartSceneFixture, chartTextFixture } from '@engine/figures/testing'
-import { chartGeometryNodes, validateChartRenderScene } from '@engine/figures/chart'
+import { chartGeometryNodes, prepareChartRenderContext, validateChartRenderScene } from '@engine/figures/chart'
+import type { ChartRenderSceneV1 } from '@shared/figuresChart'
 import { ChartExportScene } from './ChartExportScene'
+
+const markup = (scene: ChartRenderSceneV1, initialZoom = 1): string => renderToStaticMarkup(<ChartExportScene scene={validateChartRenderScene(scene)} context={prepareChartRenderContext(scene, initialZoom)} />)
 
 describe('escena pasiva Chart', () => {
   it('pinta SVG real en un único lienzo y mantiene cada regla cerrada de trazo y tspan', () => {
-    const scene = validateChartRenderScene(chartSceneFixture()), html = renderToStaticMarkup(<ChartExportScene scene={scene} />)
+    const scene = validateChartRenderScene(chartSceneFixture()), html = markup(scene)
     expect(html.match(/<svg /g)).toHaveLength(1)
     expect(html).toContain('stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"')
     expect(html).toContain('fill-opacity="0.8" stroke-opacity="0.6"')
@@ -22,7 +25,7 @@ describe('escena pasiva Chart', () => {
     const scene = chartSceneFixture(), text = chartTextFixture()
     text.text = '**texto** $x$ <img src="https://private"> العربية 👩‍🔬 COLA OCULTA'; text.direction = 'rtl'; text.align = 'end'; text.letterSpacing = -.2; text.opacity = .6
     text.box = { x: 22.125, y: -12.5, width: 37.75, height: 19.5 }; scene.layers.push(text)
-    const html = renderToStaticMarkup(<ChartExportScene scene={validateChartRenderScene(scene)} />)
+    const html = markup(scene)
     expect(html).toContain('left:22.125px;top:-12.5px;width:37.75px;height:19.5px;box-sizing:content-box;padding:0;border:0;margin:0')
     expect(html).toContain('direction:rtl;text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0.6')
     expect(html).toContain('**texto** $x$ &lt;img src=&quot;https://private&quot;&gt; العربية 👩‍🔬 COLA OCULTA')
@@ -31,12 +34,12 @@ describe('escena pasiva Chart', () => {
   it('compensa zoom y conserva fuente propia serif/cursiva de HTML y herencia mono SVG', () => {
     const scene = chartSceneFixture(); scene.metrics.bodyFont = 'mono'; scene.metrics.bodyItalic = true
     const text = chartTextFixture(); text.font = 'serif'; text.italic = true; scene.layers.push(text)
-    const normal = renderToStaticMarkup(<ChartExportScene scene={scene} />)
-    scene.metrics.cssZoom = 1.75
-    const zoomed = renderToStaticMarkup(<ChartExportScene scene={validateChartRenderScene(scene)} />)
+    const normal = markup(scene)
+    scene.metrics.cssZoom = 1.75; scene.metrics.rawEffectiveZoom = 1.75
+    const zoomed = markup(scene)
     const opening = '<div data-figure-css-zoom="true" style="position:absolute;left:0;top:0;width:100px;height:80px;zoom:1.75;transform-origin:0 0;transform:scale(0.5714285714285714)">'
     expect(zoomed).toContain(opening)
-    expect(zoomed.replace(opening, '').replace(/<\/div><\/div>$/, '</div>')).toBe(normal)
+    expect(zoomed.replace(opening, opening.replace('zoom:1.75', 'zoom:1').replace('scale(0.5714285714285714)', 'scale(1)'))).toBe(normal)
     expect(zoomed).toContain('font-family:var(--font-mono);font-style:italic')
     expect(zoomed).toContain('font-family:var(--font-serif);font-style:italic')
     expect(zoomed).toContain('box-shadow:var(--e2)')
@@ -44,15 +47,22 @@ describe('escena pasiva Chart', () => {
   it('conserva direction/idioma efectivos y overflow SVG de cada rama sin reinterpretarlos', () => {
     const scene = chartSceneFixture(); scene.chartKind = 'pie'; scene.branch = 'donut'; scene.appearance.language = 'ar'; scene.appearance.direction = 'ltr'
     const svg = scene.layers[0]; if (svg.kind !== 'svg') throw new Error('fixture'); svg.overflow = 'hidden'
-    const html = renderToStaticMarkup(<ChartExportScene scene={validateChartRenderScene(scene)} />)
+    const html = markup(scene)
     expect(html).toContain('data-chart-scene="true" lang="ar" dir="ltr"')
     expect(html).toMatch(/<svg[^>]+overflow:hidden/)
   })
   it('es determinista y no muta la escena al pintar el panel vacío con su leyenda', () => {
     const scene = chartSceneFixture(); scene.branch = 'empty'; scene.layers.shift()
-    const before = JSON.stringify(scene), html = renderToStaticMarkup(<ChartExportScene scene={scene} />)
-    expect(html).toBe(renderToStaticMarkup(<ChartExportScene scene={scene} />))
+    const before = JSON.stringify(scene), html = markup(scene)
+    expect(html).toBe(markup(scene))
     expect(JSON.stringify(scene)).toBe(before); expect(html).not.toContain('<svg')
     expect(html).toContain('data-chart-panel'); expect(html).toContain('data-chart-text')
+  })
+  it('separa el representante CSS y la compensación cuando InitialZoom fuente y privado difieren', () => {
+    const scene = chartSceneFixture(); scene.metrics.rawEffectiveZoom = 3.875
+    const html = markup(scene, 1.25)
+    expect(html).toContain('zoom:3.0999999046325684;transform-origin:0 0;transform:scale(0.3225806451612903)')
+    expect(html).not.toContain('scale(0.32258065508506084)')
+    expect(scene.metrics.cssZoom).toBe(1)
   })
 })

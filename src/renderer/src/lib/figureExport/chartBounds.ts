@@ -1,17 +1,32 @@
 // Medición natural: conserva zoom tipográfico interior y neutraliza sólo el encuadre exterior.
 import type { FigureRenderBounds } from '@shared/figuresRender'
-import { CHART_LIMITS } from '@engine/figures/chart'
+import { CHART_LIMITS, type ChartRenderContext } from '@engine/figures/chart'
 import { unionDrawingBounds } from './drawingBounds'
 
-export function chartExportBounds(scene: HTMLElement, nominal: { width: number; height: number }, cssZoom = 1): FigureRenderBounds {
+export function chartExportBounds(scene: HTMLElement, nominal: { width: number; height: number }, cssZoom = 1, context?: ChartRenderContext): FigureRenderBounds {
   if (!Number.isFinite(cssZoom) || cssZoom < 1 / 8 || cssZoom > 8) throw new Error('Invalid chart zoom')
   const transform = scene.style.getPropertyValue('transform'), priority = scene.style.getPropertyPriority('transform')
   try {
     scene.style.setProperty('transform', 'none', 'important')
-    return naturalBounds(scene, nominal, Math.max(1, cssZoom))
+    if (context) assertChartRenderContext(scene, context)
+    return naturalBounds(scene, nominal, Math.max(1, cssZoom, context?.wrapperZoom ?? 1))
   } finally {
     if (transform) scene.style.setProperty('transform', transform, priority)
     else scene.style.removeProperty('transform')
+  }
+}
+
+/** Comprueba el mapa Float32 previsto, no una identidad CTM que Blink no promete. */
+export function assertChartRenderContext(scene: HTMLElement, context: ChartRenderContext, framingScale = 1): void {
+  if (!Number.isFinite(framingScale) || framingScale <= 0 || framingScale > 16) throw new Error('Invalid chart framing scale')
+  if (scene.ownerDocument.defaultView?.devicePixelRatio !== context.initialZoom) throw new Error('Chart native zoom changed')
+  const wrapper = scene.querySelector<HTMLElement>('[data-figure-css-zoom]')
+  if (!wrapper || wrapper.currentCSSZoom !== Math.fround(context.effectiveZoom / context.initialZoom)) throw new Error('Chart wrapper zoom changed')
+  const transformed = Math.fround(Math.fround(framingScale) * Math.fround(context.paintScale))
+  const expected = context.effectiveZoom * Math.fround(Math.fround(1 / context.initialZoom) * transformed)
+  for (const svg of wrapper.querySelectorAll<SVGSVGElement>('[data-chart-svg]')) {
+    const matrix = svg.getScreenCTM()
+    if (!matrix || matrix.a !== expected || matrix.d !== expected || matrix.b !== 0 || matrix.c !== 0) throw new Error('Chart effective paint transform changed')
   }
 }
 

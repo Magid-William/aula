@@ -2,7 +2,7 @@
 // No lee escenas DTO, atributos de exportación en las hojas ni helpers de bounds del producto.
 import { writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import type { CDPSession, ElectronApplication, JSHandle, Locator, Page, TestInfo } from 'playwright/test'
+import { expect, type CDPSession, type ElectronApplication, type JSHandle, type Locator, type Page, type TestInfo } from 'playwright/test'
 import type { LiveDiagramGeometry, PixelRect } from './diagram-pixels'
 
 export interface ChartReferenceSnapshot {
@@ -44,8 +44,12 @@ export interface ChartReference {
     capture: {
       api: 'Page.captureScreenshot'; sourceDpr: number; raster: 'dense'; width: number; height: number
       nativeContext: ChartNativeContext
+      pageZoom: number
       calibration: { width: number; height: number; pixelsPerCss: number }; requestedScale: number; desiredPixelsPerCss: number
-      observations: Array<{ stage: string; before: ChartReferenceSnapshot; after: ChartReferenceSnapshot }>
+      observations: Array<{
+        stage: string; before: ChartReferenceSnapshot; after: ChartReferenceSnapshot
+        viewportBefore: ChartCaptureViewport; viewportAfter: ChartCaptureViewport; requestedDipClip: PixelRect & { scale: number }
+      }>
     }
     invariantTolerance: number
     geometryTolerance: ChartReferenceGeometryTolerance
@@ -57,8 +61,9 @@ export interface ChartReference {
 const INVARIANT_TOLERANCE = 1e-6
 const placements = new WeakMap<Locator, ChartPlacementObservation>()
 interface ChartNativeContext { startupFactor: string; screenFactor: number; pageZoom: number; dpr: number }
+interface ChartCaptureViewport { zoom: number; scale: number; offsetX: number; offsetY: number; pageX: number; pageY: number; clientWidth: number; clientHeight: number }
 const nativeContexts = new WeakMap<Page, ChartNativeContext>()
-const protocols = new WeakMap<Page, { session: CDPSession; sourceDpr: number }>()
+const protocols = new WeakMap<Page, { session: CDPSession; sourceDpr: number; pageZoom: number }>()
 
 /** Antes del viewport/CDP, comprueba el factor nativo real: el DPR emulado no identifica la rejilla de layout. */
 export async function assertNativeChartContext(app: ElectronApplication, page: Page, sourceDpr: 1 | 2): Promise<void> {
@@ -87,7 +92,27 @@ export async function initializeChartReference(page: Page, sourceDpr: 1 | 2): Pr
   const actual = await page.evaluate<{ width: number; height: number; dpr: number }>('({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})')
   if (actual.width !== viewport.width || actual.height !== viewport.height || actual.dpr !== sourceDpr) throw new Error('Chart source metrics do not match the requested viewport and DPR')
   // La página cierra la sesión. Un detach entre capturas puede restablecer la emulación de Electron.
-  protocols.set(page, { session, sourceDpr })
+  protocols.set(page, { session, sourceDpr, pageZoom: 1 })
+}
+
+/** Zoom de página real, después de instalar emulación equivalente al factor nativo y antes de navegar al caso. */
+export async function setChartReferencePageZoom(app: ElectronApplication, page: Page, factor: number): Promise<void> {
+  const protocol = protocols.get(page), native = nativeContexts.get(page)
+  if (!protocol || !native || protocol.pageZoom !== 1 || !Number.isFinite(factor) || factor <= 0) throw new Error('Invalid Chart page zoom setup')
+  const actual = await app.evaluate(({ BrowserWindow }, requested) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length !== 1) throw new Error('Chart page zoom requires its single source window')
+    windows[0].webContents.setZoomFactor(requested)
+    return windows[0].webContents.getZoomFactor()
+  }, factor)
+  if (actual !== factor) throw new Error('Chart page zoom differs from its requested factor')
+  // En este dominio nativo/matched, Blink aplica Float32 al zoom de página y al producto de escala.
+  const expectedDpr = Math.fround(native.screenFactor * Math.fround(factor))
+  await expect.poll(() => page.evaluate<number>('devicePixelRatio'), { timeout: 5000, message: 'Chart page zoom must retain the matched native DPR' }).toBe(expectedDpr)
+  await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+  const stable = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor())
+  if (stable !== factor || await page.evaluate<number>('devicePixelRatio') !== expectedDpr) throw new Error('Chart page zoom changed during setup')
+  protocol.pageZoom = factor; protocol.sourceDpr = expectedDpr
 }
 
 export function requireContainedChartClip(clip: PixelRect, viewport: { width: number; height: number }): void {
@@ -447,12 +472,28 @@ export async function canonicalizeChartReference(body: Locator): Promise<ChartRe
   } catch (error) { await restore(); throw error }
 }
 
-/** Captura completa con clip entero observado; no oculta overflow ni usa el encuadre del exportador. */
+/** Captura completa con bordes DIP enteros; no oculta overflow ni usa el encuadre del exportador. */
 export async function captureChartReference(body: Locator, info?: TestInfo, name = 'chart'): Promise<ChartReference> {
   const protocol = protocols.get(body.page())
   if (!protocol) throw new Error('Initialize the Chart reference protocol before capturing')
+  const nativeContext = nativeContexts.get(body.page())
+  if (!nativeContext) throw new Error('Chart native context is unavailable')
+  const captureViewport = async (): Promise<ChartCaptureViewport> => {
+    const { cssVisualViewport: value } = await protocol.session.send('Page.getLayoutMetrics')
+    if (!value || typeof value.zoom !== 'number') throw new Error('Chart capture requires CSS visual viewport zoom metrics')
+    const viewport: ChartCaptureViewport = {
+      zoom: value.zoom, scale: value.scale, offsetX: value.offsetX, offsetY: value.offsetY,
+      pageX: value.pageX, pageY: value.pageY, clientWidth: value.clientWidth, clientHeight: value.clientHeight
+    }
+    if (!Object.values(viewport).every(Number.isFinite) || viewport.zoom <= 0
+      || viewport.zoom !== Math.fround(protocol.sourceDpr / nativeContext.screenFactor)
+      || viewport.scale !== 1 || viewport.offsetX !== 0 || viewport.offsetY !== 0) throw new Error('Unsupported Chart CSS-to-DIP capture viewport')
+    return viewport
+  }
   const observation = await observe(body), { snapshot, ink, background } = observation
   if (snapshot.viewport.devicePixelRatio !== protocol.sourceDpr) throw new Error('Chart source DPR changed before capture')
+  const initialViewport = await captureViewport()
+  if (initialViewport.pageX !== snapshot.viewport.scrollX || initialViewport.pageY !== snapshot.viewport.scrollY) throw new Error('Chart capture scroll coordinates disagree')
   const geometryTolerance = chartReferenceGeometryTolerance(snapshot, snapshot)
   const placement = placements.get(body) ?? { target: { x: Math.round(snapshot.body.box.x), y: Math.round(snapshot.body.box.y) }, quantum: { x: 0, y: 0 }, residual: { x: 0, y: 0 }, method: 'exact' as const }
   for (const axis of ['x', 'y'] as const) {
@@ -468,8 +509,23 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
   }
   // El matcher omite seis píxeles del borde: ocho dejan toda la tinta observada dentro
   // de la zona auditada, también los extremos de trazo y el halo conservador de sombra.
-  const clip = { x: Math.floor(ink.x - 8), y: Math.floor(ink.y - 8), width: Math.ceil(ink.x + ink.width + 8) - Math.floor(ink.x - 8), height: Math.ceil(ink.y + ink.height + 8) - Math.floor(ink.y - 8) }
+  const cssClip = { x: Math.floor(ink.x - 8), y: Math.floor(ink.y - 8), width: Math.ceil(ink.x + ink.width + 8) - Math.floor(ink.x - 8), height: Math.ceil(ink.y + ink.height + 8) - Math.floor(ink.y - 8) }
+  // Chromium trunca el tamaño DIP a entero antes de aplicar clip.scale. Expandimos
+  // hacia fuera una sola vez y conservamos esos enteros en ambas capturas.
+  const dipLeft = Math.floor((cssClip.x + initialViewport.pageX) * initialViewport.zoom)
+  const dipTop = Math.floor((cssClip.y + initialViewport.pageY) * initialViewport.zoom)
+  const dipClip = {
+    x: dipLeft, y: dipTop,
+    width: Math.ceil((cssClip.x + cssClip.width + initialViewport.pageX) * initialViewport.zoom) - dipLeft,
+    height: Math.ceil((cssClip.y + cssClip.height + initialViewport.pageY) * initialViewport.zoom) - dipTop
+  }
+  const clip = {
+    x: dipClip.x / initialViewport.zoom - initialViewport.pageX,
+    y: dipClip.y / initialViewport.zoom - initialViewport.pageY,
+    width: dipClip.width / initialViewport.zoom, height: dipClip.height / initialViewport.zoom
+  }
   requireContainedChartClip(clip, snapshot.viewport)
+  requireContainedChartClip(clip, { width: initialViewport.clientWidth, height: initialViewport.clientHeight })
   for (const outer of observation.outerClips) {
     if (outer.x && (ink.x < outer.box.x - 1e-6 || ink.x + ink.width > outer.box.x + outer.box.width + 1e-6) || outer.y && (ink.y < outer.box.y - 1e-6 || ink.y + ink.height > outer.box.y + outer.box.height + 1e-6)) throw new Error(`Chart reference ink is clipped by external ${outer.tag}`)
   }
@@ -524,17 +580,24 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
       const before = await snapshotChartReference(body)
       assertChartCaptureInvariant(snapshot, before)
       requireContainedChartClip(clip, before.viewport)
+      const viewportBefore = await captureViewport()
+      if (JSON.stringify(viewportBefore) !== JSON.stringify(initialViewport)) throw new Error('Chart CSS visual viewport changed before capture')
+      requireContainedChartClip(clip, { width: viewportBefore.clientWidth, height: viewportBefore.clientHeight })
+      if (viewportBefore.pageX !== before.viewport.scrollX || viewportBefore.pageY !== before.viewport.scrollY) throw new Error('Chart capture scroll coordinates disagree')
+      // Page.captureScreenshot recibe DIP; las cajas DOM y el oráculo permanecen en CSS px.
+      const requestedDipClip = { ...dipClip, scale }
       // El clip completo cabe en el viewport: no permitimos el resize temporal de beyondViewport.
       const response = await protocol.session.send('Page.captureScreenshot', {
         format: 'png', fromSurface: true, captureBeyondViewport: false,
-        clip: { x: clip.x + before.viewport.scrollX, y: clip.y + before.viewport.scrollY, width: clip.width, height: clip.height, scale }
+        clip: requestedDipClip
       })
-      const bytes = Buffer.from(response.data, 'base64'), after = await snapshotChartReference(body)
-      observations.push({ stage, before, after })
+      const bytes = Buffer.from(response.data, 'base64'), viewportAfter = await captureViewport(), after = await snapshotChartReference(body)
+      observations.push({ stage, before, after, viewportBefore, viewportAfter, requestedDipClip })
       if (info) {
         writeFileSync(info.outputPath(`${name}-${stage}.png`), bytes)
         writeFileSync(info.outputPath(`${name}-capture-observations.json`), JSON.stringify(observations, null, 2))
       }
+      if (JSON.stringify(viewportBefore) !== JSON.stringify(viewportAfter)) throw new Error('Chart capture changed its CSS visual viewport')
       assertChartCaptureInvariant(before, after)
       if (bytes.length < 24 || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('Chart reference capture returned an invalid PNG')
       return bytes
@@ -556,7 +619,7 @@ export async function captureChartReference(body: Locator, info?: TestInfo, name
     }
     const metadata: ChartReference['metadata'] = {
       clip, ink, canvasOffset: { x: geometry.canvas.x, y: geometry.canvas.y }, isolation: await isolation.evaluate(state => state.metadata),
-      capture: { api: 'Page.captureScreenshot', sourceDpr: protocol.sourceDpr, raster: 'dense', nativeContext: nativeContexts.get(body.page())!, width, height, calibration: { width: calibrationWidth, height: calibrationHeight, pixelsPerCss }, requestedScale, desiredPixelsPerCss, observations },
+      capture: { api: 'Page.captureScreenshot', sourceDpr: protocol.sourceDpr, raster: 'dense', nativeContext, pageZoom: protocol.pageZoom, width, height, calibration: { width: calibrationWidth, height: calibrationHeight, pixelsPerCss }, requestedScale, desiredPixelsPerCss, observations },
       invariantTolerance: INVARIANT_TOLERANCE, geometryTolerance, placement
     }
     if (info) {

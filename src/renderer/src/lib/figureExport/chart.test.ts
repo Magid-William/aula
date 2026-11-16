@@ -4,7 +4,7 @@ import { captureChartPng } from './chart'
 import { api } from '@renderer/lib/api'
 vi.mock('@renderer/lib/api', () => ({ api: { invoke: vi.fn() } }))
 afterEach(() => vi.mocked(api.invoke).mockReset())
-const scene: ChartRenderSceneV1 = { version: 1, family: 'chart', chartKind: 'bar', branch: 'empty', canvas: { width: 300, height: 160 }, metrics: { rootFontPx: 16, bodyFont: 'sans', bodyItalic: false, cssZoom: 1 }, appearance: { theme: 'light', language: 'en', direction: 'ltr', palette: { paper: '#fffdf9', text: '#000000', text2: '#222222', text3: '#444444', link: '#cc3311', accent: '#cc3311', brick: '#cc3311' } }, layers: [], output: { scale: 2 } }
+const scene: ChartRenderSceneV1 = { version: 1, family: 'chart', chartKind: 'bar', branch: 'empty', canvas: { width: 300, height: 160 }, metrics: { rootFontPx: 16, bodyFont: 'sans', bodyItalic: false, cssZoom: 1, rawEffectiveZoom: 1 }, appearance: { theme: 'light', language: 'en', direction: 'ltr', palette: { paper: '#fffdf9', text: '#000000', text2: '#222222', text3: '#444444', link: '#cc3311', accent: '#cc3311', brick: '#cc3311' } }, layers: [], output: { scale: 2 } }
 describe('ciclo de captura Chart', () => {
   it('entrega PNG del mismo scene y retira cancelación al terminar', async () => {
     const controller = new AbortController(), data = new Uint8Array([1, 2, 3])

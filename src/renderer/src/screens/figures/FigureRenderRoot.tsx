@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom'
 import type { FigureRenderApi, FigureRenderBounds, FigureRenderInput } from '@shared/figuresRender'
 import { validateFigureRenderInput, figureRenderLayout } from '@engine/figures/render'
 import { diagramGeometryNodes, diagramTexts } from '@engine/figures/diagram'
+import { prepareChartRenderContext, type ChartRenderContext } from '@engine/figures/chart'
 import { FIGURE_LIMITS } from '@shared/figures'
 import { DrawingExportScene } from '@renderer/blocks/visual/shared/DrawingExportScene'
 import { DiagramExportScene, diagramBackgroundStyle } from '@renderer/blocks/visual/shared/DiagramExportScene'
@@ -12,7 +13,7 @@ import { assertDrawingFontsReady } from '@renderer/lib/figureExport/drawingFonts
 import { preflightDrawingTexts } from '@renderer/lib/figureExport/StaticDrawingText'
 import { drawingExportBounds } from '@renderer/lib/figureExport/drawingBounds'
 import { diagramExportBounds } from '@renderer/lib/figureExport/diagramBounds'
-import { chartExportBounds } from '@renderer/lib/figureExport/chartBounds'
+import { assertChartRenderContext, chartExportBounds } from '@renderer/lib/figureExport/chartBounds'
 import './figure-render.css'
 
 declare global { interface Window { aulaFigureRender: FigureRenderApi } }
@@ -21,7 +22,7 @@ const host = document.getElementById('root')!
 let renderError: unknown
 const root = createRoot(host, { onUncaughtError: (error) => { renderError = error } })
 const controller = new AbortController()
-let mounted: { input: FigureRenderInput; bounds: FigureRenderBounds } | undefined
+let mounted: { input: FigureRenderInput; bounds: FigureRenderBounds; chartContext?: ChartRenderContext } | undefined
 let resourceError = false
 window.addEventListener('error', (event) => { if (event.target !== window) resourceError = true }, true)
 document.fonts.addEventListener('loadingerror', () => { resourceError = true })
@@ -30,6 +31,7 @@ function active(): void {
   if (controller.signal.aborted) throw new DOMException('Drawing render cancelled', 'AbortError')
   if (resourceError) throw new Error('Drawing resource failed')
   if (renderError) throw renderError
+  if (mounted?.chartContext && window.devicePixelRatio !== mounted.chartContext.initialZoom) throw new Error('Chart native zoom changed')
 }
 function deadline<T>(promise: PromiseLike<T>): Promise<T> {
   active()
@@ -61,19 +63,25 @@ async function fontsReady(scene: HTMLElement): Promise<void> {
 }
 const sameBounds = (a: FigureRenderBounds, b: FigureRenderBounds): boolean => (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(a[key] - b[key]) < 0.01)
 const sceneSelector = '[data-drawing-scene], [data-diagram-scene], [data-chart-scene]'
-function sceneElement(input: FigureRenderInput) {
+function sceneElement(input: FigureRenderInput, chartContext?: ChartRenderContext) {
   switch (input.kind) {
     case 'drawing': return <DrawingExportScene scene={input.scene} />
     case 'diagram': return <DiagramExportScene scene={input.scene} />
-    case 'chart': return <ChartExportScene scene={input.scene} />
+    case 'chart': {
+      if (!chartContext) throw new Error('Chart render context is unavailable')
+      return <ChartExportScene scene={input.scene} context={chartContext} />
+    }
     default: { const exhaustive: never = input; return exhaustive }
   }
 }
-function measureFor(input: FigureRenderInput): typeof drawingExportBounds {
+function measureFor(input: FigureRenderInput, chartContext?: ChartRenderContext): typeof drawingExportBounds {
   switch (input.kind) {
     case 'drawing': return drawingExportBounds
     case 'diagram': return diagramExportBounds
-    case 'chart': return (element, nominal) => chartExportBounds(element, nominal, input.scene.metrics.cssZoom)
+    case 'chart': {
+      if (!chartContext) throw new Error('Chart render context is unavailable')
+      return (element, nominal) => chartExportBounds(element, nominal, input.scene.metrics.cssZoom, chartContext)
+    }
     default: { const exhaustive: never = input; return exhaustive }
   }
 }
@@ -118,6 +126,7 @@ window.aulaFigureRender = {
     if (mounted) throw new Error('Drawing scene is already mounted')
     // El CSS inicial puede fallar antes de que el módulo instale su listener de recursos.
     if (![...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].every((link) => link.sheet !== null)) throw new Error('Drawing stylesheet failed')
+    const chartContext = input.kind === 'chart' ? prepareChartRenderContext(input.scene, window.devicePixelRatio) : undefined
     preflight(input)
     const { palette, theme, language } = scene.appearance
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -128,14 +137,14 @@ window.aulaFigureRender = {
     document.body.style.backgroundColor = palette.paper
     host.style.backgroundColor = palette.paper
     if (input.kind === 'diagram') Object.assign(host.style, diagramBackgroundStyle(input.scene))
-    flushSync(() => root.render(sceneElement(input)))
+    flushSync(() => root.render(sceneElement(input, chartContext)))
     active()
     const element = host.querySelector<HTMLElement>(sceneSelector)
     if (!element) throw new Error('Drawing scene is unavailable')
     await fontsReady(element)
     const { width: layoutWidth, height: layoutHeight } = figureRenderLayout(input)
-    const bounds = await stableBounds(element, layoutWidth, layoutHeight, measureFor(input))
-    mounted = { input, bounds }
+    const bounds = await stableBounds(element, layoutWidth, layoutHeight, measureFor(input, chartContext))
+    mounted = { input, bounds, chartContext }
     return { bounds, layoutWidth, layoutHeight }
   },
   async resize({ width, height, scale, offsetX, offsetY }) {
@@ -149,12 +158,13 @@ window.aulaFigureRender = {
     await nextFrame(); await nextFrame()
     if (window.innerWidth !== width || window.innerHeight !== height) throw new Error('Drawing viewport was constrained')
     const bounds = mounted.bounds
-    const measured = measureFor(mounted.input)(element, figureRenderLayout(mounted.input), scale)
+    const measured = measureFor(mounted.input, mounted.chartContext)(element, figureRenderLayout(mounted.input), scale)
     // La medida natural restaura transform; esperamos también después de esa última mutación.
     // Desde aquí sólo se lee el DOM hasta la captura nativa.
     await nextFrame(); await nextFrame()
     if (window.innerWidth !== width || window.innerHeight !== height) throw new Error('Drawing viewport was constrained')
     const frame = element.getBoundingClientRect()
+    if (mounted.chartContext) assertChartRenderContext(element, mounted.chartContext, scale)
     if ((['x', 'y', 'width', 'height'] as const).some((key) => Math.abs(bounds[key] - measured[key]) > 1)) {
       // Diagnóstico privado sólo numérico; el proceso principal conserva el error público genérico.
       const detail = mounted.input.kind === 'diagram' ? `: ${JSON.stringify({ expected: bounds, measured, scale, frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height } })}` : ''

@@ -100,13 +100,17 @@ test('entrada Pie: conserva IDs/cancel nativos y restaura descriptores propios o
   }
 })
 
-test('entrada Pie: primer commit completo o sin una RAF precedente falla; no busca otro parcial', async () => {
+test('entrada Pie: primer commit con ocho sectores o sin RAF precedente falla y conserva su evidencia', async () => {
   for (const full of [false, true]) {
     const f = fixture()
     if (full) f.host.requestAnimationFrame(() => f.setPaths(Array.from({ length: 8 }, (_, i) => String(i))))
     if (full) f.frame(100); else f.commit(['partial-without-raf'])
     const result = await outcome(f.clock.checkpoint())
-    expect(result.ok).toBe(false); expect(result.error).toContain(full ? 'already complete' : 'no preceding native RAF')
+    expect(result.ok).toBe(false); expect(result.error).toContain(full ? 'already contains all sectors' : 'no preceding native RAF')
+    expect(f.clock.report().firstPaths).toEqual(full ? Array.from({ length: 8 }, (_, i) => String(i)) : ['partial-without-raf'])
+    expect(f.clock.report().firstCommitNativeTimestamp).toBe(full ? 100 : null)
+    expect(f.clock.report().elapsedToCommit).toBe(full ? 100 : 0)
+    expect(f.clock.report().frozenTimestamp).toBe(null)
     expect(f.clock.report().steps).toEqual([])
     expect(f.timers.size).toBe(0); expect(f.disconnected).toBe(1)
     expect(Object.getOwnPropertyDescriptor(f.host, 'requestAnimationFrame')).toEqual(f.before.raf)

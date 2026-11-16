@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ChartRenderSceneV1, ChartSvgLayer } from '@shared/figuresChart'
-import { CHART_LIMITS, chartGeometryNodes, validateChartRenderScene as validate } from './chart'
+import { CHART_LIMITS, chartGeometryNodes, prepareChartRenderContext, validateChartRenderScene as validate } from './chart'
 import { chartPaintFixture, chartSceneFixture as fixture, chartTextFixture } from './testing'
 
 const svg = (scene: ChartRenderSceneV1): ChartSvgLayer => scene.layers[0] as ChartSvgLayer
@@ -33,6 +33,50 @@ describe('DTO cerrado de Chart', () => {
   })
   it.each([0, .124, 8.001, Infinity, NaN, '1.75', '175%', 'var(--zoom)', undefined])('rechaza zoom activo o fuera de límites %s', cssZoom => {
     const source = fixture(); Object.assign(source.metrics, { cssZoom }); expect(() => validate(source)).toThrow()
+  })
+  it.each([1 / 16, 1, 3.875, 64])('transporta EffectiveZoom Float32 %s separado del zoom CSS', rawEffectiveZoom => {
+    const source = fixture(); source.metrics.rawEffectiveZoom = rawEffectiveZoom
+    expect(validate(source).metrics).toEqual(source.metrics)
+  })
+  it.each([0, 1 / 32, 65, 1.1, NaN, Infinity, '2', undefined])('rechaza EffectiveZoom ambiguo o fuera del dominio %s', rawEffectiveZoom => {
+    const source = fixture(); Object.assign(source.metrics, { rawEffectiveZoom })
+    expect(() => validate(source)).toThrow('Invalid figure export')
+  })
+  it('no ejecuta accessors de EffectiveZoom ni acepta señales de emulación o zoom ajenas al DTO', () => {
+    const source = fixture(), getter = vi.fn(() => 2)
+    Object.defineProperty(source.metrics, 'rawEffectiveZoom', { enumerable: true, get: getter })
+    expect(() => validate(source)).toThrow(); expect(getter).not.toHaveBeenCalled()
+    const extra = fixture(); Object.assign(extra.metrics, { initialZoom: 2, inspectorOverride: 1 })
+    expect(() => validate(extra)).toThrow()
+  })
+  it('prepara la rejilla fuente bajo otro InitialZoom privado sin sustituirla por cssZoom', () => {
+    const source = fixture(); source.metrics.rawEffectiveZoom = 3.5; source.metrics.cssZoom = 1.75
+    const before = structuredClone(source)
+    expect(prepareChartRenderContext(source, 2)).toEqual({ initialZoom: 2, effectiveZoom: 3.5, wrapperZoom: 1.75, paintScale: 2 / 3.5 })
+    expect(prepareChartRenderContext(source, 1)).toEqual({ initialZoom: 1, effectiveZoom: 3.5, wrapperZoom: 3.5, paintScale: 1 / 3.5 })
+    expect(source).toEqual(before)
+    source.metrics.rawEffectiveZoom = 3.875
+    const context = prepareChartRenderContext(source, 1.25)
+    expect(context.wrapperZoom).toBe(Math.fround(3.1))
+    expect(context.paintScale).toBe(1.25 / 3.875)
+    expect(Math.fround(context.paintScale)).not.toBe(Math.fround(1 / context.wrapperZoom))
+    expect(Object.isFrozen(context)).toBe(true)
+  })
+  it('revalida recursos bajo el wrapper real antes de reducir la pintura', () => {
+    for (const change of [
+      (s: ChartRenderSceneV1) => { s.canvas.width = 9000 },
+      (s: ChartRenderSceneV1) => { Object.assign(svg(s).primitives[0], { strokeWidth: 200 }) },
+      (s: ChartRenderSceneV1) => { Object.assign(s.layers[2], { size: 200 }) },
+      (s: ChartRenderSceneV1) => { Object.assign(svg(s).primitives[0], { d: 'M0 0L20000 0' }) }
+    ]) {
+      const source = fixture(); source.metrics.rawEffectiveZoom = 2; change(source)
+      expect(validate(source)).toEqual(source)
+      expect(prepareChartRenderContext(source, 2).wrapperZoom).toBe(1)
+      expect(() => prepareChartRenderContext(source, 1)).toThrow('exceeds export limits')
+    }
+    const source = fixture(); source.metrics.rawEffectiveZoom = 64
+    expect(() => prepareChartRenderContext(source, 1)).toThrow()
+    expect(prepareChartRenderContext(source, 8).wrapperZoom).toBe(8)
   })
   it('rechaza accessors sin invocarlos, prototipos, símbolos y propiedades no enumerables', () => {
     const getter = vi.fn(() => 1), active = fixture(); Object.defineProperty(active.metrics, 'cssZoom', { get: getter, enumerable: true })
@@ -106,11 +150,14 @@ describe('DTO cerrado de Chart', () => {
   it('admite 6000 puntos simples y cuenta spans vacíos, textos HTML y wrapper contra el DOM', () => {
     const source = fixture(); source.layers = [svg(source)]
     svg(source).primitives = Array.from({ length: 6000 }, () => ({ kind: 'ellipse', cx: 1, cy: 1, rx: 2, ry: 2, ...chartPaintFixture() }))
-    expect(chartGeometryNodes(source)).toBe(6002); expect(validate(source)).toEqual(source)
-    svg(source).primitives = Array.from({ length: 3332 }, () => ({ kind: 'text', x: 0, y: 0, size: 12, weight: 400, color: '#000000', anchor: 'start', tabular: false, lines: [{ text: '', x: 0, dy: 0 }] }))
+    expect(chartGeometryNodes(source)).toBe(6003); expect(validate(source)).toEqual(source)
+    svg(source).primitives = Array.from({ length: 3331 }, () => ({ kind: 'text', x: 0, y: 0, size: 12, weight: 400, color: '#000000', anchor: 'start', tabular: false, lines: [{ text: '', x: 0, dy: 0 }] }))
+    svg(source).primitives.push(...Array.from({ length: 2 }, () => ({ kind: 'ellipse' as const, cx: 1, cy: 1, rx: 2, ry: 2, ...chartPaintFixture() })))
     source.layers.push(chartTextFixture())
     expect(chartGeometryNodes(source)).toBe(CHART_LIMITS.maxDomNodes); expect(validate(source)).toEqual(source)
     source.metrics.cssZoom = 1.75
+    expect(chartGeometryNodes(source)).toBe(CHART_LIMITS.maxDomNodes); expect(validate(source)).toEqual(source)
+    svg(source).primitives.push({ kind: 'ellipse', cx: 1, cy: 1, rx: 2, ry: 2, ...chartPaintFixture() })
     expect(chartGeometryNodes(source)).toBe(CHART_LIMITS.maxDomNodes + 1); expect(() => validate(source)).toThrow('exceeds export limits')
   })
   it('acota texto UTF-8 por hoja y agregado, bytes completos y todos los números de path', () => {
