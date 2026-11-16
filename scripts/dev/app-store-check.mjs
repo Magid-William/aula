@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { aulaNotice } from '../../native/ios/scripts/aula-notice.mjs'
 
 const IOS = 'native/ios'
 const onlyTexts = process.argv.includes('--texts')
@@ -150,8 +151,7 @@ else {
     line(ids.has(id), `incluye ${id}`)
   }
   const aula = licenses.components.find((c) => c.id === 'aula')
-  const notice = ['NOTICE.md', 'LICENSE.md'].map((f) => readFileSync(f, 'utf8').replace(/\r\n/g, '\n').trim()).join('\n\n')
-  line(aula?.text === notice, 'el aviso de Aula es el de NOTICE.md y LICENSE.md de ahora (si no: node native/ios/scripts/licenses.mjs)')
+  line(aula?.text === aulaNotice('.'), 'el aviso de Aula es el de NOTICE.md y LICENSE.md de ahora (si no: node native/ios/scripts/licenses.mjs)')
   line(licenses.components.every((c) => c.text?.trim() && c.license), `${licenses.components.length} componentes, todos con su licencia y su texto`)
 }
 

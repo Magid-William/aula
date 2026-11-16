@@ -1,5 +1,5 @@
 // Escribe native/ios/Aula/Licenses.json: los avisos de licencia que la app de iOS enseña en «Licencias».
-// Van Aula (AGPL, de LICENSE.md y NOTICE.md) y lo que TailscaleKit mete en el binario: libtailscale, la biblioteca
+// Van Aula (AGPL, de LICENSE.md y NOTICE.md, este pasado a texto) y lo que TailscaleKit mete en el binario: libtailscale, la biblioteca
 // estándar de Go y cada módulo de Go que se enlaza para iOS (lo que dice `go list -deps`, no todo el go.mod), cada uno
 // con el texto entero de sus LICENSE/NOTICE/PATENTS. Lo llama build-tailscalekit.sh; a mano:
 //   node native/ios/scripts/licenses.mjs
@@ -10,6 +10,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { aulaNotice } from './aula-notice.mjs'
 
 const IOS = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(IOS, '../..')
@@ -140,7 +141,7 @@ const components = [
     id: 'aula',
     name: 'Aula',
     license: 'AGPL-3.0-only',
-    text: ['NOTICE.md', 'LICENSE.md'].map((f) => readFileSync(join(ROOT, f), 'utf8').replace(/\r\n/g, '\n').trim()).join('\n\n')
+    text: aulaNotice(ROOT)
   },
   component(MAIN, 'TailscaleKit (libtailscale)', ref.slice(0, 12), moduleFiles(main), main.dir),
   ...FIRST.filter((p) => modules.has(p)).map((p) => ofModule(modules.get(p))),

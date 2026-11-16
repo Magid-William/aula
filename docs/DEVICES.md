@@ -131,7 +131,7 @@ A small SwiftUI app, no third-party packages:
 | `Aula/DemoServer.swift` | The demo (*Try it with an example course*): a tiny HTTP server on `127.0.0.1` that plays back a recording of the real app, so Aula can be tried with no Mac. See below |
 | `Aula/Assets.xcassets` | The app icon in its three looks (light, dark and tinted: the system picks one with its mode; `npx electron scripts/dev/icon/build-icons.mjs` writes them) and the drawings of the connect screen (the arch at each hour and the desk lamp, in light and dark), taken from the real app with `node scripts/dev/ios-art.mjs` |
 | `build-tailscalekit.sh` | Builds `Frameworks/TailscaleKit.xcframework` from Tailscale's official `libtailscale`, with log uploads disabled, Aula's bundle id (`com.luumlabs.aula.TailscaleKit`) and its own privacy manifest (`tailscalekit/PrivacyInfo.xcprivacy`) in each framework; then runs `scripts/licenses.mjs` |
-| `scripts/licenses.mjs` | Writes `Aula/Licenses.json` from the Go modules that `go list -deps` says are linked for iOS, each with its `LICENSE`/`NOTICE`/`PATENTS` files |
+| `scripts/licenses.mjs` | Writes `Aula/Licenses.json` from the Go modules that `go list -deps` says are linked for iOS, each with its `LICENSE`/`NOTICE`/`PATENTS` files, after Aula's own notice (`scripts/aula-notice.mjs`: `NOTICE.md` as plain text, then `LICENSE.md`) |
 | `Aula.xcodeproj` | The Xcode project (iOS 18.1+, iPhone and iPad) |
 
 Build it (needs a Mac with **Xcode 16.1 or newer**; the Command Line Tools are not enough):
