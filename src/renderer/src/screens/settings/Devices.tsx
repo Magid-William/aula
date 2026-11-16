@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { RemoteDeviceInfo, RemoteStatus } from '@shared/ipc/remote'
-import { Button, Card, ConfirmDialog, Icon, Spinner, Switch, cx, toast, type IconName } from '@renderer/design'
+import { Button, ConfirmDialog, Icon, Section, Spinner, Switch, cx, toast, type IconName } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import { useRpc } from '@renderer/lib/useRpc'
 import { rowTime } from '../inbox/format'
@@ -27,7 +27,7 @@ function useCountdown(expires: string | undefined): string {
   return left ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : ''
 }
 
-export function DevicesCard() {
+export function DevicesSection() {
   const { t } = useTranslation('settings')
   const { data: status, setData } = useRpc('remote.status', undefined, { events: ['remote.changed'] })
   const [busy, setBusy] = useState(false)
@@ -42,7 +42,8 @@ export function DevicesCard() {
     setBusy(true)
     try { setData(await call()) } catch (e) { toast.error(t('devices.failed'), e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
   }
-  if (!status) return null
+  // mientras llega el estado, solo el título (sin un hueco entre dos filetes)
+  if (!status) return <Section title={t('devices.title')} rule={false} />
   const server = status.server === true
   const on = status.enabled
   const net = status.tailnet
@@ -52,21 +53,14 @@ export function DevicesCard() {
   const headline = !on ? t('devices.off') : ready ? (status.connected ? t('devices.connected', { count: status.connected }) : t('devices.ready')) : t(`devices.net.${net.state}`)
 
   return (
-    <Card padded="lg" className={cx('transition-colors', on && 'bg-accent-wash!')}>
-      <div className="flex items-start gap-4">
-        <div className={cx('grid h-11 w-11 shrink-0 place-items-center rounded-[13px]', on ? 'bg-accent text-on-accent' : 'bg-fill2 text-text2')}>
-          <Icon name="tablet" size={22} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="t-title2">{server ? t('devices.server.title') : t('devices.title')}</h2>
-            {/* un servidor no se apaga desde un dispositivo: dejaría fuera a todos */}
-            {!server && <Switch checked={on} disabled={busy} onChange={(v) => void run(() => api.invoke('remote.setEnabled', { enabled: v }))} label={t('devices.title')} />}
-          </div>
-          <p className="t-ui text-text2 mt-1" aria-live="polite">{headline}</p>
-          <p className="t-callout text-text2 mt-2">{server ? t('devices.server.hint') : t('devices.hint')}</p>
-        </div>
-      </div>
+    <Section
+      title={server ? t('devices.server.title') : t('devices.title')}
+      rule={false}
+      detail={<span className="text-text2" aria-live="polite">{headline}</span>}
+      // un servidor no se apaga desde un dispositivo: dejaría fuera a todos
+      action={!server ? <Switch checked={on} disabled={busy} onChange={(v) => void run(() => api.invoke('remote.setEnabled', { enabled: v }))} label={t('devices.title')} /> : undefined}
+    >
+      <p className="t-callout text-text2">{server ? t('devices.server.hint') : t('devices.hint')}</p>
 
       {on && (
         <div className="mt-4 flex flex-col">
@@ -135,7 +129,7 @@ export function DevicesCard() {
         cancelLabel={t('devices.cancel')}
         danger
       />
-    </Card>
+    </Section>
   )
 }
 

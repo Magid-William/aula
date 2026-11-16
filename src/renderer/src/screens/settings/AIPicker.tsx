@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Card, Companion, Icon, ProgressBar, ProviderLogo, Spinner, TextField, cx, toast, pixelBurst, spring, type LogoId } from '@renderer/design'
+import { Button, Card, Icon, ProgressBar, ProviderLogo, Spinner, TextField, cx, toast, spring, type LogoId } from '@renderer/design'
 import type { AIProviderView, AIStatus } from '@shared/ai/views'
 import type { AgentsDetection, LocalProgressEvent } from '@shared/agents'
 import { validateAPIKey } from '@shared/ai/apiKey'
@@ -46,7 +46,8 @@ function useAIData() {
 
 type OptionId = 'claude-cli' | 'codex-cli' | 'aula-local' | 'ollama' | 'lmstudio' | string
 
-export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string) => void; compact?: boolean }) {
+/** `plain`: sobre el papel de Ajustes, en una columna y sin tarjetas (en la bienvenida, cada forma va en su tarjeta). */
+export function AIPicker({ onChosen, compact, plain }: { onChosen?: (providerId: string) => void; compact?: boolean; plain?: boolean }) {
   const { t } = useTranslation('settings')
   const { status, providers, detection, loading, reload } = useAIData()
   const [busy, setBusy] = useState<string | null>(null)
@@ -70,11 +71,10 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
   const view = (id: string) => providers.find((p) => p.id === id)
   const reloadViews = () => void reload()
 
-  const use = async (id: OptionId, el?: HTMLElement | null) => {
+  const use = async (id: OptionId) => {
     setBusy(id)
     try {
       await aiClient.configure({ providerId: id })
-      if (el) pixelBurst(el)
       onChosen?.(id)
       await reload()
     } catch (e) {
@@ -95,29 +95,26 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
     void reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [login.connected])
-  const connectChatGPT = async (el: HTMLElement | null, deviceAuth = false) => {
+  const connectChatGPT = async (deviceAuth = false) => {
     const ok = await useChatGPTLogin.getState().start({ deviceAuth, onError: (m) => toast.error(m) })
-    if (!ok) return
-    if (el?.isConnected) pixelBurst(el)
-    onChosen?.('codex-cli')
+    if (ok) onChosen?.('codex-cli')
   }
-  const chatgptButton = useRef<HTMLElement | null>(null)
 
   /** Modelo local: si ya está descargado se usa; si no, se descarga (motor + modelo, verificado) y después se usa. */
-  const useLocal = async (el: HTMLElement) => {
-    if (local.installed) return use('aula-local', el)
+  const useLocal = async () => {
+    if (local.installed) return use('aula-local')
     const ok = await local.download()
-    if (ok) await use('aula-local', el)
+    if (ok) await use('aula-local')
   }
 
-  const saveKey = async (el: HTMLElement) => {
+  const saveKey = async () => {
     const v = validateAPIKey(key)
     if (!v.ok) return toast.warning(t('ai.pasteKey'))
     const id = guessed ?? 'openai'
     setBusy('key')
     try {
       await aiClient.setKey(id, v.key)
-      await use(id, el)
+      await use(id)
       setKey('')
     } catch (e) {
       toast.error((e as Error).message)
@@ -133,16 +130,17 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
     )
 
   return (
-    // dos columnas: suscripción y local una sobre otra, la clave al lado; sin estirar (ninguna tarjeta con hueco vacío)
-    <div className={cx('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-1 @4xl:grid-cols-2 items-start')}>
-      <div className={cx('contents', !compact && '@4xl:flex @4xl:flex-col @4xl:gap-4')}>
-        <Group title={t('ai.subscription')} hint={t('ai.subscriptionHint')} companion="luna">
+    // en tarjetas, dos columnas: suscripción y local una sobre otra, la clave al lado (ninguna tarjeta con hueco vacío); sobre
+    // el papel, las tres formas una debajo de otra
+    <div className={cx('grid', plain ? 'grid-cols-1 gap-7 pt-2' : compact ? 'grid-cols-1 gap-4' : 'grid-cols-1 gap-4 @4xl:grid-cols-2 items-start')}>
+      <div className={cx('contents', !compact && !plain && '@4xl:flex @4xl:flex-col @4xl:gap-4')}>
+        <Group title={t('ai.subscription')} hint={t('ai.subscriptionHint')} plain={plain}>
           <Option
             active={activeId === 'claude-cli'}
             title={t('ai.claude')}
             detail={claude?.installed && claude.loggedIn !== false ? t('ai.claudeReady') : t('ai.claudeMissing')}
             ready={!!claude?.installed && claude.loggedIn !== false}
-            action={claude?.installed ? (e) => use('claude-cli', e) : undefined}
+            action={claude?.installed ? () => void use('claude-cli') : undefined}
             busy={busy === 'claude-cli'}
             logo="claude"
             extra={<ReasoningSelect provider={view('claude-cli')} onChanged={reloadViews} />}
@@ -152,11 +150,10 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
             title={t('ai.chatgpt')}
             detail={detection?.codexManagedLoggedIn || codex?.loggedIn ? t('ai.chatgptReady') : t('ai.chatgptConnect')}
             ready={!!(detection?.codexManagedLoggedIn || codex?.loggedIn)}
-            action={loginBusy ? undefined : (e) => {
-              chatgptButton.current = e
+            action={loginBusy ? undefined : () => {
               // desde un dispositivo (propietario de Aula como servidor), con el código de un solo uso: la página normal
               // volvería a una dirección del servidor que el dispositivo no ve
-              return detection?.codexManagedLoggedIn || codex?.loggedIn ? use('codex-cli', e) : connectChatGPT(e, api.remote)
+              void (detection?.codexManagedLoggedIn || codex?.loggedIn ? use('codex-cli') : connectChatGPT(api.remote))
             }}
             actionLabel={detection?.codexManagedLoggedIn || codex?.loggedIn ? undefined : t('ai.chatgptConnect')}
             busy={busy === 'codex-cli'}
@@ -169,13 +166,13 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
                 key="chatgpt-login"
                 view={login}
                 onCancel={login.cancel}
-                onUseCode={() => void connectChatGPT(chatgptButton.current, true)}
+                onUseCode={() => void connectChatGPT(true)}
               />
             )}
           </AnimatePresence>
         </Group>
 
-        <Group title={t('ai.local')} hint={t('ai.localHint')} companion="farol">
+        <Group title={t('ai.local')} hint={t('ai.localHint')} plain={plain}>
           {detection?.recommendedModel && (
             <>
               <Option
@@ -183,7 +180,7 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
                 title={detection.recommendedModel.name}
                 detail={local.installed ? t('ai.localReady') : t('ai.localModel')}
                 ready={local.installed || !!detection.engine?.running}
-                action={local.progress ? undefined : (e) => void useLocal(e)}
+                action={local.progress ? undefined : () => void useLocal()}
                 actionLabel={local.installed ? undefined : t('ai.localDownload')}
                 busy={busy === 'aula-local'}
                 logo="aula"
@@ -207,12 +204,12 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
           {!detection?.recommendedModel && !ollama && !lmstudio && (
             <p className="t-ui text-text3 leading-relaxed">{detection ? t('ai.localNone') : t('ai.localChecking')}</p>
           )}
-          {ollama && <Option active={activeId === 'ollama'} title={t('ai.ollama')} detail={t('ai.running', { count: ollama.models.length })} ready action={(e) => use('ollama', e)} busy={busy === 'ollama'} logo="ollama" />}
-          {lmstudio && <Option active={activeId === 'lmstudio'} title={t('ai.lmstudio')} detail={t('ai.running', { count: lmstudio.models.length })} ready action={(e) => use('lmstudio', e)} busy={busy === 'lmstudio'} logo="lmstudio" />}
+          {ollama && <Option active={activeId === 'ollama'} title={t('ai.ollama')} detail={t('ai.running', { count: ollama.models.length })} ready action={() => void use('ollama')} busy={busy === 'ollama'} logo="ollama" />}
+          {lmstudio && <Option active={activeId === 'lmstudio'} title={t('ai.lmstudio')} detail={t('ai.running', { count: lmstudio.models.length })} ready action={() => void use('lmstudio')} busy={busy === 'lmstudio'} logo="lmstudio" />}
         </Group>
       </div>
 
-      <Group title={t('ai.key')} hint={t('ai.keyHint')} companion="cristal">
+      <Group title={t('ai.key')} hint={t('ai.keyHint')} plain={plain}>
         {keyed.map((p) => (
           <Option
             key={p.id}
@@ -220,7 +217,7 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
             title={p.label}
             detail={p.keyHint ?? ''}
             ready={p.available}
-            action={(e) => use(p.id, e)}
+            action={() => void use(p.id)}
             busy={busy === p.id}
             provider={p}
             extra={
@@ -237,7 +234,7 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
             title={hostOf(custom.baseURL) ?? custom.label}
             detail={custom.available ? custom.model ?? '' : custom.availability ?? custom.model ?? ''}
             ready={custom.available}
-            action={(e) => use(custom.id, e)}
+            action={() => void use(custom.id)}
             busy={busy === custom.id}
             provider={custom}
             extra={
@@ -257,14 +254,14 @@ export function AIPicker({ onChosen, compact }: { onChosen?: (providerId: string
                   <ProviderLogo provider={{ id: guessed ?? 'openai' }} size={16} tone="brand" decorative />
                   <span className="truncate">{t('ai.detected', { provider: providers.find((p) => p.id === guessed)?.label ?? guessed ?? 'OpenAI' })}</span>
                 </span>
-                <Button size="sm" variant="primary" loading={busy === 'key'} onClick={(e) => void saveKey(e.currentTarget)}>
+                <Button size="sm" variant="primary" loading={busy === 'key'} onClick={() => void saveKey()}>
                   {t('ai.save')}
                 </Button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-        <CustomProvider current={custom} onSaved={(el) => use(CUSTOM_PROVIDER_ID, el)} />
+        <CustomProvider current={custom} onSaved={() => use(CUSTOM_PROVIDER_ID)} />
         {/* con qué proveedores funciona y dónde queda la clave (aquí o en el servidor, cifrada o no; solo sale a su proveedor) */}
         {!compact && !keyed.length && !customSet && (
           <div className="mt-1">
@@ -425,22 +422,30 @@ function fmtBytes(n: number): string {
   return `${Math.round(n / 1e3)} kB`
 }
 
-function Group({ title, hint, companion, children }: { title: string; hint: string; companion: string; children: React.ReactNode }) {
+/** Una forma de tener IA (suscripción, local, clave): su nombre, una línea y sus opciones. En tarjeta o sobre el papel. */
+function Group({ title, hint, plain, children }: { title: string; hint: string; plain?: boolean; children: React.ReactNode }) {
+  const head = (
+    <div>
+      <div className="t-headline">{title}</div>
+      <div className="t-ui text-text3">{hint}</div>
+    </div>
+  )
+  if (plain)
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="mb-1">{head}</div>
+        {children}
+      </div>
+    )
   return (
     <Card padded="lg" className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <Companion id={companion} size={40} />
-        <div>
-          <div className="t-headline">{title}</div>
-          <div className="t-ui text-text3">{hint}</div>
-        </div>
-      </div>
+      {head}
       <div className="flex flex-col gap-2 mt-1">{children}</div>
     </Card>
   )
 }
 
-export function Option({ title, detail, ready, active, action, actionLabel, busy, logo, provider, extra }: { title: string; detail: string; ready: boolean; active: boolean; action?: (el: HTMLElement) => void; actionLabel?: string; busy?: boolean; logo?: LogoId; provider?: AIProviderView; extra?: React.ReactNode }) {
+export function Option({ title, detail, ready, active, action, actionLabel, busy, logo, provider, extra }: { title: string; detail: string; ready: boolean; active: boolean; action?: () => void; actionLabel?: string; busy?: boolean; logo?: LogoId; provider?: AIProviderView; extra?: React.ReactNode }) {
   const { t } = useTranslation('settings')
   return (
     <motion.div layout transition={spring.smooth} className={cx('group flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] p-3 border-[0.5px] transition-colors', active ? 'bg-accent-wash border-accent-line' : 'bg-sunken border-transparent')}>
@@ -454,7 +459,7 @@ export function Option({ title, detail, ready, active, action, actionLabel, busy
           <Icon name="check" size={14} /> {t('ai.inUse')}
         </span>
       ) : action ? (
-        <Button size="sm" variant={ready ? 'secondary' : 'plain'} loading={busy} className="ml-auto" onClick={(e) => action(e.currentTarget)}>
+        <Button size="sm" variant={ready ? 'secondary' : 'plain'} loading={busy} className="ml-auto" onClick={() => action()}>
           {actionLabel ?? t('ai.use')}
         </Button>
       ) : null}

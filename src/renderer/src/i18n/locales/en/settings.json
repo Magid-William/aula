@@ -1,6 +1,5 @@
 {
   "title": "Settings",
-  "subtitle": "Everything is on by default except “Aula always on”. Change only what you need.",
   "remote": {
     "subtitle": "These are Aula’s settings on your Mac: what you change here changes everywhere. Keys, platforms, devices and data are managed on the Mac.",
     "subtitleServer": "These are your Aula server’s settings: what you change here changes on all your devices. The AI and its keys, platforms and devices are managed by its owner.",
@@ -146,8 +145,7 @@
     "keepSignedIn": "Keep me signed in",
     "keepSignedInHint": "Aula stores the cookies encrypted and refreshes the session in the background.",
     "none": "No platforms. You can study with your own files only.",
-    "worksWith": "Works with",
-    "anySite": "any other class website",
+    "worksWith": "Works with Canvas, Moodle, Blackboard, Google Classroom, Brightspace and any class website.",
     "signedInAt": "Signed in to {{name}}",
     "signedInDetail": "Aula can read your platform now. It only reads: it never submits or starts anything.",
     "waiting": "Waiting for you to sign in in the window",

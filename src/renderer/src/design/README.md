@@ -151,8 +151,8 @@ grano de papel muy suave, algo fuera de registro de su línea. Minimalista y ama
   sola vez**: si la pantalla ya pinta su h1 (el curso, el monitor de creación), `useScreenTitle(título, acciones, deps,
   { compactOnly: true })` y la barra superior solo lo pone en el teléfono; si no, la barra es el título visible y la pantalla
   deja `<h1 className="sr-only">` con el mismo texto.
-- Contenedor: `<div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-24">` y rejilla `grid grid-cols-12 gap-4`
-  con variantes de contenedor (`@3xl:`, `@5xl:`). Deja `pb-24` para el botón flotante de Aula.
+- Contenedor: `<div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-10">` y rejilla `grid grid-cols-12 gap-4`
+  con variantes de contenedor (`@3xl:`, `@5xl:`).
 - Datos: `useRpc('dominio.metodo', args, { events: [...] })`. Navegar: `navigate({ name: 'course', id })`.
 - Textos con i18n (`i18n/locales/{es,en}/<espacio>.json`), tono de persona: concretos, sin eslóganes, plurales de verdad.
 - Vacío con `EmptyState` (la marca de Aula), carga con `skeleton` o `Spinner`, error con frase + «Reintentar».
