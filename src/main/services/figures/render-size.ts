@@ -1,12 +1,11 @@
 import { FIGURE_LIMITS as L, FigureValidationError } from '@shared/figures'
-import type { DrawingRenderBounds } from '@shared/figuresDrawing'
-import { DRAWING_LIMITS } from '@engine/figures/drawing'
+import { FIGURE_RENDER_LIMITS, type FigureRenderBounds } from '@shared/figuresRender'
 const fail = (): never => { throw new FigureValidationError('too_large') }
 export function checkRenderSize(width: number, height: number): void {
   if (![width, height].every(n => Number.isInteger(n) && n > 0 && n <= L.maxDimension) || width * height > L.maxPixels) fail()
 }
-export function drawingCaptureSize(bounds: DrawingRenderBounds, scale: 1 | 2, physicalScale: number): { width: number; height: number; outputWidth: number; outputHeight: number; scale: number } {
-  if (![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) || bounds.width <= 0 || bounds.height <= 0 || Math.max(Math.abs(bounds.x), Math.abs(bounds.y), bounds.width, bounds.height) > DRAWING_LIMITS.maxSceneExtent) fail()
+export function figureCaptureSize(bounds: FigureRenderBounds, scale: 1 | 2, physicalScale: number): { width: number; height: number; outputWidth: number; outputHeight: number; scale: number } {
+  if (![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) || bounds.width <= 0 || bounds.height <= 0 || Math.max(Math.abs(bounds.x), Math.abs(bounds.y), bounds.width, bounds.height) > FIGURE_RENDER_LIMITS.maxSceneExtent) fail()
   if (!Number.isFinite(physicalScale) || physicalScale < .5 || physicalScale > 8) fail()
   const outputScale = Math.min(scale, L.maxDimension / bounds.width, L.maxDimension / bounds.height, Math.sqrt(L.maxPixels / (bounds.width * bounds.height)))
   const outputWidth = Math.max(1, Math.floor(bounds.width * outputScale)), outputHeight = Math.max(1, Math.floor(bounds.height * outputScale))
@@ -19,6 +18,7 @@ export function drawingCaptureSize(bounds: DrawingRenderBounds, scale: 1 | 2, ph
   if ((Math.ceil(width * physicalScale) * Math.ceil(height * physicalScale) * 2 + outputWidth * outputHeight * 2) * 4 > 256 * 1024 * 1024) fail()
   return { width, height, outputWidth, outputHeight, scale: Math.min(width / bounds.width, height / bounds.height) }
 }
+export const drawingCaptureSize = figureCaptureSize
 export function privatePngSize(data: Uint8Array): { width: number; height: number } {
   if (data.byteLength < 33 || data.byteLength > L.maxPngBytes) fail()
   const header = new DataView(data.buffer, data.byteOffset, data.byteLength)

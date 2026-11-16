@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { go, homeWithDemoCourse } from './helpers'
 import { compareDrawingPixels, type LiveDrawingGeometry } from './drawing-pixels'
+import type { FigureRenderInput } from '../../src/shared/figuresRender'
 
 for (const fixture of [{ theme: 'academic', layout: 'content', italic: false }, { theme: 'chalk', layout: 'content', italic: false }, { theme: 'aula', layout: 'quote', italic: true }]) {
   test(`Drawing PNG conserva tipografía de diapositiva ${fixture.theme}/${fixture.layout}`, async ({}, info) => {
@@ -34,7 +35,9 @@ for (const fixture of [{ theme: 'academic', layout: 'content', italic: false }, 
             const result = await execute(code, gesture)
             if (code.startsWith('window.aulaFigureRender.render(')) {
               (globalThis as unknown as { typography: unknown }).typography = await execute(`(() => { const n=document.querySelector('[data-drawing-label]'), c=getComputedStyle(n); return {family:c.fontFamily,style:c.fontStyle,text:n.textContent} })()`)
-              ;(globalThis as unknown as { layoutMetrics: unknown }).layoutMetrics = JSON.parse(code.slice('window.aulaFigureRender.render('.length, -1)).metrics
+              const input = JSON.parse(code.slice('window.aulaFigureRender.render('.length, -1)) as FigureRenderInput
+              if (input.kind !== 'drawing') throw new Error('Expected Drawing render input')
+              ;(globalThis as unknown as { layoutMetrics: unknown }).layoutMetrics = input.scene.metrics
             }
             return result
           }) as typeof win.webContents.executeJavaScript

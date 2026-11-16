@@ -1,21 +1,25 @@
 // Entrada dedicada sin App, puente IPC, almacenes ni proveedores que lean preferencias.
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import type { DrawingRenderApi, DrawingRenderBounds, DrawingRenderSceneV1 } from '@shared/figuresDrawing'
+import type { FigureRenderApi, FigureRenderBounds, FigureRenderInput } from '@shared/figuresRender'
+import { validateFigureRenderInput, figureRenderLayout } from '@engine/figures/render'
+import { diagramGeometryNodes, diagramTexts } from '@engine/figures/diagram'
 import { FIGURE_LIMITS } from '@shared/figures'
 import { DrawingExportScene } from '@renderer/blocks/visual/shared/DrawingExportScene'
+import { DiagramExportScene, diagramBackgroundStyle } from '@renderer/blocks/visual/shared/DiagramExportScene'
 import { assertDrawingFontsReady } from '@renderer/lib/figureExport/drawingFonts'
 import { preflightDrawingTexts } from '@renderer/lib/figureExport/StaticDrawingText'
 import { drawingExportBounds } from '@renderer/lib/figureExport/drawingBounds'
+import { diagramExportBounds } from '@renderer/lib/figureExport/diagramBounds'
 import './figure-render.css'
 
-declare global { interface Window { aulaFigureRender: DrawingRenderApi } }
+declare global { interface Window { aulaFigureRender: FigureRenderApi } }
 
 const host = document.getElementById('root')!
 let renderError: unknown
 const root = createRoot(host, { onUncaughtError: (error) => { renderError = error } })
 const controller = new AbortController()
-let mounted: { scene: DrawingRenderSceneV1; bounds: DrawingRenderBounds } | undefined
+let mounted: { input: FigureRenderInput; bounds: FigureRenderBounds } | undefined
 let resourceError = false
 window.addEventListener('error', (event) => { if (event.target !== window) resourceError = true }, true)
 document.fonts.addEventListener('loadingerror', () => { resourceError = true })
@@ -53,12 +57,12 @@ async function fontsReady(scene: HTMLElement): Promise<void> {
   }
   throw new Error('Drawing fonts did not settle')
 }
-const sameBounds = (a: DrawingRenderBounds, b: DrawingRenderBounds): boolean => (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(a[key] - b[key]) < 0.01)
-async function stableBounds(scene: HTMLElement, width: number, height: number): Promise<DrawingRenderBounds> {
-  let previous = drawingExportBounds(scene, { width, height })
+const sameBounds = (a: FigureRenderBounds, b: FigureRenderBounds): boolean => (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(a[key] - b[key]) < 0.01)
+async function stableBounds(scene: HTMLElement, width: number, height: number, measure: typeof drawingExportBounds): Promise<FigureRenderBounds> {
+  let previous = measure(scene, { width, height })
   for (let attempt = 0, stable = 0; attempt < 12; attempt++) {
     await nextFrame()
-    const current = drawingExportBounds(scene, { width, height })
+    const current = measure(scene, { width, height })
     stable = sameBounds(previous, current) ? stable + 1 : 0
     if (stable >= 2 && document.fonts.status === 'loaded') return current
     previous = current
@@ -75,12 +79,17 @@ function encode(bytes: Uint8Array): string {
 }
 
 window.aulaFigureRender = {
-  async render(scene) {
+  async render(value) {
     active()
+    const input = validateFigureRenderInput(value)
+    const { scene } = input
     if (mounted) throw new Error('Drawing scene is already mounted')
     // El CSS inicial puede fallar antes de que el módulo instale su listener de recursos.
     if (![...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].every((link) => link.sheet !== null)) throw new Error('Drawing stylesheet failed')
-    preflightDrawingTexts(scene.items.flatMap((item) => item.labels.map((label) => label.text)), 2 + (scene.metrics.cssZoom === 1 ? 0 : 1) + scene.items.reduce((total, item) => total + 1 + item.paths.length * 5 + item.labels.length * 2 + item.rings.reduce((sum, ring) => sum + 2 + ring.strokes.length * 4, 0), 0))
+    if (input.kind === 'drawing') {
+      const { scene } = input
+      preflightDrawingTexts(scene.items.flatMap((item) => item.labels.map((label) => label.text)), 2 + (scene.metrics.cssZoom === 1 ? 0 : 1) + scene.items.reduce((total, item) => total + 1 + item.paths.length * 5 + item.labels.length * 2 + item.rings.reduce((sum, ring) => sum + 2 + ring.strokes.length * 4, 0), 0))
+    } else preflightDrawingTexts(diagramTexts(input.scene), diagramGeometryNodes(input.scene))
     const { palette, theme, language } = scene.appearance
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.documentElement.lang = language
@@ -89,29 +98,41 @@ window.aulaFigureRender = {
     document.body.style.fontSize = 'inherit'
     document.body.style.backgroundColor = palette.paper
     host.style.backgroundColor = palette.paper
-    flushSync(() => root.render(<DrawingExportScene scene={scene} />))
+    if (input.kind === 'diagram') Object.assign(host.style, diagramBackgroundStyle(input.scene))
+    flushSync(() => root.render(input.kind === 'drawing' ? <DrawingExportScene scene={input.scene} /> : <DiagramExportScene scene={input.scene} />))
     active()
-    const element = host.querySelector<HTMLElement>('[data-drawing-scene]')
+    const element = host.querySelector<HTMLElement>('[data-drawing-scene], [data-diagram-scene]')
     if (!element) throw new Error('Drawing scene is unavailable')
     await fontsReady(element)
-    const layoutWidth = scene.metrics.layoutWidth, layoutHeight = scene.canvas.height * layoutWidth / scene.canvas.width
-    const bounds = await stableBounds(element, layoutWidth, layoutHeight)
-    mounted = { scene, bounds }
+    const { width: layoutWidth, height: layoutHeight } = figureRenderLayout(input)
+    const bounds = await stableBounds(element, layoutWidth, layoutHeight, input.kind === 'drawing' ? drawingExportBounds : diagramExportBounds)
+    mounted = { input, bounds }
     return { bounds, layoutWidth, layoutHeight }
   },
   async resize({ width, height, scale, offsetX, offsetY }) {
     active()
     dimensions(width, height)
     if (!mounted || !Number.isFinite(scale) || scale <= 0 || scale > 16 || ![offsetX, offsetY].every(Number.isFinite)) throw new Error('Invalid drawing viewport')
-    const element = host.querySelector<HTMLElement>('[data-drawing-scene]')!
+    const element = host.querySelector<HTMLElement>('[data-drawing-scene], [data-diagram-scene]')!
     element.style.transformOrigin = '0 0'
     element.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`
+    if (mounted.input.kind === 'diagram') Object.assign(host.style, diagramBackgroundStyle(mounted.input.scene, scale, offsetX, offsetY))
+    await nextFrame(); await nextFrame()
+    if (window.innerWidth !== width || window.innerHeight !== height) throw new Error('Drawing viewport was constrained')
+    const bounds = mounted.bounds
+    const measured = mounted.input.kind === 'drawing'
+      ? drawingExportBounds(element, figureRenderLayout(mounted.input), scale)
+      : diagramExportBounds(element, figureRenderLayout(mounted.input))
+    // La medida natural restaura transform; esperamos también después de esa última mutación.
+    // Desde aquí sólo se lee el DOM hasta la captura nativa.
     await nextFrame(); await nextFrame()
     if (window.innerWidth !== width || window.innerHeight !== height) throw new Error('Drawing viewport was constrained')
     const frame = element.getBoundingClientRect()
-    const bounds = mounted.bounds
-    const measured = drawingExportBounds(element, { width: mounted.scene.metrics.layoutWidth, height: mounted.scene.canvas.height * mounted.scene.metrics.layoutWidth / mounted.scene.canvas.width }, scale)
-    if ((['x', 'y', 'width', 'height'] as const).some((key) => Math.abs(bounds[key] - measured[key]) > 1)) throw new Error('Drawing bounds changed while framing')
+    if ((['x', 'y', 'width', 'height'] as const).some((key) => Math.abs(bounds[key] - measured[key]) > 1)) {
+      // Diagnóstico privado sólo numérico; el proceso principal conserva el error público genérico.
+      const detail = mounted.input.kind === 'diagram' ? `: ${JSON.stringify({ expected: bounds, measured, scale, frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height } })}` : ''
+      throw new Error(`Drawing bounds changed while framing${detail}`)
+    }
     if (Math.abs(frame.x + bounds.x * scale) > 1 || Math.abs(frame.y + bounds.y * scale) > 1 || bounds.width * scale > width + 1 || bounds.height * scale > height + 1) throw new Error('Drawing framing is inconsistent')
     return { width: window.innerWidth, height: window.innerHeight }
   },

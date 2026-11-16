@@ -15,6 +15,9 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
   Moving drawings capture the frame currently on screen while their clock and transitions continue. Saving does not
   include controls, annotations or content from hidden steps. Additional figure types, student annotations and sending
   a marked image to the tutor remain on the [figure roadmap](https://github.com/luumlabs/aula/issues/28).
+- **Save a complete diagram as PNG**, including flowcharts, concept maps, trees, cycles, layers, pyramids, funnels,
+  Venn diagrams and mind maps. The image keeps the current layout, visible construction step, labels, formulas and
+  emphasis, and includes the full canvas independently of pan and zoom.
 
 ### Fixed
 - **Importing scanned PDFs no longer stops because the OCR worker is missing a required file.** Desktop installers
@@ -22,6 +25,7 @@ All notable changes to Aula. Versions follow `MAJOR.MINOR.PATCH`; each one is a
 - **Retrying a failed question keeps its saved images and documents**, including questions containing only an image.
   The original question, context and files stay intact, and repeated clicks do not send duplicate questions. If a saved
   attachment is unavailable, Aula explains the problem before starting another response.
+- **Diagram construction steps keep future shapes hidden**, including their emphasis rings and Venn cutouts.
 
 ## [0.2.5] - 2026-11-14
 

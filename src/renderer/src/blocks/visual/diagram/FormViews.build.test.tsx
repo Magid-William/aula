@@ -16,6 +16,25 @@ const props = (b: BlockOf<'diagram'>, step: number | null): FormViewProps => ({ 
 beforeAll(async () => { await i18n.changeLanguage('es') })
 
 describe('con `build`, lo que aún no ha salido no se puede señalar', () => {
+  it('los anillos nunca señalan una parte todavía oculta, ni con foco inconsistente', () => {
+    const b = diagram({ form: 'pyramid', build: true, nodes: [{ id: 'a', label: 'Cima' }, { id: 'b', label: 'Futuro' }], steps: [{ md: '1', nodes: ['a'] }, { md: '2', nodes: ['b'] }] })
+    const l = layoutPyramid(b, estimateMeasure, false, true), p = props(b, 0)
+    const baseline = renderToStaticMarkup(<PyramidView layout={l} {...p} />)
+    p.hl!.focus.add('b')
+    const withHiddenFocus = renderToStaticMarkup(<PyramidView layout={l} {...p} />)
+    expect((withHiddenFocus.match(/<mask /g) ?? []).length).toBe((baseline.match(/<mask /g) ?? []).length)
+  })
+  it('Venn no recorta la región visible por un conjunto futuro ni pinta su anillo', () => {
+    const b = diagram({ form: 'venn', build: true, nodes: [{ id: 'a', label: 'A', shape: 'circle' }, { id: 'b', label: 'B', shape: 'circle' }, { id: 'x', label: 'x' }], edges: [{ from: 'x', to: 'a' }], steps: [{ md: '1', nodes: ['x'] }, { md: '2', nodes: ['b'] }] })
+    const l = layoutVenn(b, estimateMeasure)!, p = props(b, 0)
+    const baseline = renderToStaticMarkup(<VennView layout={l} hover="a" onHover={() => undefined} {...p} />)
+    const regionMask = baseline.match(/<mask[^>]*id="[^"]*-m"[\s\S]*?<\/mask>/)?.[0]
+    expect(regionMask).toBeDefined()
+    expect(regionMask).not.toContain('<circle')
+    p.hl!.focus.add('b')
+    const withHiddenFocus = renderToStaticMarkup(<VennView layout={l} hover="a" onHover={() => undefined} {...p} />)
+    expect((withHiddenFocus.match(/<mask /g) ?? []).length).toBe((baseline.match(/<mask /g) ?? []).length)
+  })
   it('pirámide: solo la cúspide en el primer paso', () => {
     const b = diagram({ form: 'pyramid', build: true, nodes: [{ id: 'a', label: 'Cima' }, { id: 'b', label: 'Medio', detail: 'Lo de en medio' }, { id: 'c', label: 'Base' }], steps: [{ md: '1', nodes: ['a'] }, { md: '2', nodes: ['b', 'c'] }] })
     const l = layoutPyramid(b, estimateMeasure, false, true)

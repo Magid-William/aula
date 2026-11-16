@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { drawingCaptureSize, privatePngSize } from './render-size'
+import { drawingCaptureSize, figureCaptureSize, privatePngSize } from './render-size'
 import { pngChunk, pngFixture } from './testing'
 import { canonicalizeFigurePng } from './png'
 
 describe('superficies físicas y PNG intermedio privado', () => {
+  it('conserva la misma captura para ambas escenas y el nombre Drawing anterior', () => { expect(drawingCaptureSize).toBe(figureCaptureSize) })
   it.each([1, 1.25, 1.5, 2, 3, 8])('acota captura y salida con escala física %s conservando encuadre', physical => {
     const bounds = { x: -100, y: -50, width: 10000, height: 7000 }, size = drawingCaptureSize(bounds, 2, physical)
     expect(Math.ceil(size.width * physical)).toBeLessThanOrEqual(4096)
