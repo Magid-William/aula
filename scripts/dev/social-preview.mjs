@@ -1,7 +1,7 @@
-// La imagen para redes de Aula (docs/media/social-preview.png, 1280×640): el icono, el nombre, la frase y la pantalla de
-// Hoy. Se hace con el Electron del proyecto, a partir del icono y de la captura del README (sin dependencias):
+// La imagen para redes de Aula (docs/media/social-preview.png, 1280×640): el icono, el nombre, la frase de la portada y
+// un cuestionario corregido en el chat. Se hace con el Electron del proyecto, sin dependencias:
 //   npx electron scripts/dev/social-preview.mjs [salida.png]
-// Después de regenerar el icono (scripts/dev/icon/build-icons.mjs) o las capturas (scripts/readme-shots.mjs), vuelve a
+// Si cambian el icono (scripts/dev/icon/build-icons.mjs) o la captura del chat (scripts/readme-shots.mjs chat), vuelve a
 // ejecutarlo. GitHub no la toma del repositorio: hay que subirla a mano en Settings → Social preview.
 import { app, BrowserWindow } from 'electron'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -12,34 +12,31 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const out = resolve(process.argv.slice(2).find((a) => a.endsWith('.png')) ?? join(ROOT, 'docs/media/social-preview.png'))
 const data = (file) => 'data:image/png;base64,' + readFileSync(join(ROOT, file)).toString('base64')
+// recorte de la captura del chat (1440×900): la columna del mensaje con el cuestionario corregido
+const K = 0.745
 
 const html = `<!doctype html><meta charset="utf-8"><style>
   html, body { margin: 0; }
   body { width: 1280px; height: 640px; overflow: hidden; background: #f6f1e8; color: #201e1a; position: relative; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; }
-  /* una aguada tibia detrás del icono, como las del propio icono (pintada con filtros, sin degradados de relleno) */
-  svg.wash { position: absolute; left: -120px; top: -90px; width: 760px; height: 560px; mix-blend-mode: multiply; }
-  .icon { position: absolute; left: 66px; top: 68px; width: 158px; height: 158px; }
-  h1 { position: absolute; left: 82px; top: 246px; margin: 0; font: 500 112px/1 'New York', ui-serif, Georgia, serif; letter-spacing: -1px; }
-  p.line { position: absolute; left: 84px; top: 398px; margin: 0; width: 460px; font: 400 33px/1.28 'New York', ui-serif, Georgia, serif; color: #2f2b26; }
-  p.line em { color: #a9472a; font-weight: 500; }
-  p.sub { position: absolute; left: 84px; top: 508px; margin: 0; font-size: 18px; color: #5d5852; }
-  p.sub b { color: #2f2b26; font-weight: 600; }
-  .shot { position: absolute; left: 604px; top: 86px; width: 1010px; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px rgba(32, 30, 26, 0.1), 0 30px 60px -24px rgba(60, 40, 20, 0.4); }
-  .shot img { display: block; width: 100%; }
+  /* grano de papel fijo, sin desenfoque ni degradados */
+  svg.grain { position: absolute; inset: 0; width: 1280px; height: 640px; opacity: 0.5; mix-blend-mode: multiply; }
+  .icon { position: absolute; left: 72px; top: 64px; width: 112px; height: 112px; }
+  h1 { position: absolute; left: 206px; top: 78px; margin: 0; font: 500 92px/1 'New York', ui-serif, Georgia, serif; letter-spacing: -1px; }
+  .hook { position: absolute; left: 76px; top: 214px; width: 600px; margin: 0; font: 400 40px/1.2 'New York', ui-serif, Georgia, serif; color: #2f2b26; }
+  .hook em { display: block; color: #a9472a; font-style: italic; font-weight: 500; }
+  .sub { position: absolute; left: 78px; top: 350px; width: 520px; margin: 0; font-size: 21px; line-height: 1.45; color: #4a4540; }
+  .sub b { color: #201e1a; font-weight: 600; }
+  .plat { position: absolute; left: 78px; top: 548px; margin: 0; font-size: 17px; color: #6b655e; letter-spacing: 0.2px; }
+  .shot { position: absolute; left: 652px; top: 56px; width: 572px; height: 528px; border-radius: 18px; overflow: hidden; background: #fcfaf5; box-shadow: 0 0 0 1px rgba(32, 30, 26, 0.1), 0 30px 60px -24px rgba(60, 40, 20, 0.38); }
+  .shot img { position: absolute; width: ${1440 * K}px; left: ${-612 * K}px; top: ${-62 * K}px; }
 </style>
-<svg class="wash" viewBox="0 0 760 560"><defs><filter id="w" x="-30%" y="-30%" width="160%" height="160%">
-  <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves="3" seed="13" result="n"/>
-  <feDisplacementMap in="SourceGraphic" in2="n" scale="46" xChannelSelector="R" yChannelSelector="G" result="d"/>
-  <feGaussianBlur in="d" stdDeviation="16" result="b"/>
-  <feTurbulence type="fractalNoise" baseFrequency="0.006 0.012" numOctaves="2" seed="7" result="p"/>
-  <feColorMatrix in="p" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -0.45 1.12" result="pa"/>
-  <feComposite in="b" in2="pa" operator="in"/></filter></defs>
-  <g filter="url(#w)"><ellipse cx="300" cy="250" rx="250" ry="150" fill="#efbf6f" opacity="0.3"/><ellipse cx="470" cy="180" rx="170" ry="80" fill="#dba892" opacity="0.26"/></g></svg>
+<svg class="grain"><filter id="g"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 .55  0 0 0 0 .45  0 0 0 0 .35  0 0 0 .06 0"/></filter><rect width="100%" height="100%" filter="url(#g)"/></svg>
 <img class="icon" src="${data('docs/media/aula-icon.png')}">
 <h1>Aula</h1>
-<p class="line">Turn anything you study into a course, <em>and study it together.</em></p>
-<p class="sub"><b>Free &amp; open source</b> · macOS · Windows · Linux</p>
-<div class="shot"><img src="${data('docs/media/screenshots/home-light-en.png')}"></div>`
+<p class="hook">Turn your notes into a course. <em>An AI tutor studies it with you.</em></p>
+<p class="sub"><b>Free and open source.</b> Lessons, exercises checked as you answer, flashcards and mock exams. Your own AI, or a free local model.</p>
+<p class="plat">Windows · macOS · Linux · iPhone · iPad · Android</p>
+<div class="shot"><img src="${data('docs/media/screenshots/chat-light-en.png')}"></div>`
 
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 app.dock?.hide()
@@ -49,7 +46,7 @@ app.whenReady().then(async () => {
   writeFileSync(file, html)
   const win = new BrowserWindow({ show: false, width: 1280, height: 640, useContentSize: true, webPreferences: { offscreen: true, sandbox: true } })
   await win.loadFile(file)
-  await new Promise((ok) => setTimeout(ok, 600))
+  await new Promise((ok) => setTimeout(ok, 700))
   writeFileSync(out, (await win.webContents.capturePage({ x: 0, y: 0, width: 1280, height: 640 })).toPNG())
   rmSync(tmp, { recursive: true, force: true })
   console.log('✓', out)
