@@ -1,6 +1,5 @@
 {
   "title": "Ajustes",
-  "subtitle": "Todo viene encendido salvo «Aula siempre activa». Cambia solo lo que necesites.",
   "remote": {
     "subtitle": "Son los ajustes de Aula en tu Mac: lo que cambies aquí cambia en todas partes. Las claves, las plataformas, los dispositivos y los datos se gestionan en el Mac.",
     "subtitleServer": "Son los ajustes de tu servidor de Aula: lo que cambies aquí cambia en todos tus dispositivos. La IA y sus claves, las plataformas y los dispositivos los lleva su propietario.",
@@ -146,8 +145,7 @@
     "keepSignedIn": "Mantener la sesión abierta",
     "keepSignedInHint": "Aula guarda las cookies cifradas y renueva la sesión en segundo plano.",
     "none": "Sin plataformas. Puedes estudiar solo con tus archivos.",
-    "worksWith": "Funciona con",
-    "anySite": "cualquier otra web de clase",
+    "worksWith": "Funciona con Canvas, Moodle, Blackboard, Google Classroom, Brightspace y cualquier web de clase.",
     "signedInAt": "Sesión iniciada en {{name}}",
     "signedInDetail": "Aula ya puede leer tu plataforma. Solo lee: nunca entrega ni empieza nada.",
     "waiting": "Esperando a que entres en la ventana",

@@ -1,8 +1,9 @@
-// Orden de la paleta (⌘K), sin React para poder probarlo: los comandos que coinciden de verdad primero, después lo encontrado
-// dentro de los cursos, luego las coincidencias sueltas y «Pregúntale a Aula» siempre al final.
+// Orden de la paleta (⌘K), sin React para poder probarlo. Sin escribir nada: primero estudiar (el plan de hoy, repasar, el
+// simulacro…), después las acciones, ir a, los cursos, las herramientas y la apariencia. Escribiendo: los comandos que coinciden
+// de verdad primero, después lo encontrado dentro de los cursos, luego las coincidencias sueltas y «Pregúntale a Aula» al final.
 import { defaultFilter } from 'cmdk'
 
-export type PaletteGroup = 'navigate' | 'courses' | 'tools' | 'actions'
+export type PaletteGroup = 'study' | 'actions' | 'navigate' | 'courses' | 'tools' | 'appearance'
 
 export interface Filterable {
   id: string
@@ -17,7 +18,7 @@ export interface ScoredGroup<C extends Filterable> {
   best: number
 }
 
-export const PALETTE_GROUPS: PaletteGroup[] = ['actions', 'navigate', 'courses', 'tools']
+export const PALETTE_GROUPS: PaletteGroup[] = ['study', 'actions', 'navigate', 'courses', 'tools', 'appearance']
 /** Un grupo con una coincidencia así de buena va antes que lo encontrado en los cursos (por debajo, es una coincidencia suelta). */
 export const STRONG_MATCH = 0.5
 export const ASK_VALUE = 'ask'

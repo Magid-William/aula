@@ -1,11 +1,9 @@
-// Ajustes → «Aula siempre activa» (AutomationSettingsView.swift), en una tarjeta: el interruptor con su estado, el estilo
-// (Discreta · Equilibrada · Muy atenta), horas de silencio, notificaciones, lo no leído en el icono, abrir al iniciar sesión,
-// los seguimientos de Aula, lo usado hoy y el acceso a las rutinas y automatizaciones. Sustituye a la tarjeta sencilla de
-// «Aula siempre activa» de Ajustes. Lo que es de settings.json va por 'settings.update'; lo del modo, por 'automations.*'.
+// Ajustes → «Aula siempre activa» (AutomationSettingsView.swift), una sección sobre el papel: el interruptor con su estado,
+// lo que hace, horas de silencio, notificaciones, abrir al iniciar sesión, lo usado hoy y el acceso a las rutinas y
+// automatizaciones. Lo que es de settings.json va por 'settings.update'; lo del modo, por 'automations.*'.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { motion } from 'motion/react'
-import { AulaMark, Button, Card, Icon, ProgressBar, SegmentedTabs, Switch, cx } from '@renderer/design'
+import { AulaMark, Button, Icon, ProgressBar, Section, Switch, cx } from '@renderer/design'
 import { useSettings } from '@renderer/lib/settings'
 import { useRpc } from '@renderer/lib/useRpc'
 import { api } from '@renderer/lib/api'
@@ -25,7 +23,7 @@ function Toggle({ title, hint, checked, onChange, disabled }: { title: string; h
   )
 }
 
-export function AutomationsSettingsCard() {
+export function AutomationsSection() {
   const { t } = useTranslation('inbox')
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
@@ -38,25 +36,24 @@ export function AutomationsSettingsCard() {
   const quiet = ps.quietHours
   const status = !on ? t('proactive.off') : snap && !snap.active ? t('proactive.paused') : snap?.nextUp ? t('proactive.next', { what: snap.nextUp.routine ? t(`routines.${snap.nextUp.routine}`) : snap.nextUp.title, when: whenText(t, snap.nextUp.at) }) : t('proactive.on')
   return (
-    <Card padded="lg" className={cx('h-full transition-colors', on && 'bg-accent-wash!')}>
-      <div className="flex items-start gap-4">
-        <motion.div animate={{ scale: on ? 1.05 : 1 }}>
-          <AulaMark size={44} state={snap?.running.length ? 'working' : on && snap?.active !== false ? 'idle' : 'paused'} />
-        </motion.div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="t-title2">{t('proactive.title')}</h2>
-            <Switch checked={on} onChange={(v) => void update({ persistent: { enabled: v } })} label={t('proactive.title')} />
-          </div>
-          <p className="t-ui text-text2 mt-1">{status}</p>
-          <p className="t-callout text-text2 mt-2">{t('settingsCard.hint')}</p>
-        </div>
-      </div>
+    <Section
+      title={t('proactive.title')}
+      rule={false}
+      // el estado, con la marca de Aula como está ahora (trabajando, atenta o en pausa)
+      detail={
+        <span className="inline-flex items-center gap-1.5 text-text2">
+          <AulaMark size={15} state={snap?.running.length ? 'working' : on && snap?.active !== false ? 'idle' : 'paused'} />
+          {status}
+        </span>
+      }
+      action={<Switch checked={on} onChange={(v) => void update({ persistent: { enabled: v } })} label={t('proactive.title')} />}
+    >
+      <p className="t-callout text-text2">{t('settingsCard.hint')}</p>
 
       {/* lo que hace, en tres líneas: nada que configurar para que funcione */}
       <ul className="mt-4 flex flex-col gap-1.5">
         {(t('settingsCard.does', { returnObjects: true }) as unknown as string[]).map((line, i) => (
-          <li key={i} className="flex items-start gap-2 t-callout text-text2"><Icon name="check" size={14} className="mt-[3px] shrink-0 text-accent-text" /><span>{line}</span></li>
+          <li key={i} className="flex items-start gap-2 t-callout text-text2"><Icon name="check" size={14} className="mt-[3px] shrink-0 text-text3" /><span>{line}</span></li>
         ))}
       </ul>
 
@@ -98,6 +95,6 @@ export function AutomationsSettingsCard() {
           </div>
         </div>
       )}
-    </Card>
+    </Section>
   )
 }

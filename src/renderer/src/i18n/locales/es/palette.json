@@ -2,6 +2,14 @@
   "inCourses": "En tus cursos",
   "searching": "Buscando en tus cursos…",
   "page": "p. {{page}}",
+  "groups": {
+    "study": "Estudiar",
+    "actions": "Acciones",
+    "navigate": "Ir a",
+    "courses": "Cursos",
+    "tools": "Herramientas",
+    "appearance": "Apariencia"
+  },
   "kinds": {
     "lesson": "Lección",
     "exercise": "Ejercicio",
@@ -16,5 +24,12 @@
     "themeLight": "Modo claro",
     "cursorSystem": "Usar el cursor del sistema",
     "cursorSun": "Usar el cursor sol"
+  },
+  "study": {
+    "continue": "Seguir con el plan de hoy",
+    "review": "Repasar {{course}}",
+    "exam": "Simulacro: {{course}}",
+    "materials": "Añadir materiales a {{course}}",
+    "ask": "Pregúntale a Aula"
   }
 }

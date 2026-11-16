@@ -2,6 +2,14 @@
   "inCourses": "In your courses",
   "searching": "Searching your courses…",
   "page": "p. {{page}}",
+  "groups": {
+    "study": "Study",
+    "actions": "Actions",
+    "navigate": "Go to",
+    "courses": "Courses",
+    "tools": "Tools",
+    "appearance": "Appearance"
+  },
   "kinds": {
     "lesson": "Lesson",
     "exercise": "Exercise",
@@ -16,5 +24,12 @@
     "themeLight": "Light mode",
     "cursorSystem": "Use the system cursor",
     "cursorSun": "Use the sun cursor"
+  },
+  "study": {
+    "continue": "Continue today’s plan",
+    "review": "Review {{course}}",
+    "exam": "Mock exam: {{course}}",
+    "materials": "Add materials to {{course}}",
+    "ask": "Ask Aula"
   }
 }

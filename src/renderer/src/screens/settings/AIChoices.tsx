@@ -3,7 +3,7 @@
 // tampoco deja hacerlo desde aquí (remote/policy.ts).
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Card, Icon, Spinner, pixelBurst, toast } from '@renderer/design'
+import { Icon, Spinner, toast } from '@renderer/design'
 import type { AIProviderView, AIStatus } from '@shared/ai/views'
 import { aiClient } from '@renderer/lib/aiClient'
 import { api } from '@renderer/lib/api'
@@ -29,11 +29,10 @@ export function AIChoices() {
     return api.on('ai.changed', () => void load())
   }, [])
 
-  const use = async (id: string, el: HTMLElement) => {
+  const use = async (id: string) => {
     setBusy(id)
     try {
       await aiClient.select({ providerId: id })
-      if (el.isConnected) pixelBurst(el)
       await load()
     } catch (e) {
       toast.error((e as Error).message)
@@ -51,7 +50,8 @@ export function AIChoices() {
   const activeId = status?.resolved?.providerId ?? null
   const reload = () => void load()
   return (
-    <Card padded="lg" className="flex flex-col gap-2" data-testid="ai-choices">
+    // sobre el papel de Ajustes, como las demás secciones
+    <div className="flex flex-col gap-2" data-testid="ai-choices">
       {choices.length === 0 && <p className="t-body text-text2">{api.server ? t('ai.remote.noneServer') : t('ai.remote.none')}</p>}
       {choices.map((p) => {
         const pickModel = !!p.models && p.models.length > 1
@@ -63,7 +63,7 @@ export function AIChoices() {
             title={NAMES[p.id] ? t(NAMES[p.id]) : p.label}
             detail={[api.server ? t('ai.remote.readyServer') : t('ai.remote.ready'), !pickModel && !live ? p.model : undefined].filter(Boolean).join(' · ')}
             ready
-            action={(el) => void use(p.id, el)}
+            action={() => void use(p.id)}
             busy={busy === p.id}
             provider={p}
             extra={
@@ -80,6 +80,6 @@ export function AIChoices() {
         <Icon name="info" size={12} className="mt-[3px] shrink-0" />
         {api.server ? t('ai.remote.hintServer') : t('ai.remote.hint')}
       </p>
-    </Card>
+    </div>
   )
 }

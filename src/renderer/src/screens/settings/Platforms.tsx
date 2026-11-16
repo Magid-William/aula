@@ -2,23 +2,44 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Card, Icon, LiveDot, Menu, IconButton, SectionTitle, Switch, TextField, cx, toast, pixelBurst } from '@renderer/design'
+import { Button, Card, Icon, LiveDot, Menu, IconButton, Section, SectionTitle, Switch, TextField, cx, toast } from '@renderer/design'
 import type { PlatformAccountView } from '@shared/platforms/types'
 import { api } from '@renderer/lib/api'
 import { useRpc } from '@renderer/lib/useRpc'
 import { useSettings } from '@renderer/lib/settings'
 import { isDemo } from '@renderer/lib/demo'
 import { signInHere } from '@renderer/lib/live'
-import { KNOWN_PLATFORM_KINDS, platformInfo } from '@engine/platforms/model'
 
 const DEMO: PlatformAccountView[] = [
   { id: 'p1', kind: 'canvas', label: 'Canvas · Universidad', baseURL: 'https://canvas.universidad.edu', kindName: 'Canvas', status: 'signedIn', calendarConnected: true, tokenMode: false, signingIn: false, lastCheckedAt: new Date().toISOString() },
   { id: 'p2', kind: 'moodle', label: 'Moodle · Ciencias', baseURL: 'https://moodle.ciencias.edu', kindName: 'Moodle', status: 'needsSignIn', statusDetail: 'La sesión caducó', calendarConnected: false, tokenMode: false, signingIn: false }
 ]
 
-/** Plataformas conectadas. `heading={false}` cuando la pantalla ya lo titula (bienvenida). */
+/** Plataformas conectadas, en una tarjeta (la bienvenida). `heading={false}` cuando la pantalla ya lo titula. */
 /** `className` sustituye a «h-full» (p. ej. vacío para que tome su altura natural en una columna). */
 export function PlatformsCard({ heading = true, className = 'h-full' }: { heading?: boolean; className?: string }) {
+  const { t } = useTranslation('settings')
+  return (
+    <Card padded="lg" className={cx('flex flex-col', className)}>
+      {heading && <SectionTitle title={t('platforms.title')} detail={t('platforms.hint')} />}
+      <div className={cx(heading && 'mt-4')}>
+        <PlatformsBody />
+      </div>
+    </Card>
+  )
+}
+
+/** Ajustes → Tus plataformas: la misma lista sobre el papel. */
+export function PlatformsSection() {
+  const { t } = useTranslation('settings')
+  return (
+    <Section title={t('platforms.title')} detail={t('platforms.hint')} rule={false}>
+      <PlatformsBody />
+    </Section>
+  )
+}
+
+function PlatformsBody() {
   const { t } = useTranslation('settings')
   const { data, error, reload } = useRpc('platforms.list', undefined, { events: ['platforms.status', 'platforms.signedIn'] })
   const accounts = data ?? (error && isDemo() ? DEMO : [])
@@ -49,24 +70,13 @@ export function PlatformsCard({ heading = true, className = 'h-full' }: { headin
   }
 
   return (
-    <Card padded="lg" className={cx('flex flex-col', className)}>
-      {heading && <SectionTitle title={t('platforms.title')} detail={t('platforms.hint')} />}
-      <div className={cx('flex flex-col gap-2', heading && 'mt-4')}>
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-2">
+        {/* sin plataformas: con qué campus funciona, en una frase (sin logotipos ni nube de nombres) */}
         {accounts.length === 0 && (
-          <div>
-            <p className="t-callout text-text3">{t('platforms.none')}</p>
-            {/* con qué campus funciona (sin logotipos: solo el nombre) */}
-            <div className="t-footnote text-text3 mt-3 mb-1.5">{t('platforms.worksWith')}</div>
-            <div className="flex flex-wrap gap-1.5">
-              {KNOWN_PLATFORM_KINDS.map((k, i) => (
-                <motion.span key={k} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 + i * 0.025 }}
-                  className="t-footnote rounded-full bg-fill1 px-2.5 py-1 text-text2">
-                  {platformInfo(k).displayName}
-                </motion.span>
-              ))}
-              <span className="t-footnote rounded-full px-2.5 py-1 text-text3">{t('platforms.anySite')}</span>
-            </div>
-          </div>
+          <p className="t-callout text-text2">
+            {t('platforms.none')} <span className="text-text3">{t('platforms.worksWith')}</span>
+          </p>
         )}
         <AnimatePresence initial={false}>
           {accounts.map((a) => (
@@ -82,15 +92,14 @@ export function PlatformsCard({ heading = true, className = 'h-full' }: { headin
           {t('platforms.add')}
         </Button>
       </div>
-      <div className="mt-auto" />
-      <div className="mt-5 flex items-start justify-between gap-4 rounded-[14px] bg-sunken p-3.5">
+      <div className="mt-4 flex items-start justify-between gap-4 border-t-[0.5px] border-line-soft pt-3">
         <div>
           <div className="t-callout font-medium">{t('platforms.keepSignedIn')}</div>
           <div className="t-ui text-text3 mt-0.5">{t('platforms.keepSignedInHint')}</div>
         </div>
         <Switch checked={settings?.platforms.keepSignedIn ?? true} onChange={(v) => void update({ platforms: { keepSignedIn: v } })} label={t('platforms.keepSignedIn')} />
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -99,15 +108,14 @@ function AccountRow({ a, onChanged }: { a: PlatformAccountView; onChanged: () =>
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const ok = a.status === 'signedIn' && !a.signingIn
-  const signIn = async (el: HTMLElement) => {
+  const signIn = async () => {
     setBusy(true)
     try {
       if (api.remote) {
         await signInHere(a.id)
         return
       }
-      const r = await api.invoke('platforms.signIn', { accountId: a.id })
-      if (r.signedIn && el.isConnected) pixelBurst(el, { colors: ['var(--success)', 'var(--sun)'] })
+      await api.invoke('platforms.signIn', { accountId: a.id })
       onChanged()
     } catch (e) {
       toast.error((e as Error).message)
@@ -146,7 +154,7 @@ function AccountRow({ a, onChanged }: { a: PlatformAccountView; onChanged: () =>
       </div>
       {a.signingIn ? (
         <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="ghost" onClick={(e) => void signIn(e.currentTarget)}>
+          <Button size="sm" variant="ghost" onClick={() => void signIn()}>
             {t('platforms.showWindow')}
           </Button>
           <Button size="sm" variant="primary" loading={confirming} onClick={() => void confirm()}>
@@ -155,7 +163,7 @@ function AccountRow({ a, onChanged }: { a: PlatformAccountView; onChanged: () =>
         </div>
       ) : (
         !ok && (
-          <Button size="sm" variant="primary" loading={busy} onClick={(e) => void signIn(e.currentTarget)}>
+          <Button size="sm" variant="primary" loading={busy} onClick={() => void signIn()}>
             {t('platforms.signIn')}
           </Button>
         )

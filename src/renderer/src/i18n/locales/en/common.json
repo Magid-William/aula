@@ -13,7 +13,7 @@
     "stats": "Statistics",
     "settings": "Settings",
     "courses": "Your courses",
-    "newCourse": "New course with Aula",
+    "newCourse": "New course",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "back": "Back",
@@ -28,13 +28,7 @@
   "search": {
     "placeholder": "Search Aula",
     "hint": "Courses, lessons, tools, actions",
-    "empty": "Nothing here. Try other words.",
-    "groups": {
-      "navigate": "Go to",
-      "courses": "Courses",
-      "tools": "Tools",
-      "actions": "Actions"
-    }
+    "empty": "Nothing here. Try other words."
   },
   "actions": {
     "cancel": "Cancel",
@@ -73,9 +67,6 @@
     "retry": "Try again in a moment.",
     "screen": "This screen couldn’t be shown. Your courses and progress are safe.",
     "details": "Technical details"
-  },
-  "orb": {
-    "ask": "Ask Aula"
   },
   "approval": {
     "action": {

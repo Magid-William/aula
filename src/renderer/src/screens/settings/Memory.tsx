@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Card, ConfirmDialog, Icon, IconButton, Menu, SectionTitle, Spinner, TextField, toast, cx } from '@renderer/design'
+import { Button, ConfirmDialog, Icon, IconButton, Menu, Section, Spinner, TextField, toast, cx } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import { settingsElsewhere } from '@renderer/lib/device'
 import { fmtDate } from '@renderer/lib/format'
@@ -12,7 +12,7 @@ import type { MemoryRecordView, MemoryStatus } from '@shared/ipc/memory'
 
 const GROUPS: MemoryRecordView['group'][] = ['about', 'learning', 'exams', 'progress', 'other']
 
-export function MemoryCard() {
+export function MemorySection() {
   const { t } = useTranslation('settings')
   const [status, setStatus] = useState<MemoryStatus | null>(null)
   const [items, setItems] = useState<MemoryRecordView[] | null>(null)
@@ -58,36 +58,40 @@ export function MemoryCard() {
   const elsewhere = settingsElsewhere(api.role)
   const offKey = elsewhere === 'mac' ? 'memory.offRemote' : elsewhere === 'owner' ? 'memory.offServer' : 'memory.off'
   return (
-    <Card padded="lg" className="h-full flex flex-col">
-      <SectionTitle
-        title={t('memory.title')}
-        detail={disabled ? t(offKey) : paused ? t('memory.paused') : t('memory.count', { count: status?.active ?? 0 })}
-        action={
-          <Menu
-            trigger={(open) => (
-              <IconButton label={t('memory.more')} onClick={open}>
-                <Icon name="more" size={16} />
-              </IconButton>
-            )}
-            items={[
-              paused
-                ? { label: t('memory.resume'), icon: <Icon name="play" size={15} />, onSelect: () => void run(() => api.invoke('memory.pause', { until: null })) }
-                : { label: t('memory.pauseDay'), icon: <Icon name="pause" size={15} />, onSelect: () => void run(() => api.invoke('memory.pause', { until: new Date(Date.now() + 86400000).toISOString() })) },
-              ...(remote
-                ? []
-                : [
-                    { label: t('memory.export'), icon: <Icon name="download" size={15} />, onSelect: () => void exportMemory() },
-                    { label: t('memory.clear'), icon: <Icon name="trash" size={15} />, danger: true, separatorBefore: true, onSelect: () => setConfirmClear(true) }
-                  ])
-            ]}
-          />
-        }
-      />
-      <p className="t-ui text-text3 -mt-1 mb-3">{t(remote ? (api.server ? 'memory.bodyServer' : 'memory.bodyRemote') : 'memory.body')}</p>
-      <div className="flex gap-2 mb-3">
-        <TextField value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('memory.search')} icon={<Icon name="search" size={15} />} className="flex-1" />
-      </div>
-      <div className="flex-1 min-h-0 max-h-[420px] overflow-y-auto -mx-2 px-2">
+    <Section
+      title={t('memory.title')}
+      rule={false}
+      // sin recuerdos no se dice «0»: lo cuenta el texto de la lista vacía
+      detail={disabled ? t(offKey) : paused ? t('memory.paused') : status?.active ? t('memory.count', { count: status.active }) : undefined}
+      action={
+        <Menu
+          trigger={(open) => (
+            <IconButton label={t('memory.more')} onClick={open}>
+              <Icon name="more" size={16} />
+            </IconButton>
+          )}
+          items={[
+            paused
+              ? { label: t('memory.resume'), icon: <Icon name="play" size={15} />, onSelect: () => void run(() => api.invoke('memory.pause', { until: null })) }
+              : { label: t('memory.pauseDay'), icon: <Icon name="pause" size={15} />, onSelect: () => void run(() => api.invoke('memory.pause', { until: new Date(Date.now() + 86400000).toISOString() })) },
+            ...(remote
+              ? []
+              : [
+                  { label: t('memory.export'), icon: <Icon name="download" size={15} />, onSelect: () => void exportMemory() },
+                  { label: t('memory.clear'), icon: <Icon name="trash" size={15} />, danger: true, separatorBefore: true, onSelect: () => setConfirmClear(true) }
+                ])
+          ]}
+        />
+      }
+    >
+      <p className="t-ui text-text3 mb-3">{t(remote ? (api.server ? 'memory.bodyServer' : 'memory.bodyRemote') : 'memory.body')}</p>
+      {/* buscar, solo cuando hay algo que buscar */}
+      {(query || shown.length > 0) && (
+        <div className="flex gap-2 mb-3">
+          <TextField value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('memory.search')} icon={<Icon name="search" size={15} />} className="flex-1" />
+        </div>
+      )}
+      <div className="max-h-[420px] overflow-y-auto -mx-2 px-2">
         {items == null ? (
           <div className="grid place-items-center py-8">
             <Spinner size={16} />
@@ -156,7 +160,7 @@ export function MemoryCard() {
         confirmLabel={t('memory.clear')}
         cancelLabel={t('common:actions.cancel')}
       />
-    </Card>
+    </Section>
   )
 
   async function exportMemory() {

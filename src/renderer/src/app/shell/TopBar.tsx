@@ -54,11 +54,14 @@ export function TopBar({ title, right, compact }: { title?: ReactNode; right?: R
       </IconButton>
       <div className="min-w-0 flex-1 truncate t-headline pl-1.5">{compactOnly ? null : title}</div>
       {right && <div className="no-drag flex items-center gap-1.5 mr-1.5">{right}</div>}
-      <button onClick={openPalette} className="no-drag flex h-8 w-[min(300px,28vw)] items-center gap-2 rounded-full bg-fill2 px-3 t-ui text-text3 hover:bg-fill3 transition-colors">
-        <Icon name="search" size={15} />
-        <span className="flex-1 text-left truncate">{t('search.placeholder')}</span>
-        {!api.remote && <Kbd>{isMac ? '⌘K' : 'Ctrl K'}</Kbd>}
-      </button>
+      {/* al estudiar no hay buscador a la vista (modo concentración): ⌘K sigue abriéndolo */}
+      {route.name !== 'study' && (
+        <button onClick={openPalette} className="no-drag flex h-8 w-[min(300px,28vw)] items-center gap-2 rounded-full bg-fill2 px-3 t-ui text-text3 hover:bg-fill3 transition-colors">
+          <Icon name="search" size={15} />
+          <span className="flex-1 text-left truncate">{t('search.placeholder')}</span>
+          {!api.remote && <Kbd>{isMac ? '⌘K' : 'Ctrl K'}</Kbd>}
+        </button>
+      )}
     </div>
   )
 }

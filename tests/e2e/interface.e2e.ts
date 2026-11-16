@@ -1,8 +1,8 @@
 // Interfaz (auditoría final A4/A5, FIX2-UI): el curso de ejemplo se marca, las fórmulas van en el idioma de la interfaz, el
 // menú «Explore» no se corta, las tarjetas se abren con el teclado, «Inbox» no se confunde con las actualizaciones, la píldora
-// de las pestañas va debajo de las etiquetas, el monitor no se solapa al terminar, el foco no sale de las capas modales, la
-// gota no tapa controles, el movimiento reducido no deja la pantalla vacía, el texto al 130 % no se monta y el lector PDF no
-// retiene memoria al entrar y salir. (Las páginas se leen con cadenas: este proyecto de pruebas no carga los tipos del DOM.)
+// de las pestañas va debajo de las etiquetas, el monitor no se solapa al terminar, el foco no sale de las capas modales, el
+// movimiento reducido no deja la pantalla vacía, el texto al 130 % no se monta y el lector PDF no retiene memoria al entrar y
+// salir. (Las páginas se leen con cadenas: este proyecto de pruebas no carga los tipos del DOM.)
 import { test, expect, type Page } from 'playwright/test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -198,34 +198,6 @@ test('A4-P2-9/10/12 · la pista no se sale ni se queda pegada; el foco no cambia
   await page.getByRole('button', { name: 'Collapse sidebar' }).click()
   await page.waitForTimeout(400)
   expect(await js<string[]>(page, `[...document.querySelectorAll('nav[aria-label="Aula"] button')].filter((b) => !(b.getAttribute('aria-label') || b.textContent.trim())).map((b) => b.outerHTML.slice(0, 80))`)).toEqual([])
-  await app.close()
-})
-
-test('A4-P2-13 · con la vista quieta, la gota nunca tapa un control (y escondida no se enfoca)', async () => {
-  const { app, page } = await launch({ home: home() })
-  await page.setViewportSize({ width: 1000, height: 680 })
-  for (const route of [{ name: 'settings' }, { name: 'home' }, { name: 'inbox' }]) {
-    await go(page, route)
-    await page.waitForTimeout(1600)
-    for (let step = 0; step < 12; step++) {
-      const res = await js<{ visible: boolean; covered: string[]; more: boolean }>(page, `(() => {
-        const orb = document.querySelector('.aula-orb'); if (!orb) return { visible: false, covered: [], more: false }
-        const drop = orb.firstElementChild
-        const visible = getComputedStyle(drop).visibility !== 'hidden'
-        const o = { left: orb.offsetLeft, top: orb.offsetTop, right: orb.offsetLeft + orb.offsetWidth, bottom: orb.offsetTop + orb.offsetHeight }
-        const covered = visible ? [...document.querySelectorAll('main button, main [role="switch"], main input, main a[href], main [role="button"], main [role="tab"]')].filter((el) => {
-          const r = el.getBoundingClientRect(); const w = Math.max(0, Math.min(o.right, r.right) - Math.max(o.left, r.left)); const h = Math.max(0, Math.min(o.bottom, r.bottom) - Math.max(o.top, r.top))
-          return r.width > 0 && w * h / Math.max(1, r.width * r.height) >= 0.2 && getComputedStyle(el).visibility !== 'hidden'
-        }).map((el) => (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 40)) : []
-        const sc = [...document.querySelectorAll('main *')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 20 && e.clientHeight > 200).sort((a, b) => b.clientHeight - a.clientHeight)[0]
-        const before = sc ? sc.scrollTop : 0; if (sc) sc.scrollTop += 140
-        return { visible, covered, more: !!sc && sc.scrollTop !== before }
-      })()`)
-      expect(res.covered, `${route.name}, paso ${step}`).toEqual([])
-      if (!res.more) break
-      await page.waitForTimeout(1300)
-    }
-  }
   await app.close()
 })
 

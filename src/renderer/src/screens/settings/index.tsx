@@ -1,96 +1,219 @@
-// Ajustes: pocas tarjetas, claras. Todo viene activado por defecto salvo «Aula siempre activa».
+// Ajustes: una columna de lectura (720 px como mucho) con un índice fijo a la izquierda. Cada sección va sobre el papel,
+// separada por un filete, y lleva su ancla `data-settings-section` (⌘K, el chat y los avisos llevan directamente a ella).
+// Todo viene activado por defecto salvo «Aula siempre activa».
 // Desde un dispositivo (iPad, iPhone) son los mismos ajustes, los de Aula en el Mac, pero solo lo de uso diario: las claves,
 // las plataformas, los dispositivos, los datos y las actualizaciones se llevan desde el Mac (y el servidor no deja otra cosa:
 // src/main/services/remote/policy.ts).
 // Con Aula como servidor (sin Mac), el dispositivo PROPIETARIO hace de ventana: ve también la IA con sus claves, las
 // plataformas y los dispositivos (no los datos ni las actualizaciones, que se llevan en el servidor).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { fmtPercent } from '@renderer/lib/format'
 import { motion } from 'motion/react'
-import { Button, Card, ConfirmDialog, Icon, PageHeader, SectionTitle, SegmentedTabs, Select, Slider, Stagger, StaggerItem, Switch, TextField, AulaMark, cx, Companion, toast } from '@renderer/design'
+import { Brain, Cpu, GraduationCap, Info, Languages, MonitorSmartphone, Palette, Power, Shield, type LucideIcon } from 'lucide-react'
+import { fmtPercent } from '@renderer/lib/format'
+import { Button, ConfirmDialog, Icon, Rule, Section, SegmentedTabs, Select, Slider, Stagger, Switch, TextField, AulaMark, cx, toast } from '@renderer/design'
 import { useScreenTitle } from '@renderer/app/title'
-import { useRoute } from '@renderer/app/router'
+import { navigate, useRoute } from '@renderer/app/router'
 import { useSettings } from '@renderer/lib/settings'
 import { useRpc } from '@renderer/lib/useRpc'
 import { useUpdateState } from '@renderer/lib/updates'
 import { api } from '@renderer/lib/api'
 import { AIPicker } from './AIPicker'
 import { AIChoices } from './AIChoices'
-import { PlatformsCard } from './Platforms'
-import { AutomationsSettingsCard } from './Automations'
-import { MemoryCard } from './Memory'
-import { DevicesCard } from './Devices'
+import { PlatformsSection } from './Platforms'
+import { AutomationsSection } from './Automations'
+import { MemorySection } from './Memory'
+import { DevicesSection } from './Devices'
 import { UpdateButtons, UpdateStatus } from './Updates'
 import type { AppSettings } from '@shared/settings'
+import type { SettingsSection } from '@shared/settings/sections'
 import { resolveCourseLanguage } from '@shared/settings/courseLanguage'
 import { CourseLanguages } from '@engine/base/language'
 import { sourceCodeURL, type LegalDoc } from '@shared/legal'
+
+type Upd = ReturnType<typeof useSettings.getState>['update']
+
+/** Las secciones, en el orden de la página (y del índice): lo que se configura una vez, cómo se ve y habla, lo que Aula hace
+ *  sola, lo que guarda y, al final, la versión. */
+const ORDER: readonly SettingsSection[] = ['ai', 'platforms', 'appearance', 'general', 'persistent', 'devices', 'memory', 'data', 'about']
+
+const INDEX_ICONS: Record<SettingsSection, LucideIcon> = {
+  ai: Cpu,
+  platforms: GraduationCap,
+  appearance: Palette,
+  general: Languages,
+  persistent: Power,
+  devices: MonitorSmartphone,
+  memory: Brain,
+  data: Shield,
+  about: Info
+}
 
 export default function SettingsScreen() {
   const { t } = useTranslation('settings')
   useScreenTitle(t('title'))
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
-  // «Ajustes → Memoria» (⌘K, el chat): baja hasta esa tarjeta (cada sección de @shared/settings/sections lleva su
-  // `data-settings-section`); con movimiento reducido, sin deslizarse
   const route = useRoute()
   const section = route.name === 'settings' ? route.section : undefined
-  useEffect(() => {
-    if (!section || !settings) return
-    const behavior = document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth'
-    const timer = setTimeout(() => document.querySelector(`[data-settings-section="${CSS.escape(section)}"]`)?.scrollIntoView({ behavior, block: 'start' }), 260)
-    return () => clearTimeout(timer)
-  }, [section, !!settings])
-  if (!settings) return null
+  const scroller = useRef<HTMLDivElement>(null)
+  useScrollToSection(scroller, section, !!settings)
   // `remote`: un dispositivo con solo lo de uso diario; un propietario ve como la ventana (salvo datos y actualizaciones)
   const owner = api.owner
   const remote = api.remote && !owner
-  const subtitle = owner ? t('remote.subtitleOwner') : remote ? (api.server ? t('remote.subtitleServer') : t('remote.subtitle')) : t('subtitle')
+  const shown = ORDER.filter((id) => !(remote && (id === 'platforms' || id === 'devices' || id === 'data')))
+  const active = useActiveSection(scroller, shown, !!settings)
+  if (!settings) return null
+  const note = owner ? t('remote.subtitleOwner') : remote ? (api.server ? t('remote.subtitleServer') : t('remote.subtitle')) : null
+  const body: Record<SettingsSection, ReactNode> = {
+    ai: (
+      <Section title={t('ai.title')} detail={remote ? (api.server ? t('ai.remote.detailServer') : t('ai.remote.detail')) : t('ai.auto')} rule={false}>
+        {remote ? <AIChoices /> : <AIPicker plain />}
+      </Section>
+    ),
+    platforms: <PlatformsSection />,
+    appearance: <AppearanceSection s={settings} update={update} />,
+    general: <GeneralSection s={settings} update={update} />,
+    persistent: <AutomationsSection />,
+    devices: <DevicesSection />,
+    memory: <MemorySection />,
+    data: <DataSection s={settings} update={update} />,
+    about: <AboutSection s={settings} update={update} />
+  }
+  // un enlace del índice baja a su sección (también si ya era la del enlace y se había desplazado); sin llenar el historial
+  const go = (id: SettingsSection): void => {
+    if (id === section) scrollToSection(id)
+    else navigate({ name: 'settings', section: id }, { replace: true })
+  }
   return (
-    <div className="@container flex-1 min-h-0 overflow-y-auto px-6 max-[700px]:px-4 pt-2 pb-24">
-      <PageHeader title={t('title')} subtitle={subtitle} className="mb-6" />
-      <Stagger className="grid grid-cols-12 gap-4">
-        {/* el ancla va en el contenedor: SectionTitle no pasa atributos al DOM */}
-        <StaggerItem className="col-span-12" data-settings-section="ai">
-          <SectionTitle title={t('ai.title')} detail={remote ? (api.server ? t('ai.remote.detailServer') : t('ai.remote.detail')) : t('ai.auto')} className="px-1" />
-          {remote ? <AIChoices /> : <AIPicker />}
-        </StaggerItem>
-        {/* plataformas y apariencia, una sobre otra, junto a «Aula siempre activa» (la más alta): sin huecos en las tarjetas */}
-        {/* en un dispositivo no hay plataformas: apariencia cabe al lado ya en un iPad apaisado, con su altura (sin estirarse) */}
-        <div className={cx('col-span-12 flex flex-col gap-4', remote ? '@3xl:col-span-7 self-start' : '@5xl:col-span-7')}>
-          {!remote && (
-            <StaggerItem data-settings-section="platforms">
-              <PlatformsCard className="" />
-            </StaggerItem>
-          )}
-          <StaggerItem className="flex-1 flex flex-col" data-settings-section="appearance">
-            <AppearanceCard s={settings} update={update} />
-          </StaggerItem>
-        </div>
-        <StaggerItem className={cx('col-span-12', remote ? '@3xl:col-span-5' : '@5xl:col-span-5')} data-settings-section="persistent">
-          <AutomationsSettingsCard />
-        </StaggerItem>
-        {/* el resto en dos columnas que se reparten solas (cada tarjeta con su altura, sin estirarse) */}
-        <div className="col-span-12 @4xl:columns-2 gap-4">
-          {[
-            ...(remote ? [] : [<DevicesCard key="devices" />]),
-            <MemoryCard key="memory" />,
-            <GeneralCard key="general" s={settings} update={update} />,
-            ...(remote ? [] : [<DataCard key="data" s={settings} update={update} />]),
-            <AboutCard key="about" s={settings} update={update} />
-          ].map((card) => (
-            <StaggerItem key={card.key} className="break-inside-avoid mb-4" data-settings-section={card.key ?? undefined}>
-              {card}
-            </StaggerItem>
+    <div ref={scroller} className="@container flex-1 min-h-0 overflow-y-auto px-6 max-[700px]:px-4 pt-2 pb-16">
+      {/* el título visible es el de la barra superior */}
+      <h1 className="sr-only">{t('title')}</h1>
+      <div data-settings-page className="mx-auto flex max-w-[976px] gap-14">
+        <SettingsIndex sections={shown} active={active} onPick={go} />
+        <Stagger className="min-w-0 max-w-[720px] flex-1">
+          {note && <p className="t-callout text-text2 pt-4">{note}</p>}
+          {shown.map((id, i) => (
+            <div key={id} data-settings-section={id} className="scroll-mt-2">
+              {i > 0 && <Rule />}
+              {body[id]}
+            </div>
           ))}
-        </div>
-      </Stagger>
+        </Stagger>
+      </div>
     </div>
   )
 }
 
-type Upd = ReturnType<typeof useSettings.getState>['update']
+/** El índice de la izquierda: las secciones con su icono; la que se está leyendo, marcada. Sin `data-settings-section`
+ *  (cada ancla está una sola vez: la de su sección). Solo si cabe al lado de la columna. */
+function SettingsIndex({ sections, active, onPick }: { sections: readonly SettingsSection[]; active: SettingsSection | null; onPick: (id: SettingsSection) => void }) {
+  const { t } = useTranslation('settings')
+  return (
+    <nav aria-label={t('title')} className="hidden @4xl:block w-[200px] shrink-0 self-start sticky top-0 pt-6">
+      <ul className="m-0 flex list-none flex-col gap-px p-0">
+        {sections.map((id) => {
+          const IconFor = INDEX_ICONS[id]
+          const on = id === active
+          return (
+            <li key={id}>
+              <button
+                type="button"
+                onClick={() => onPick(id)}
+                aria-current={on ? 'location' : undefined}
+                className={cx('flex w-full items-center gap-2.5 h-8 rounded-[8px] px-2.5 text-left t-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-line', on ? 'bg-fill1 text-text font-medium' : 'text-text2 hover:text-text hover:bg-fill1')}
+              >
+                <IconFor size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-text2" />
+                {/* el mismo nombre que el título de la sección */}
+                <span className="min-w-0 flex-1 truncate">{t(`${id}.title`)}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </nav>
+  )
+}
+
+/** Baja hasta una sección; con movimiento reducido (o `instant`), sin deslizarse. */
+function scrollToSection(id: string, instant = false): void {
+  const behavior = instant || document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth'
+  document.querySelector(`[data-settings-section="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior, block: 'start' })
+}
+
+/** Lo que dura vigilar que la sección pedida se quede arriba mientras termina de cargar lo de encima. */
+const SETTLE_MS = 2000
+
+/** «Ajustes → Memoria» (⌘K, el chat, el índice): baja hasta esa sección. Al abrir la pantalla, de golpe; después, deslizándose.
+ *  Mientras lo de encima termina de cargar (la IA, las plataformas, los recuerdos…) y cambia de alto, la sección se queda
+ *  arriba, hasta que la persona se mueva por su cuenta. */
+function useScrollToSection(scroller: React.RefObject<HTMLDivElement | null>, section: string | undefined, ready: boolean): void {
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!ready) return
+    const first = !mounted.current
+    mounted.current = true
+    const box = scroller.current
+    const content = box?.querySelector(':scope > [data-settings-page]')
+    if (!section || !box || !content) return
+    let moved = false
+    const stop = (): void => {
+      moved = true
+    }
+    const userEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
+    for (const e of userEvents) box.addEventListener(e, stop, { passive: true })
+    let height = content.getBoundingClientRect().height
+    const ro = new ResizeObserver(() => {
+      const h = content.getBoundingClientRect().height
+      if (h === height) return
+      height = h
+      if (!moved) scrollToSection(section, true)
+    })
+    ro.observe(content)
+    const timer = setTimeout(() => scrollToSection(section, first), first ? 120 : 0)
+    const done = setTimeout(() => ro.disconnect(), SETTLE_MS)
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(done)
+      ro.disconnect()
+      for (const e of userEvents) box.removeEventListener(e, stop)
+    }
+  }, [section, ready, scroller])
+}
+
+/** La sección que se está leyendo: la última cuyo principio ya ha pasado por arriba (o la última, al llegar al final). Se mira
+ *  al desplazar, una vez por fotograma como mucho. */
+function useActiveSection(scroller: React.RefObject<HTMLDivElement | null>, ids: readonly SettingsSection[], ready: boolean): SettingsSection | null {
+  const [active, setActive] = useState<SettingsSection | null>(ids[0] ?? null)
+  const key = ids.join(',')
+  useEffect(() => {
+    const el = scroller.current
+    if (!el || !ready) return
+    let frame = 0
+    const measure = (): void => {
+      frame = 0
+      const top = el.getBoundingClientRect().top
+      const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
+      let current: SettingsSection | null = ids[0] ?? null
+      for (const id of ids) {
+        const anchor = el.querySelector(`[data-settings-section="${id}"]`)
+        if (anchor && anchor.getBoundingClientRect().top - top <= 96) current = id
+      }
+      setActive(atEnd && el.scrollTop > 0 ? (ids[ids.length - 1] ?? current) : current)
+    }
+    const onScroll = (): void => {
+      if (!frame) frame = requestAnimationFrame(measure)
+    }
+    measure()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, ready, scroller])
+  return active
+}
 
 function ToggleRow({ title, hint, checked, onChange }: { title: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -104,7 +227,7 @@ function ToggleRow({ title, hint, checked, onChange }: { title: string; hint?: s
   )
 }
 
-function AppearanceCard({ s, update }: { s: AppSettings; update: Upd }) {
+function AppearanceSection({ s, update }: { s: AppSettings; update: Upd }) {
   const { t } = useTranslation('settings')
   const themes: { id: AppSettings['general']['theme']; label: string; paper: string; ink: string; side: string }[] = [
     { id: 'system', label: t('appearance.system'), paper: 'linear-gradient(90deg,#fcfaf5 50%,#181613 50%)', ink: '#b4502f', side: 'linear-gradient(90deg,#ece8e1 50%,#221f1c 50%)' },
@@ -112,73 +235,74 @@ function AppearanceCard({ s, update }: { s: AppSettings; update: Upd }) {
     { id: 'dark', label: t('appearance.dark'), paper: '#181613', ink: '#ea9a6c', side: '#221f1c' }
   ]
   return (
-    <Card padded="lg" className="flex-1">
-      <SectionTitle title={t('appearance.title')} />
-      <div className="grid grid-cols-3 gap-3 mt-4">
-        {themes.map((th) => {
-          const active = s.general.theme === th.id
-          return (
-            <motion.button key={th.id} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => void update({ general: { theme: th.id } })} className="flex flex-col items-center gap-2">
-              <div className={cx('w-full aspect-[4/3] rounded-[14px] overflow-hidden border-[0.5px] flex', active ? 'ring-2 ring-accent border-transparent' : 'border-line')} style={{ background: th.paper }}>
-                <div className="w-[30%] h-full" style={{ background: th.side }} />
-                <div className="flex-1 p-2 flex flex-col gap-1.5">
-                  <div className="h-1.5 w-2/3 rounded-full bg-current opacity-30" style={{ color: th.id === 'dark' ? '#f0eae3' : '#201e1a' }} />
-                  <div className="h-3 w-1/2 rounded-[4px]" style={{ background: th.ink }} />
+    <Section title={t('appearance.title')} rule={false}>
+      {/* los controles, a lo ancho de una mano: en la columna entera quedarían larguísimos */}
+      <div className="max-w-[480px]">
+        <div className="grid grid-cols-3 gap-3">
+          {themes.map((th) => {
+            const active = s.general.theme === th.id
+            return (
+              <motion.button key={th.id} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => void update({ general: { theme: th.id } })} className="flex flex-col items-center gap-2">
+                <div className={cx('w-full aspect-[4/3] rounded-[14px] overflow-hidden border-[0.5px] flex', active ? 'ring-2 ring-accent border-transparent' : 'border-line')} style={{ background: th.paper }}>
+                  <div className="w-[30%] h-full" style={{ background: th.side }} />
+                  <div className="flex-1 p-2 flex flex-col gap-1.5">
+                    <div className="h-1.5 w-2/3 rounded-full bg-current opacity-30" style={{ color: th.id === 'dark' ? '#f0eae3' : '#201e1a' }} />
+                    <div className="h-3 w-1/2 rounded-[4px]" style={{ background: th.ink }} />
+                  </div>
                 </div>
-              </div>
-              <span className={cx('t-ui', active ? 'font-semibold text-text' : 'text-text2')}>{th.label}</span>
-            </motion.button>
-          )
-        })}
-      </div>
-      <div className="mt-5 flex flex-col gap-4">
-        <Slider label={t('appearance.textSize')} min={0.85} max={1.3} step={0.05} value={s.general.textScale} onChange={(v) => void update({ general: { textScale: v } })} format={(v) => fmtPercent(v)} />
-        <div>
-          <div className="t-ui font-medium text-text2 mb-1.5">{t('appearance.motion')}</div>
-          <SegmentedTabs
-            fill
-            size="sm"
-            value={s.general.motion}
-            onChange={(v) => void update({ general: { motion: v } })}
-            items={[
-              { id: 'system', label: t('appearance.motionSystem') },
-              { id: 'full', label: t('appearance.motionFull') },
-              { id: 'reduced', label: t('appearance.motionReduced') }
-            ]}
-          />
+                <span className={cx('t-ui', active ? 'font-semibold text-text' : 'text-text2')}>{th.label}</span>
+              </motion.button>
+            )
+          })}
         </div>
-        {/* el cursor es de la ventana del Mac: un dispositivo táctil no tiene */}
-        {!api.remote && (
+        <div className="mt-6 flex flex-col gap-5">
+          <Slider label={t('appearance.textSize')} min={0.85} max={1.3} step={0.05} value={s.general.textScale} onChange={(v) => void update({ general: { textScale: v } })} format={(v) => fmtPercent(v)} />
           <div>
-            <div className="t-ui font-medium text-text2 mb-1.5">{t('appearance.cursor')}</div>
+            <div className="t-ui font-medium text-text2 mb-1.5">{t('appearance.motion')}</div>
             <SegmentedTabs
               fill
               size="sm"
-              value={s.general.cursor}
-              onChange={(v) => void update({ general: { cursor: v } })}
+              value={s.general.motion}
+              onChange={(v) => void update({ general: { motion: v } })}
               items={[
-                { id: 'sun', label: t('appearance.cursorSun') },
-                { id: 'system', label: t('appearance.cursorSystem') }
+                { id: 'system', label: t('appearance.motionSystem') },
+                { id: 'full', label: t('appearance.motionFull') },
+                { id: 'reduced', label: t('appearance.motionReduced') }
               ]}
             />
-            <div className="t-ui text-text3 mt-1.5">{t('appearance.cursorHint')}</div>
           </div>
-        )}
+          {/* el cursor es de la ventana del Mac: un dispositivo táctil no tiene */}
+          {!api.remote && (
+            <div>
+              <div className="t-ui font-medium text-text2 mb-1.5">{t('appearance.cursor')}</div>
+              <SegmentedTabs
+                fill
+                size="sm"
+                value={s.general.cursor}
+                onChange={(v) => void update({ general: { cursor: v } })}
+                items={[
+                  { id: 'sun', label: t('appearance.cursorSun') },
+                  { id: 'system', label: t('appearance.cursorSystem') }
+                ]}
+              />
+              <div className="t-ui text-text3 mt-1.5">{t('appearance.cursorHint')}</div>
+            </div>
+          )}
+        </div>
       </div>
-    </Card>
+    </Section>
   )
 }
 
-function GeneralCard({ s, update }: { s: AppSettings; update: Upd }) {
+function GeneralSection({ s, update }: { s: AppSettings; update: Upd }) {
   const { t, i18n } = useTranslation('settings')
   const [name, setName] = useState(s.general.name)
   // «Automático» dice qué idioma sale ahora (el primero del sistema en el que Aula escribe cursos, o el de Aula)
   const { data: systemLanguages } = useRpc('settings.systemLanguages', undefined)
   const autoLanguage = CourseLanguages.of(resolveCourseLanguage('auto', systemLanguages ?? [], s.general.language, i18n.language))
   return (
-    <Card padded="lg" className="h-full">
-      <SectionTitle title={t('general.title')} />
-      <div className="mt-4 grid grid-cols-2 max-[700px]:grid-cols-1 gap-3">
+    <Section title={t('general.title')} rule={false}>
+      <div className="grid grid-cols-2 max-[700px]:grid-cols-1 gap-3">
         <TextField label={t('general.name')} value={name} maxLength={80} placeholder={t('general.namePlaceholder')} onChange={(e) => setName(e.target.value)} onBlur={() => name !== s.general.name && void update({ general: { name: name.trim() } })} />
         <Select
           label={t('general.language')}
@@ -200,7 +324,7 @@ function GeneralCard({ s, update }: { s: AppSettings; update: Upd }) {
           ]}
         />
       </div>
-      <div className="mt-3">
+      <div className="mt-4">
         <ToggleRow title={t('general.reminders')} checked={s.general.reminders} onChange={(v) => void update({ general: { reminders: v } })} />
         {s.general.reminders && (
           <div className="flex items-center justify-between gap-3 pb-3">
@@ -209,11 +333,11 @@ function GeneralCard({ s, update }: { s: AppSettings; update: Upd }) {
           </div>
         )}
       </div>
-    </Card>
+    </Section>
   )
 }
 
-function DataCard({ s, update }: { s: AppSettings; update: Upd }) {
+function DataSection({ s, update }: { s: AppSettings; update: Upd }) {
   const { t } = useTranslation(['settings', 'common'])
   const [confirm, setConfirm] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -230,27 +354,25 @@ function DataCard({ s, update }: { s: AppSettings; update: Upd }) {
     }
   }
   return (
-    <Card padded="lg" className="h-full">
-      <div className="flex items-center justify-between">
-        <SectionTitle title={t('data.title')} />
-        <Companion id="buho" size={36} />
-      </div>
-      <div className="mt-2">
+    <Section title={t('data.title')} rule={false}>
+      <div>
         <ToggleRow title={t('data.memory')} hint={t('data.memoryHint')} checked={s.data.memory} onChange={(v) => void update({ data: { memory: v } })} />
         <ToggleRow title={t('data.web')} hint={t('data.webHint')} checked={s.data.webSearch} onChange={(v) => void update({ data: { webSearch: v } })} />
       </div>
       {/* abrir, exportar o borrar los datos de un servidor se hace allí (su carpeta de datos), no desde un propietario */}
-      {!api.remote && <div className="flex flex-wrap gap-2 mt-4">
-        <Button size="md" icon={<Icon name="folder-open" size={15} />} onClick={() => info && void api.invoke('app.showItemInFolder', { path: info.dataPath + '/settings.json' })}>
-          {t('data.openFolder')}
-        </Button>
-        <Button size="md" loading={exporting} icon={<Icon name="archive" size={15} />} onClick={() => void exportAll()}>
-          {t('data.exportAll')}
-        </Button>
-        <Button size="md" variant="ghost" className="text-danger!" icon={<Icon name="trash" size={15} />} onClick={() => setConfirm(true)}>
-          {t('data.deleteAll')}
-        </Button>
-      </div>}
+      {!api.remote && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Button size="md" icon={<Icon name="folder-open" size={15} />} onClick={() => info && void api.invoke('app.showItemInFolder', { path: info.dataPath + '/settings.json' })}>
+            {t('data.openFolder')}
+          </Button>
+          <Button size="md" loading={exporting} icon={<Icon name="archive" size={15} />} onClick={() => void exportAll()}>
+            {t('data.exportAll')}
+          </Button>
+          <Button size="md" variant="ghost" className="text-danger!" icon={<Icon name="trash" size={15} />} onClick={() => setConfirm(true)}>
+            {t('data.deleteAll')}
+          </Button>
+        </div>
+      )}
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}
@@ -261,7 +383,7 @@ function DataCard({ s, update }: { s: AppSettings; update: Upd }) {
         cancelLabel={t('common:actions.cancel')}
         danger
       />
-    </Card>
+    </Section>
   )
 }
 
@@ -282,7 +404,7 @@ function AboutLink({ onClick, children }: { onClick: () => void; children: React
   )
 }
 
-function AboutCard({ s, update }: { s: AppSettings; update: Upd }) {
+function AboutSection({ s, update }: { s: AppSettings; update: Upd }) {
   const { t } = useTranslation('settings')
   const { data: info } = useRpc('app.info', undefined)
   const upd = useUpdateState()
@@ -292,50 +414,47 @@ function AboutCard({ s, update }: { s: AppSettings; update: Upd }) {
   // servidor, que se actualiza con su imagen)
   const remote = api.remote
   return (
-    <Card padded="lg" className="h-full flex flex-col">
-      <div className="flex items-center gap-3">
-        <AulaMark size={36} state={!remote && (upd.status === 'checking' || upd.status === 'downloading') ? 'working' : 'idle'} />
-        <div>
-          <div className="t-title2">Aula</div>
-          <div className="t-ui text-text3">{t('about.version', { version: info?.version ?? '—' })}</div>
+    <Section title={t('about.title')} rule={false}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <AulaMark size={28} state={!remote && (upd.status === 'checking' || upd.status === 'downloading') ? 'working' : 'idle'} />
+          <div className="t-callout text-text2">{t('about.version', { version: info?.version ?? '—' })}</div>
         </div>
+        {!remote && <UpdateButtons state={upd} asked={asked} current={current} onAsk={() => setAsked(true)} />}
       </div>
       {!remote && (
         <>
+          <UpdateStatus state={upd} asked={asked} current={current} />
           <div className="mt-3">
             <ToggleRow title={t('about.autoUpdate')} checked={s.data.autoUpdate} onChange={(v) => void update({ data: { autoUpdate: v } })} />
           </div>
-          <UpdateStatus state={upd} asked={asked} current={current} />
           {/* «instala GNOME Keyring o KWallet»: solo Linux (en macOS y Windows nunca se guarda sin cifrar) */}
           {info?.secretProtection === 'basic' && info.platform === 'linux' && <div className="t-footnote text-warning mt-2">{t('about.noKeyring')}</div>}
         </>
       )}
       {api.owner && info?.secretProtection === 'basic' && <div className="t-footnote text-text3 mt-3">{t('about.noKeyringServer')}</div>}
-      <div className="mt-auto pt-3 flex items-center justify-between gap-3">
-        {/* avisos legales de la AGPL (§0, §5(d)): copyright, sin garantía, la licencia y el código de esta versión */}
-        <div className="flex flex-col items-start gap-0.5 min-w-0" data-testid="about-legal">
-          <span className="t-footnote text-text3">{t('about.copyright')}</span>
-          <span className="t-footnote text-text3">{t('about.license')}</span>
-          {remote ? (
-            <span className="flex flex-wrap items-center gap-x-3">
-              {/* un enlace de verdad: se abre en el dispositivo, no en el Mac */}
-              <a className="t-ui text-accent-text hover:underline" href={sourceCodeURL(current)} target="_blank" rel="noreferrer">
-                {t('about.source')}
-              </a>
-              {/* la app del iPhone, el iPad o Android: con más de una Aula en la red (un Mac y un servidor), abrir otra */}
-              {appBridge()?.switchAula && <AboutLink onClick={() => appBridge()?.switchAula?.()}>{t('about.switchAula')}</AboutLink>}
-            </span>
-          ) : (
-            <span className="flex flex-wrap items-center gap-x-3">
-              <AboutLink onClick={() => openLegal('aula')}>{t('about.licenseText')}</AboutLink>
-              <AboutLink onClick={() => openURL(sourceCodeURL(current))}>{t('about.source')}</AboutLink>
-              <AboutLink onClick={() => openLegal('third-party')}>{t('about.licenses')}</AboutLink>
-              <AboutLink onClick={() => openURL(SPONSORS_URL)}>{t('about.support')}</AboutLink>
-            </span>
-          )}
-        </div>
-        {!remote && <UpdateButtons state={upd} asked={asked} current={current} onAsk={() => setAsked(true)} />}
+      {/* avisos legales de la AGPL (§0, §5(d)): copyright, sin garantía, la licencia y el código de esta versión */}
+      <div className="mt-4 flex flex-col items-start gap-0.5 min-w-0" data-testid="about-legal">
+        <span className="t-footnote text-text3">{t('about.copyright')}</span>
+        <span className="t-footnote text-text3">{t('about.license')}</span>
+        {remote ? (
+          <span className="flex flex-wrap items-center gap-x-3">
+            {/* un enlace de verdad: se abre en el dispositivo, no en el Mac */}
+            <a className="t-ui text-accent-text hover:underline" href={sourceCodeURL(current)} target="_blank" rel="noreferrer">
+              {t('about.source')}
+            </a>
+            {/* la app del iPhone, el iPad o Android: con más de una Aula en la red (un Mac y un servidor), abrir otra */}
+            {appBridge()?.switchAula && <AboutLink onClick={() => appBridge()?.switchAula?.()}>{t('about.switchAula')}</AboutLink>}
+          </span>
+        ) : (
+          <span className="flex flex-wrap items-center gap-x-3">
+            <AboutLink onClick={() => openLegal('aula')}>{t('about.licenseText')}</AboutLink>
+            <AboutLink onClick={() => openURL(sourceCodeURL(current))}>{t('about.source')}</AboutLink>
+            <AboutLink onClick={() => openLegal('third-party')}>{t('about.licenses')}</AboutLink>
+            <AboutLink onClick={() => openURL(SPONSORS_URL)}>{t('about.support')}</AboutLink>
+          </span>
+        )}
       </div>
-    </Card>
+    </Section>
   )
 }

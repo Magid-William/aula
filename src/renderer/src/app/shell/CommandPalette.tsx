@@ -1,6 +1,7 @@
-// Paleta de comandos (⌘K): ir a cualquier sitio, abrir un curso o una herramienta, buscar dentro de tus cursos (lecciones,
-// ejercicios, glosario, fórmulas y materiales) o preguntar a Aula. El filtro y el orden son nuestros: primero lo que coincide
-// de verdad, después lo de tus cursos y «Pregúntale a Aula» siempre al final (elegido solo si no hay nada más).
+// Paleta de comandos (⌘K): seguir estudiando, ir a cualquier sitio, abrir un curso o una herramienta, buscar dentro de tus cursos
+// (lecciones, ejercicios, glosario, fórmulas y materiales) o preguntar a Aula. El filtro y el orden son nuestros: sin escribir,
+// primero lo de estudiar; escribiendo, lo que coincide de verdad, después lo de tus cursos y «Pregúntale a Aula» siempre al
+// final (elegido solo si no hay nada más).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { create } from 'zustand'
 import { Command } from 'cmdk'
@@ -12,12 +13,12 @@ import { api } from '@renderer/lib/api'
 import type { LibraryHit } from '@shared/ipc/search'
 import { openCourseSource } from '@renderer/screens/documents/lib'
 import { navigate } from '../router'
-import { ASK_VALUE, filterCommands, focusSnippet, paletteValues, splitGroups, type ScoredGroup } from './paletteOrder'
+import { ASK_VALUE, filterCommands, focusSnippet, paletteValues, splitGroups, type PaletteGroup, type ScoredGroup } from './paletteOrder'
 import { useCourses } from '@renderer/lib/courses'
 
 export interface PaletteCommand {
   id: string
-  group: 'navigate' | 'courses' | 'tools' | 'actions'
+  group: PaletteGroup
   label: string
   keywords?: string[]
   icon?: ReactNode
@@ -165,7 +166,7 @@ export function CommandPalette() {
   }
 
   const groupView = (g: ScoredGroup<PaletteCommand>) => (
-    <Command.Group key={g.group} heading={t(`search.groups.${g.group}`)} className="aula-cmd-group">
+    <Command.Group key={g.group} heading={t(`palette:groups.${g.group}`)} className="aula-cmd-group">
       {g.items.map((c) => (
         <Item key={c.id} value={`cmd:${c.id}`} icon={c.icon} label={c.label} hint={c.hint} onSelect={() => run(c.run)} />
       ))}
@@ -208,8 +209,8 @@ export function CommandPalette() {
                 )}
                 {weak.map(groupView)}
                 {showAsk && (
-                  <Command.Group heading={t('search.groups.actions')} className="aula-cmd-group">
-                    <Item value={ASK_VALUE} icon={<AulaMark size={17} />} label={`${t('orb.ask')}: ${quoted(q)}`} onSelect={() => run(() => navigate({ name: 'chat', prompt: q }))} />
+                  <Command.Group heading={t('palette:groups.actions')} className="aula-cmd-group">
+                    <Item value={ASK_VALUE} icon={<AulaMark size={17} />} label={`${t('palette:study.ask')}: ${quoted(q)}`} onSelect={() => run(() => navigate({ name: 'chat', prompt: q }))} />
                   </Command.Group>
                 )}
               </Command.List>
