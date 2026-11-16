@@ -9,21 +9,27 @@
 # Equivalent to libtailscale's `cd swift && make ios-fat`, except:
 #   * tailscalekit/aula_nologs.go is added to the Go package: the node never
 #     uploads logs to log.tailscale.com (like the Mac's aula-tsnet),
-#   * the simulator slice is arm64 only (no x86_64 build), and
+#   * the simulator slice is arm64 only (no x86_64 build),
 #   * every path is quoted, because this project lives under a path with spaces
-#     (the upstream Makefile's `CC=$(PWD)/...` breaks on spaces).
+#     (the upstream Makefile's `CC=$(PWD)/...` breaks on spaces),
+#   * the framework's bundle id is com.luumlabs.aula.TailscaleKit (not Tailscale's
+#     io.tailscale.Tailscale), and every framework in the xcframework carries its own
+#     privacy manifest (tailscalekit/PrivacyInfo.xcprivacy), as the App Store asks.
 #
 # Env overrides:
 #   LIBTAILSCALE_REF   git commit/tag to build (default: pinned commit below)
 #   SKIP_GO=1          reuse existing libtailscale_ios*.a archives
+#   AULA_TOOLCHAIN     the Go toolchain folder (default: <root>/.toolchain; handy in a git worktree)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-TC="$ROOT/.toolchain"
+TC="${AULA_TOOLCHAIN:-$ROOT/.toolchain}"
 SRC="$TC/src/libtailscale"
 OUT="$HERE/Frameworks/TailscaleKit.xcframework"
 LIBTAILSCALE_REF="${LIBTAILSCALE_REF:-ac7ed43af14e19e1c1810ee9f8319872c6beb412}"
+# el identificador del framework: el de Aula, no el de Tailscale
+BUNDLE_ID="com.luumlabs.aula.TailscaleKit"
 
 if ! xcodebuild -version >/dev/null 2>&1; then
   echo "error: this needs the full Xcode (16.1 or newer), not just the Command Line Tools." >&2
@@ -71,14 +77,14 @@ xcodebuild build -scheme "TailscaleKit (iOS)" \
   -derivedDataPath build \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
   CODE_SIGNING_ALLOWED=NO -quiet
 echo "::: xcodebuild TailscaleKit (Simulator)"
 xcodebuild build -scheme "TailscaleKit (Simulator)" \
   -derivedDataPath build \
   -configuration Release \
   -destination 'generic/platform=iOS Simulator' \
-  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
   CODE_SIGNING_ALLOWED=NO -quiet
 
 echo "::: Creating $OUT"
@@ -91,8 +97,19 @@ xcodebuild -create-xcframework \
 # Debug symbols name the folders it was built in (the builder's home): the shipped framework carries none (the Go
 # part already leaves its paths out with -trimpath).
 for f in "$OUT"/*/TailscaleKit.framework/TailscaleKit; do strip -S "$f"; done
+# cada framework, con su manifiesto de privacidad (en la raíz del bundle, como en iOS) y el identificador de Aula
+for fw in "$OUT"/*/TailscaleKit.framework; do
+  cp "$HERE/tailscalekit/PrivacyInfo.xcprivacy" "$fw/PrivacyInfo.xcprivacy"
+  plutil -lint -s "$fw/PrivacyInfo.xcprivacy"
+  id="$(plutil -extract CFBundleIdentifier raw "$fw/Info.plist")"
+  if [ "$id" != "$BUNDLE_ID" ]; then
+    echo "error: $fw has bundle id $id, expected $BUNDLE_ID" >&2
+    exit 1
+  fi
+done
 
 echo "::: Done"
 for f in "$OUT"/*/TailscaleKit.framework/TailscaleKit; do
   echo "$f: $(lipo -archs "$f")"
 done
+ls "$OUT"/*/TailscaleKit.framework/PrivacyInfo.xcprivacy

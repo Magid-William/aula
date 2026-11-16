@@ -9,8 +9,10 @@
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array/>
-	<!-- Funciones del sistema «con motivo» que usa el nodo de Tailscale incluido (libtailscale, Go): mira archivos de su
-	     propia carpeta (stat/fstat/lstat) y mide tiempos con el reloj del sistema (mach_absolute_time). -->
+	<!-- Funciones del sistema «con motivo». Las de archivos y reloj las usa el nodo de Tailscale incluido (libtailscale,
+	     Go): mira archivos de su propia carpeta (stat/fstat/lstat) y mide tiempos (mach_absolute_time); su framework
+	     lleva además su propio manifiesto (tailscalekit/PrivacyInfo.xcprivacy). UserDefaults lo usa la app para
+	     recordar qué Aula abrir (AppModel.swift). -->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
@@ -27,6 +29,14 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>35F9.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
 			</array>
 		</dict>
 	</array>
