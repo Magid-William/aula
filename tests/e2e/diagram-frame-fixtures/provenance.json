@@ -1,0 +1,40 @@
+{
+  "sourceRun": "https://github.com/luumlabs/aula/actions/runs/43769227620",
+  "sourceBase": "a56d859502b6e6c0c458a8074027454d962288f3",
+  "case": "Windows x64 / Diagram PNG: hover de nodo y flechas incidentes con 40 aristas en dark / hovered-node",
+  "pngOrigins": {
+    "framed.png": "beyond-false attachment hovered-node-png-eeaa65106c1603ce49dbedec28ec11857571c5ca.png",
+    "missing-frame.png": "beyond-true attachment hovered-node-png-4eda94acde4a7c3872884d693b6edab1717103af.png"
+  },
+  "output": {
+    "width": 2128,
+    "height": 1188
+  },
+  "files": {
+    "missing-frame.png": {
+      "sha256": "b2cb0dafac12e5d709ba49842c99c0df86d456af940922bfd77bfc3398f91481",
+      "bytes": 423234
+    },
+    "framed.png": {
+      "sha256": "546402483eb1609435dbf7e6b78523189aec05d15940ff4605c163894490e825",
+      "bytes": 432760
+    }
+  },
+  "acceptance": "Specific absolute framing guard, complementary to unchanged independent pixel content oracle; coordinates derived from synthetic fixture, not from reference PNG correlation.",
+  "geometryContract": {
+    "scope": "Only the original edges-40 dark node0-hover fixture, output scale 2; separate from the unchanged content correlation oracle.",
+    "source": "The existing live DOM geometry.canvas.naturalWidth/naturalHeight, collected before export, supplies the size precondition and expected output width. No renderer DTO or PNG search supplies this value.",
+    "sourceNaturalWidths": [
+      1028,
+      1029
+    ],
+    "sourceNaturalHeight": 547,
+    "expectedOutputWidth": "2 * (sourceNaturalWidth + 26 + 9)",
+    "expectedOutputHeight": "2 * (547 + 24 + 23) = 1188",
+    "margins": "Fixed fixture paint envelope: left 26 (node0 left16 minus e2 horizontal reach40 minus union padding2); right9 (e1 horizontal reach23 minus graph padding16 plus union padding2); bottom23 (e1 bottom reach37 minus graph padding16 plus union padding2). The routed ink above this dense graph extends the upper envelope to -24 including union padding2; this upper envelope is a fixed fixture precondition, not a general graph-bounds algorithm.",
+    "anchors": "Six fixed interior/exterior strips on node0/node2/node7. The strips lie inside both native font layouts; no runtime edge search or correlation shift is used.",
+    "dotPhase": "18-DIP tiles and the fixed origin (-26,-24) imply 36-pixel periods with touched phases x32..35 and y28..31 at output scale2.",
+    "crossPlatformEvidence": "Original exported fixture verified offline on macOS arm64, Linux x64/arm64 and Windows x64/arm64. macOS natural width1028, others1029; all good anchors/dots accepted unchanged, the original Windows missing-frame PNG rejected.",
+    "limits": "Detects the reproduced lost framing translation and tested scale/crop/period shifts; does not promise universal one-pixel misalignment detection. Geometry outside the closed fixture domain fails explicitly."
+  }
+}

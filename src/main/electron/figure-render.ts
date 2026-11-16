@@ -75,6 +75,14 @@ function captureSize(image: NativeImage): { width: number; height: number } {
   checkRenderSize(size.width, size.height)
   return size
 }
+function screenshotPng(value: unknown): { data: Buffer; width: number; height: number } {
+  try {
+    const { data } = object(value, ['data'])
+    if (typeof data !== 'string' || !data.length || data.length > Math.ceil(FIGURE_LIMITS.maxPngBytes / 3) * 4 || data.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(data) || /=[^=]|={3}/.test(data) || (data.endsWith('==') ? !/[AQgw]==$/.test(data) : data.endsWith('=') && !/[AEIMQUYcgkosw048]=$/.test(data))) throw failed()
+    const bytes = Buffer.from(data, 'base64')
+    return { data: bytes, ...privatePngSize(bytes) }
+  } catch { throw failed() } // La respuesta privada defectuosa no es un error de argumentos del emisor.
+}
 async function invoke<K extends keyof Omit<FigureRenderApi, 'cancel'>>(win: BrowserWindow, job: FigureRenderJob, method: K, args: Parameters<FigureRenderApi[K]>[0]): Promise<unknown> {
   job.check()
   // El nombre es una unión interna; el argumento es JSON copiado/validado, jamás código del emisor.
@@ -144,12 +152,18 @@ async function renderFigurePng(kind: FigureRenderInput['kind'], value: unknown, 
       if (screen.getDisplayMatching(win.getBounds()).id !== initialDisplay.id) throw failed()
       const resized = object(await invoke(win, job, 'resize', { width: size.width, height: size.height, scale: size.scale, offsetX: -result.bounds.x * size.scale, offsetY: -result.bounds.y * size.scale }), ['width', 'height'])
       if (resized.width !== size.width || resized.height !== size.height || win.getContentSize()[0] !== size.width || win.getContentSize()[1] !== size.height || displays() !== displayState) throw failed()
-      const captured = await job.wait(wc.capturePage({ x: 0, y: 0, width: size.width, height: size.height }, { stayHidden: true, stayAwake: false }))
-      const capturedSize = captureSize(captured)
-      if (Math.abs(capturedSize.width - size.width * actual.width / 128) > 1 || Math.abs(capturedSize.height - size.height * actual.height / 128) > 1 || displays() !== displayState) throw failed()
+      // Sólo esta ventana privada: Chromium solicita un nuevo frame antes de copiar la superficie.
+      // Sin clip ni emulación, el comando conserva el viewport y no altera el layout ya resuelto.
+      const debuggerClient = wc.debugger
+      if (debuggerClient.isAttached()) throw failed()
+      const detached = (): void => job.abort(failed())
+      debuggerClient.on('detach', detached)
+      job.cleanup(() => { debuggerClient.removeListener('detach', detached); if (debuggerClient.isAttached()) debuggerClient.detach() })
+      debuggerClient.attach('1.3')
+      const captured = screenshotPng(await job.wait(debuggerClient.sendCommand('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false })))
+      if (Math.abs(captured.width - size.width * actual.width / 128) > 1 || Math.abs(captured.height - size.height * actual.height / 128) > 1 || win.getContentSize()[0] !== size.width || win.getContentSize()[1] !== size.height || displays() !== displayState) throw failed()
       job.check()
-      const nativePng = captured.toPNG(), nativeSize = privatePngSize(nativePng)
-      if (nativeSize.width !== capturedSize.width || nativeSize.height !== capturedSize.height) throw failed()
+      const nativePng = captured.data
       const normalized = object(await invoke(win, job, 'normalize', { data: nativePng.toString('base64'), width: size.outputWidth, height: size.outputHeight }), ['data', 'width', 'height'])
       if (normalized.width !== size.outputWidth || normalized.height !== size.outputHeight || typeof normalized.data !== 'string' || normalized.data.length > Math.ceil(FIGURE_LIMITS.maxPngBytes / 3) * 4 || normalized.data.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(normalized.data) || /=[^=]|={3}/.test(normalized.data)) throw failed()
       const bytes = Buffer.from(normalized.data, 'base64'), outputSize = privatePngSize(bytes)
