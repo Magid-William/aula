@@ -6,11 +6,14 @@ Descarga el archivo de tu sistema desde la [última versión](https://github.com
 
 | Sistema | Archivo | La primera vez |
 | --- | --- | --- |
-| macOS 13 o posterior (Apple Silicon e Intel) | `Aula-<versión>-mac.dmg` | Abre el .dmg y arrastra Aula a *Aplicaciones*. Aula aún no está notarizada por Apple, así que la primera vez macOS te pide confirmarlo. En macOS 15 o posterior, intenta abrirla, ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa *Abrir igualmente*. En macOS 13 y 14, haz clic derecho en Aula y elige *Abrir*. |
-| Windows 10 y 11 (x64 y ARM, un solo instalador) | `Aula-Setup-<versión>.exe` | Ejecuta el instalador (no pide permisos de administrador). Si aparece SmartScreen, pulsa *Más información → Ejecutar de todas formas*. Aula aún no está firmada. |
+| macOS 13 o posterior (Apple Silicon e Intel) | `Aula-<versión>-mac.dmg` | Abre el .dmg, arrastra Aula a *Aplicaciones* y ábrela. Desde la 0.2.6 Aula va firmada con un Developer ID de Apple y notarizada, así que macOS la abre sin pasos extra. Si sustituyes Aula 0.2.5 o anterior, macOS te pide una vez la contraseña de tu Mac para «Aula Safe Storage» (mira [Actualizaciones](#actualizaciones)). |
+| Windows 10 y 11 (x64 y ARM, un solo instalador) | `Aula-Setup-<versión>.exe` | Ejecuta el instalador (no pide permisos de administrador). Si aparece SmartScreen, pulsa *Más información → Ejecutar de todas formas*. En Windows, Aula aún no está firmada. |
 | Linux x64 | `Aula-<versión>-linux-x86_64.AppImage` o `Aula-<versión>-linux-amd64.deb` | AppImage: hazla ejecutable (`chmod +x Aula-*.AppImage`) y ábrela. Debian o Ubuntu: `sudo apt install ./Aula-<versión>-linux-amd64.deb`. |
 | Linux ARM64 | `Aula-<versión>-linux-arm64.AppImage` | Hazla ejecutable (`chmod +x`) y ábrela. |
 | Android 8 o posterior (teléfonos y tabletas) | `Aula-<versión>-android.apk` | Ábrela en el teléfono y permite instalar desde esa app cuando Android lo pregunte. Es una ventana a Aula en tu Mac o en [un servidor tuyo](SERVER.md): mira [Dispositivos](DEVICES.md). |
+
+En un Mac, la página de la versión también lista unos archivos de Mac de la 0.2.5: solo están para que las copias
+antiguas se actualicen pasando por la 0.2.5. Para instalar a mano, usa el `.dmg` que lleva la versión de esa página.
 
 > **Si vienes de la 0.1.x:** instala la versión actual a mano esta única vez (descárgala aquí e instálala encima de tu
 > copia; tus cursos y ajustes se quedan). Aula 0.1.x dirá que la firma de la versión nueva no es válida: desde la 0.2.0
@@ -32,11 +35,17 @@ para que funcione; si una versión nueva no arranca, Aula vuelve a la anterior. 
 El `.deb` no: Aula te avisa cuando sale una versión nueva, y
 descarga su `.deb` de las [versiones publicadas](https://github.com/luumlabs/aula/releases) e instálalo igual.
 
+**En un Mac, la primera actualización a la 0.2.6 o posterior** cambia cómo va firmada Aula (ahora con un Developer
+ID de Apple). La primera vez que se abre la versión nueva, macOS te pide una vez la contraseña de tu Mac para que Aula
+pueda usar «Aula Safe Storage», donde se guardan tus claves y tus sesiones de las plataformas: escríbela y elige
+*Permitir siempre*. Las copias de la 0.2.0 a la 0.2.4 se actualizan primero a la 0.2.5 y luego a la última versión.
+
 ## Si algo no funciona
 
 | Problema | Qué hacer |
 |---|---|
-| macOS no puede verificar al desarrollador, o no aparece *Abrir* | Mira la fila de macOS de arriba. En macOS 15 o posterior, *Abrir igualmente* solo aparece en *Privacidad y seguridad* después de intentar abrir Aula una vez. |
+| macOS no puede verificar al desarrollador, o no aparece *Abrir* | Descarga el último `Aula-<versión>-mac.dmg`: desde la 0.2.6 Aula está notarizada y se abre sin más. Hasta la 0.2.5 no lo estaba: en macOS 15 o posterior, intenta abrir Aula una vez, ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa *Abrir igualmente*; en macOS 13 y 14, haz clic derecho en Aula y elige *Abrir*. |
+| *Aula no puede abrir el llavero* en la barra lateral (Mac) | Normalmente es que elegiste *Denegar* cuando macOS preguntó por «Aula Safe Storage». No se pierde nada: tus claves guardadas quedan bloqueadas hasta que lo permitas. Pulsa el aviso y luego *Reabrir Aula*; cuando macOS vuelva a preguntar, escribe la contraseña de tu Mac y elige *Permitir siempre*. |
 | macOS dice que la app está dañada | Mueve Aula a *Aplicaciones* e inténtalo otra vez. Si sigue sin abrir, ejecuta `xattr -dr com.apple.quarantine /Applications/Aula.app` en el Terminal. |
 | macOS no instala una actualización | Comprueba que Aula está en *Aplicaciones* y no en *Descargas* ni abierta desde el .dmg. *Ajustes → Acerca de* explica qué pasó y te deja reintentarlo o descargar la actualización. |
 | La AppImage no arranca | Hazla ejecutable (`chmod +x`). Necesita FUSE 2: `sudo apt install libfuse2` (en Ubuntu 24.04 y posteriores, `libfuse2t64`). |

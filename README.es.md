@@ -111,10 +111,9 @@ todo) ayuda a que otros estudiantes la encuentren.</sub>
 [última versión](https://github.com/luumlabs/aula/releases/latest). Es gratis y no pide cuenta.
 
 - **Windows** 10 y 11 (x64 y ARM): `Aula-Setup-<versión>.exe`. Si aparece SmartScreen, pulsa *Más información →
-  Ejecutar de todas formas* (Aula aún no está firmada).
-- **macOS** 13 o posterior (Apple Silicon e Intel): `Aula-<versión>-mac.dmg`. Arrastra Aula a *Aplicaciones*. Aún no
-  está notarizada, así que intenta abrirla una vez y luego ve a *Ajustes del Sistema → Privacidad y seguridad → Abrir
-  igualmente*.
+  Ejecutar de todas formas* (en Windows, Aula aún no está firmada).
+- **macOS** 13 o posterior (Apple Silicon e Intel): `Aula-<versión>-mac.dmg`. Arrastra Aula a *Aplicaciones* y
+  ábrela: va firmada con un Developer ID de Apple y notarizada.
 - **Linux** x64 y ARM64: la `.AppImage` (dale `chmod +x` y ábrela) o, en x64, el `.deb`
   (`sudo apt install ./Aula-<versión>-linux-amd64.deb`).
 - **Android** 8 o posterior: `Aula-<versión>-android.apk`, una ventana a Aula funcionando en tu Mac o en
