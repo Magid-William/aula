@@ -12,7 +12,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(cd ../.. && pwd)"
-TC="$ROOT/.toolchain"
+# la herramienta de Go del proyecto (AULA_TOOLCHAIN la cambia, p. ej. en un worktree de git)
+TC="${AULA_TOOLCHAIN:-$ROOT/.toolchain}"
 OUT="_verify/.derived"
 MAC="$OUT/mac"
 mkdir -p "$MAC"

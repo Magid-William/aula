@@ -42,6 +42,10 @@ final class AppModel {
     var askingSignOut = false
     /// Se está enseñando dónde descargar Aula para Mac.
     var showingMacInfo = false
+    /// Se están enseñando las licencias.
+    var showingLicenses = false
+    /// La página de inicio de sesión de Tailscale, abierta dentro de la app. Se cierra sola cuando el nodo conecta.
+    var signInPage: URL?
     /// La demostración está abierta (la interfaz la sirve la propia app, sin Mac).
     private(set) var inDemo = false
     /// La demostración con su barra de aviso. Solo las capturas del App Store (compilación de depuración, con el
@@ -121,6 +125,8 @@ final class AppModel {
     private func apply(_ snap: TailnetSnapshot) async {
         last = snap
         macName = target(snap) ?? snap.macHost
+        // sesión iniciada (o a falta de que la aprueben): la página de inicio de sesión ya no hace falta
+        if snap.state == .running || snap.state == .needsMachineAuth { signInPage = nil }
         // con la demostración abierta, la red privada sigue a lo suyo sin cambiar de pantalla
         if inDemo { return }
         switch snap.state {

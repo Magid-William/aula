@@ -73,6 +73,15 @@ identify their services.
 | Tesseract language data ([tessdata](https://github.com/tesseract-ocr/tessdata)) | The first time Aula reads a photo or a scanned page | Apache-2.0 |
 | Images from [Wikimedia Commons](https://commons.wikimedia.org) | When a lesson or an answer needs one | Each file's own license (e.g. CC BY-SA 4.0); Aula shows the author and license under every image |
 
+## Aula for iPhone and iPad
+
+The iOS app (`native/ios`) carries Tailscale's client library inside its binary: [libtailscale](https://github.com/tailscale/libtailscale)
+and its TailscaleKit wrapper (BSD-3-Clause), [tailscale.com](https://github.com/tailscale/tailscale) (BSD-3-Clause),
+[wireguard-go](https://github.com/tailscale/wireguard-go) (MIT), the [Go](https://go.dev) standard library and runtime
+(BSD-3-Clause), and the other Go modules they link (BSD, MIT and Apache-2.0). The app shows each one with its full
+license text under *Licenses* on its connect screen. The list comes from the modules actually linked for iOS
+(`native/ios/scripts/licenses.mjs`, which writes `native/ios/Aula/Licenses.json`).
+
 ## Used only to build and test
 
 electron-vite, Vite, TypeScript, Vitest, Playwright, electron-builder and the type definitions (`@types/*`) are used to
