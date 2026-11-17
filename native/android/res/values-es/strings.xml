@@ -28,4 +28,21 @@
     <string name="step_3">Escribe el código</string>
     <string name="step_label">Paso %1$d de 3: %2$s</string>
     <string name="no_browser">No hay un navegador en este dispositivo para abrir la página.</string>
+    <string name="choose_body_one">Ahora mismo esta es la única Aula de tu red. Tócala para abrirla; si enciendes otra, aparecerá aquí.</string>
+    <string name="failed_body">Comprueba que el teléfono tiene conexión y vuelve a intentarlo.</string>
+    <string name="demo_action">Probar con un curso de ejemplo</string>
+    <string name="demo_bar">Demostración · nada se guarda</string>
+    <string name="demo_exit">Salir</string>
+    <string name="demo_unavailable">Esto no está en la demostración. Conecta con tu Mac para usar Aula entera.</string>
+    <string name="demo_chat_reply">Esto es la demostración: aquí solo puedo enseñarte este cuestionario de ejemplo. Con Aula en tu Mac te respondo con tus cursos y tus materiales.</string>
+    <string name="demo_failed">No se pudo abrir la demostración.</string>
+    <string name="pick_title">Añadir un archivo o una foto</string>
+    <string name="privacy_link">Política de privacidad</string>
+    <string name="privacy_url" formatted="false">https://github.com/luumlabs/aula/blob/main/docs/PRIVACY.md#espa%C3%B1ol</string>
+    <string name="licenses_link">Licencias</string>
+    <string name="licenses_title">Licencias</string>
+    <string name="licenses_intro">Aula es software libre de Luum Labs, con la licencia GNU AGPL v3 y sin ninguna garantía: puedes conseguir su código y compartirlo con esa misma licencia. La app lleva dentro el componente de Tailscale y el código de Go que usa; aquí están sus licencias.</string>
+    <string name="licenses_source">El código de Aula</string>
+    <string name="licenses_missing">Esta copia de la app no trae los avisos de licencia. Están en github.com/luumlabs/aula.</string>
+    <string name="done">Hecho</string>
 </resources>

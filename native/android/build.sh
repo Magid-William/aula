@@ -8,7 +8,8 @@
 #
 # Necesita el SDK de Android con build-tools y la plataforma (ANDROID_HOME, o <raíz>/.toolchain/android-sdk:
 # native/android/setup.sh lo instala), un JDK 17 o posterior (JAVA_HOME, o <raíz>/.toolchain/jdk) y Go para el componente
-# de Tailscale (native/tsnet/build.sh android). La versión sale de package.json. La clave de firma vive fuera del
+# de Tailscale (native/tsnet/build.sh android), y Node para los avisos de licencia que lleva el APK
+# (native/ios/scripts/licenses.mjs --android). La versión sale de package.json. La clave de firma vive fuera del
 # repositorio: $AULA_ANDROID_KEYSTORE (por defecto ~/.aula-signing/android/aula-release.keystore) y su contraseña en el
 # archivo de al lado (.pass, 0600). La huella de su certificado (pública) está en release-cert.sha256: con la clave por
 # defecto, el APK solo se firma si coincide, y --new-key se niega si ese archivo existe.
@@ -133,14 +134,31 @@ for pair in mdpi:108 hdpi:162 xhdpi:216 xxhdpi:324 xxxhdpi:432; do
   mkdir -p "$GEN/mipmap-${pair%%:*}"
   java -Djava.awt.headless=true "$HERE/tools/Icon.java" "$A/AppIcon.appiconset/icon-1024.png" \
     "$GEN/mipmap-${pair%%:*}/ic_launcher_foreground.png" "$size" $(( size * 76 / 108 )) F2EADC
+  # la capa de los iconos temáticos (Android 13 o posterior): el arco en una sola tinta, algo más pequeño
+  java -Djava.awt.headless=true "$HERE/tools/Icon.java" "$A/AppIcon.appiconset/icon-1024.png" \
+    "$GEN/mipmap-${pair%%:*}/ic_launcher_monochrome.png" "$size" $(( size * 66 / 108 )) F2EADC mono
 done
+
+# ── 2b. lo que va en assets/: lo que la app pone en la página (el mismo Shell.js que la app del iPhone), los avisos de
+#        licencia de lo que lleva el APK y, si está grabada, la demostración (la misma que la del iPhone) ──
+ASSETS="$T/assets"
+mkdir -p "$ASSETS"
+cp "$ROOT/native/ios/Aula/Shell.js" "$ASSETS/shell.js"
+command -v node >/dev/null || { echo "Falta Node (para los avisos de licencia: native/ios/scripts/licenses.mjs)" >&2; exit 1; }
+node "$ROOT/native/ios/scripts/licenses.mjs" --android "$ASSETS/licenses.json" >/dev/null
+if [ -f "$ROOT/native/ios/Aula/Demo.aulademo" ]; then
+  cp "$ROOT/native/ios/Aula/Demo.aulademo" "$ASSETS/Demo.aulademo"
+else
+  echo "(sin native/ios/Aula/Demo.aulademo: la app sale sin «Probar con un curso de ejemplo»; npm run build && node scripts/dev/ios-demo.mjs)"
+fi
 
 # ── 3. recursos y manifiesto ──
 "$BT/aapt2" compile --dir "$HERE/res" -o "$T/res.zip"
 "$BT/aapt2" compile --dir "$GEN" -o "$T/gen.zip"
 mkdir -p "$T/java"
 # (sin listas vacías: con set -u, el bash 3.2 del Mac da «"${A[@]}"» de una lista vacía por variable sin definir)
-LINK=(-I "$JAR" --manifest "$HERE/AndroidManifest.xml" -o "$T/base.apk" --java "$T/java"
+# la demostración va sin comprimir: la app la lee proyectada en memoria, sin copiarla entera
+LINK=(-I "$JAR" --manifest "$HERE/AndroidManifest.xml" -o "$T/base.apk" --java "$T/java" -A "$ASSETS" -0 aulademo
   --min-sdk-version "$MIN_SDK" --target-sdk-version "$API" --version-code "$CODE" --version-name "$VERSION" --auto-add-overlay)
 if [ "$mode" = debug ]; then LINK+=(--debug-mode); fi   # la de prueba se puede depurar (adb run-as); la publicada, no
 "$BT/aapt2" link "${LINK[@]}" "$T/res.zip" "$T/gen.zip"
@@ -151,8 +169,9 @@ find "$HERE/src" "$T/java" -name '*.java' > "$T/sources.txt"
 javac --release 17 -encoding UTF-8 -Xlint:-options -classpath "$JAR" -d "$T/classes" @"$T/sources.txt"
 # las reglas que no dependen de Android (Tunnel.java), comprobadas en la JVM: si alguna falla, no hay paquete
 mkdir -p "$T/test"
-javac --release 17 -encoding UTF-8 -Xlint:-options -classpath "$T/classes" -d "$T/test" "$HERE/tools/TunnelTest.java"
+javac --release 17 -encoding UTF-8 -Xlint:-options -classpath "$T/classes" -d "$T/test" "$HERE/tools/TunnelTest.java" "$HERE/tools/DemoTest.java"
 java -cp "$T/classes:$T/test" com.luumlabs.aula.TunnelTest
+java -cp "$T/classes:$T/test" com.luumlabs.aula.DemoTest
 "$BT/d8" --release --min-api $MIN_SDK --lib "$JAR" --output "$T/dex" $(find "$T/classes" -name '*.class')
 
 # ── 5. el paquete: recursos + código + componente de Tailscale; alineado y firmado ──
