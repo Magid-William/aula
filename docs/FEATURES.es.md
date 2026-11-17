@@ -151,9 +151,12 @@ animaciones respetan el ajuste de *reducir movimiento* de tu sistema.
 | <kbd>⌘</kbd> <kbd>J</kbd> | Preguntar a Aula |
 | <kbd>⌘</kbd> <kbd>,</kbd> | Ajustes |
 | <kbd>⌘</kbd> <kbd>[</kbd> / <kbd>]</kbd> (macOS) · <kbd>Alt</kbd> <kbd>←</kbd> / <kbd>→</kbd> (Windows, Linux) | Atrás · Adelante |
+| <kbd>⌘</kbd> <kbd>⌃</kbd> <kbd>S</kbd> (macOS) · <kbd>Ctrl</kbd> <kbd>\\</kbd> (Windows, Linux) | Mostrar u ocultar la barra lateral |
 | Ejercicios | <kbd>Intro</kbd> comprobar · <kbd>A</kbd>–<kbd>Z</kbd> o <kbd>1</kbd>–<kbd>9</kbd> elegir una opción · <kbd>⌘</kbd> <kbd>Intro</kbd> entregar una respuesta abierta |
 | Tarjetas | <kbd>Espacio</kbd> girar · <kbd>1</kbd>–<kbd>4</kbd> valorar · <kbd>H</kbd> pista · <kbd>⌘</kbd> <kbd>Z</kbd> deshacer |
 | Simulacro | <kbd>Alt</kbd> <kbd>←</kbd> / <kbd>→</kbd> anterior / siguiente · <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>L</kbd> marcar |
+| Lector de documentos | <kbd>⌘</kbd> <kbd>F</kbd> buscar · <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>H</kbd> resaltar la selección · <kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>⌘</kbd> <kbd>0</kbd> ajustar al ancho · <kbd>←</kbd> / <kbd>→</kbd> o <kbd>RePág</kbd> / <kbd>AvPág</kbd> cambiar de página · <kbd>Esc</kbd> quitar la selección |
+| Chat | <kbd>Intro</kbd> enviar · <kbd>⇧</kbd> <kbd>Intro</kbd> nueva línea |
 </details>
 
 ## Tu IA en detalle
