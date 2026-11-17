@@ -1,99 +1,138 @@
 # App Store listing · Aula for iPhone and iPad
 
-Everything to paste into App Store Connect, in English (primary) and Spanish. `node scripts/dev/app-store-check.mjs`
-checks the length limits. The screenshots are made from the app's demo (see [Screenshots](#screenshots)).
+Everything to paste into App Store Connect, in English (primary) and Spanish (Spain), and the answers to its
+questionnaires. Before archiving, `node scripts/dev/app-store-check.mjs` checks the texts against Apple's limits (bytes
+where Apple counts bytes), the version, both privacy manifests, the license notices and the demo recording
+(`--texts` checks only the texts). The screenshots are made from the app's demo (see [Screenshots](#screenshots)).
 
 ## App information
 
 | Field | Value |
 | --- | --- |
+| Name | See [English](#english-us) and [Spanish](#español-españa) below. Under the icon the app is still called *Aula* (`CFBundleDisplayName`) |
 | Bundle ID | `com.luumlabs.aula.ios` |
 | SKU | `aula-ios` |
-| Primary language | English (U.S.) |
-| Category | Education (secondary: Productivity) |
-| Price | Free |
-| Age rating | 4+ (answer "None" to every content question; no web access outside the links the student opens) |
+| Primary language | English (U.S.); localization Spanish (Spain) |
+| Category | Education (secondary: Productivity). Not *Made for Kids* |
+| Content rights | *Yes, it contains, shows, or accesses third-party content* and *I have the necessary rights* (the student's own materials, Wikimedia Commons images with their licenses, pages of the student's study platform) |
+| Price | Free, no in-app purchases |
+| Age rating | **13+** (see [Age rating](#age-rating)) |
 | Copyright | 2026 Luum Labs |
-| Support URL | https://github.com/luumlabs/aula/issues |
-| Marketing URL | https://github.com/luumlabs/aula |
+| Support URL | https://github.com/luumlabs/aula/blob/main/docs/SUPPORT.md |
+| Marketing URL | https://github.com/luumlabs/aula (optional) |
 | Privacy policy URL | https://github.com/luumlabs/aula/blob/main/docs/PRIVACY.md |
+| Availability | Every country and region **except China mainland** (it needs an ICP filing and approval for AI chat) and **France** (it needs the French encryption declaration; add it later). Not available on Apple silicon Macs nor on Apple Vision Pro: untick both in *Pricing and Availability* (the project also says so: `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD` and `SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD` are `NO`) |
+| EU Digital Services Act | Not a trader |
+| Version | **0.2.7** (App Store Connect creates "1.0": change it), build 1. See [Version and build](#version-and-build) |
+| Release | *Manually release this version*: publish it once the notarized Mac 0.2.7 is the latest release, where *Aula for Mac* sends people |
 
-**App privacy** (the questionnaire): *Data not collected*. The app has no account, no analytics and sends nothing to
-the developer; what the student studies goes only to their own Mac.
+**App privacy** (the questionnaire): *Do you or your third-party partners collect data from this app?* **Yes**. Types
+**Contact Info → Email Address**, **Identifiers → User ID** and **Identifiers → Device ID**, each one: purpose *App
+Functionality*, linked to the user **Yes**, used for tracking **No**. Nothing else (no usage data or diagnostics: the
+Tailscale component's log uploads are off). This is what Tailscale, the third-party component inside the app, keeps
+to connect the device to the student's private network: the email address comes from Tailscale's sign-in, which the
+app shows inside itself (`SFSafariViewController` on login.tailscale.com) and which sees the email of the account the
+student chooses; the user and the device are the node Tailscale registers. Luum Labs receives nothing. It matches
+`native/ios/Aula/PrivacyInfo.xcprivacy` and the iPhone and iPad part of [docs/PRIVACY.md](../PRIVACY.md).
 
-**Export compliance**: the app uses encryption that is not Apple's own (Tailscale, i.e. WireGuard, a standard
-algorithm). That declaration is the account owner's to make.
+**Export compliance** (asked on each build until `ITSAppUsesNonExemptEncryption` is in the Info.plist):
+
+1. *Does your app use encryption?* **Yes**.
+2. Type: **Standard encryption algorithms instead of, or in addition to, using or accessing the encryption within
+   Apple's operating system**. The app carries Tailscale's Go code: TLS to Tailscale, and WireGuard (Curve25519,
+   ChaCha20-Poly1305, BLAKE2s) with Noise for the private network. All are standard, published algorithms. It is a
+   free, mass-market app with publicly available source code.
+3. *Available in France?* **No** in this submission (see Availability).
+
+Once App Store Connect has the answers, the next build gets `ITSAppUsesNonExemptEncryption` (`NO` if it asks for no
+documents, or `YES` plus the code Apple gives) so it stops asking.
+
+### Age rating
+
+| Question | Answer |
+| --- | --- |
+| Parental controls, age assurance | No |
+| Unrestricted web access | No, provided the Mac version the app ships with limits the live study-platform browser to the student's platforms when a device drives it; otherwise Yes, and the rating becomes 16+ |
+| User-generated content, social media, messaging and chat, advertising | No (what the student creates is private to them; the chat is with the AI tutor) |
+| Shared location, dating and relationships | No |
+| Medical or treatment information | **Infrequent** |
+| Alcohol, tobacco or drug use or references | **Infrequent** |
+| Realistic violence | **Infrequent** |
+| Everything else (profanity, horror, health topics, sexuality and nudity, other violence, gambling, contests, loot boxes) | None / No |
+
+The three *Infrequent* answers are there because the AI tutor answers about whatever the student studies
+(pharmacology, history, chemistry…). With them Apple gives **13+**.
 
 ## English (U.S.)
 
 <!-- name:en -->
-Aula
+Aula: Study with Your Mac
 <!-- /name -->
 
-If "Aula" is taken, use:
+If the name is taken, use:
 
 <!-- name-alt:en -->
-Aula: Study with Your Mac
+Aula Study Companion
 <!-- /name-alt -->
 
 <!-- subtitle:en -->
-Your Mac's courses, anywhere
+AI tutor, flashcards & exams
 <!-- /subtitle -->
 
 <!-- promo:en -->
-Study on your iPhone and iPad the courses that Aula builds on your Mac from your own notes, slides and past exams. Your courses and your AI stay on the Mac.
+Study the courses Aula builds on your Mac from your own notes, slides and past exams, now on your iPhone and iPad. Your courses and your AI stay on your Mac.
 <!-- /promo -->
 
 <!-- keywords:en -->
-study,courses,flashcards,exam,tutor,spaced repetition,notes,quiz,homework,learning,school,university
+courses,spaced repetition,notes,quiz,homework,learning,school,university,lessons,test prep,planner
 <!-- /keywords -->
 
 <!-- description:en -->
 Aula for iPhone and iPad is the companion of Aula for Mac, the free and open-source study app that turns your notes, slides, past exams or just a topic into a course and studies it with you.
 
-Your courses, your progress and your AI stay on your Mac. This app opens them on your iPhone or iPad over your own private Tailscale network, so you can study on the sofa, on the bus or in the library with everything exactly where you left it.
+Your courses, your progress and your AI stay on your Mac (or on your own server). This app opens them on your iPhone or iPad over your own private Tailscale network, so you can study on the sofa, on the bus or in the library with everything exactly where you left it.
 
 WHAT YOU CAN DO
 • Follow today's plan: what to study now, sorted by what raises your grade most.
 • Learn with interactive lessons: figures, graphs, 3D, real pictures and worked examples before the first exercise.
-• Practise with exercises that are checked instantly, and review your mistakes.
+• Practice with exercises that are checked instantly, and go over your mistakes.
 • Review flashcards with spaced repetition.
 • Take mock exams and see your estimated grade.
 • Ask Aula, your tutor, about anything in your courses.
 • Keep your exams and deadlines in the calendar.
-• Photograph your notes or record a class and add them to a course.
+• Take a photo of your notes or a video of a class and add it to a course.
 
 HOW IT WORKS
-1. Install Aula on your Mac (free: github.com/luumlabs/aula) and turn on "Aula on your devices".
-2. In this app, sign in to Tailscale with the same account you used on the Mac. You do it once.
+1. Install Aula on your Mac (free, from github.com/luumlabs/aula) and turn on "Aula on your devices" in Settings.
+2. In this app, sign in to Tailscale with the same account you used on the Mac. You only do this once.
 3. Type the 6-digit code your Mac shows. That's it.
 
-The Mac has to be on with Aula open. No Mac yet? Tap "Try it with an example course" to explore a full sample course inside the app.
+Your Mac has to be on, with Aula open. The tutor and new courses use the AI you set up in Aula on your Mac: your own account with an AI provider, or a model that runs on the Mac itself. Instead of a Mac, Aula can also run on a Linux computer or on your own server.
+
+No Mac yet? Tap "Try it with an example course" to explore a complete sample course inside the app.
 
 PRIVATE BY DESIGN
-• No Aula account, no ads, no analytics. The app collects no data.
+• No Aula account, no ads, no analytics: nothing you study ever reaches us.
 • What you study travels between your device and your Mac encrypted end to end.
-• A linked device can never read your API keys or delete your data.
+• A linked device never sees your API keys and can't erase or export all your data.
 
-Aula for Mac, Windows and Linux is free and open source (AGPL-3.0).
+Aula is free and open source (AGPL-3.0).
 <!-- /description -->
 
-<!-- whatsnew:en -->
-First version on the App Store.
-<!-- /whatsnew -->
+*What's New* is not available for the first version (App Store Connect doesn't show the field).
 
 ## Español (España)
 
 <!-- name:es -->
-Aula
+Aula: estudia con tu Mac
 <!-- /name -->
 
 <!-- name-alt:es -->
-Aula: estudia con tu Mac
+Aula: compañera de estudio
 <!-- /name-alt -->
 
 <!-- subtitle:es -->
-Tus cursos del Mac, contigo
+Tutor IA, tarjetas y exámenes
 <!-- /subtitle -->
 
 <!-- promo:es -->
@@ -101,13 +140,13 @@ Estudia en tu iPhone y tu iPad los cursos que Aula crea en tu Mac con tus apunte
 <!-- /promo -->
 
 <!-- keywords:es -->
-estudiar,cursos,tarjetas,examen,tutor,repaso espaciado,apuntes,ejercicios,deberes,universidad,clase
+estudiar,cursos,repaso espaciado,apuntes,ejercicios,deberes,universidad,oposiciones,examen,test
 <!-- /keywords -->
 
 <!-- description:es -->
 Aula para iPhone y iPad es la compañera de Aula para Mac, la app de estudio gratuita y de código abierto que convierte tus apuntes, diapositivas, exámenes anteriores o solo un tema en un curso, y lo estudia contigo.
 
-Tus cursos, tu progreso y tu IA se quedan en tu Mac. Esta app los abre en tu iPhone o tu iPad por tu propia red privada de Tailscale, para que estudies en el sofá, en el autobús o en la biblioteca con todo tal como lo dejaste.
+Tus cursos, tu progreso y tu IA se quedan en tu Mac (o en tu propio servidor). Esta app los abre en tu iPhone o tu iPad por tu propia red privada de Tailscale, para que estudies en el sofá, en el autobús o en la biblioteca con todo tal como lo dejaste.
 
 QUÉ PUEDES HACER
 • Seguir el plan de hoy: qué estudiar ahora, ordenado por lo que más sube tu nota.
@@ -117,51 +156,82 @@ QUÉ PUEDES HACER
 • Hacer simulacros de examen y ver tu nota estimada.
 • Preguntar a Aula, tu tutora, cualquier cosa de tus cursos.
 • Llevar tus exámenes y entregas en el calendario.
-• Fotografiar tus apuntes o grabar una clase y añadirlos a un curso.
+• Hacer una foto de tus apuntes o un vídeo de una clase y añadirlo a un curso.
 
 CÓMO FUNCIONA
-1. Instala Aula en tu Mac (gratis: github.com/luumlabs/aula) y activa «Aula en tus dispositivos».
+1. Instala Aula en tu Mac (gratis, en github.com/luumlabs/aula) y activa «Aula en tus dispositivos» en Ajustes.
 2. En esta app, inicia sesión en Tailscale con la misma cuenta que usaste en el Mac. Se hace una vez.
 3. Escribe el código de 6 cifras que te enseña el Mac. Ya está.
 
-El Mac tiene que estar encendido con Aula abierta. ¿Aún no tienes Mac? Toca «Probar con un curso de ejemplo» para explorar un curso de ejemplo completo dentro de la app.
+El Mac tiene que estar encendido y con Aula abierta. La tutora y los cursos nuevos usan la IA que configuraste en Aula en tu Mac: tu propia cuenta de un servicio de IA o un modelo que funciona en el propio Mac. En lugar de un Mac, Aula también puede funcionar en un ordenador con Linux o en tu propio servidor.
+
+¿Aún no tienes Mac? Toca «Probar con un curso de ejemplo» para explorar un curso de ejemplo completo dentro de la app.
 
 PRIVADA POR DISEÑO
-• Sin cuenta de Aula, sin anuncios, sin analíticas. La app no recoge datos.
+• Sin cuenta de Aula, sin anuncios y sin analíticas: nada de lo que estudias nos llega.
 • Lo que estudias viaja entre tu dispositivo y tu Mac cifrado de extremo a extremo.
-• Un dispositivo vinculado nunca puede leer tus claves de API ni borrar tus datos.
+• Un dispositivo vinculado nunca ve tus claves de API ni puede borrar o exportar todos tus datos.
 
-Aula para Mac, Windows y Linux es gratuita y de código abierto (AGPL-3.0).
+Aula es gratuita y de código abierto (AGPL-3.0).
 <!-- /description -->
 
-<!-- whatsnew:es -->
-Primera versión en el App Store.
-<!-- /whatsnew -->
+The keywords don't repeat words of the name or the subtitle (Apple already indexes those). A copy for Spanish
+(Mexico) is optional: the same texts, without «oposiciones».
 
 ## App Review
 
-**Sign-in required:** no (leave the demo account fields empty).
+- **Sign-in required:** no (leave the demo account fields empty; the notes explain the built-in demo).
+- **Contact:** the account owner's name, e-mail and phone number in international format (`+34 …`). They are entered
+  in App Store Connect only, never in this repository.
+- **Attachment:** a 1–2 minute video recorded on a real iPhone or iPad connected to a real Mac: signing in to
+  Tailscale, the app finding `aula-mac`, the 6-digit code, Today, a lesson and the chat. If there is no video, drop
+  the sentence about it from the notes.
 
-**Notes:**
+**Notes** (at most 4000 bytes):
 
-> Aula for iPhone and iPad is the companion of Aula for Mac (free and open source, https://github.com/luumlabs/aula).
-> The student's courses live on their own Mac and this app opens them over their private Tailscale network. No
-> account is created in the app and it collects no data.
->
-> To try it without a Mac, tap "Try it with an example course" on the first screen: it opens the full interface with
-> a sample course stored inside the app (nothing is sent anywhere and nothing is saved). A bar at the top says it is
-> the demo and has "Exit". Creating a course and uploading files need the Mac, so in the demo they answer "This isn't
-> part of the demo".
->
-> "Sign in to Tailscale" opens Tailscale's own sign-in page in the browser (Tailscale is a third-party VPN service the
-> student already uses on their Mac). The camera and the microphone are only used when the student photographs their
-> notes or records a class to add them to a course on their Mac.
+<!-- reviewnotes:en -->
+Aula for iPhone and iPad is the client of Aula, a free and open-source study app (https://github.com/luumlabs/aula) that the student runs on their own Mac (or Linux computer or home server). The student's courses, progress and AI live on that computer. This app connects to it over the student's own private Tailscale network and shows the Aula interface served by that computer.
+
+HOW TO REVIEW WITHOUT A MAC (DEMO MODE)
+On the first screen, tap "Try it with an example course". The full interface opens with a sample course (Trigonometry, six weeks of simulated study) stored inside the app. Nothing is sent anywhere and nothing is saved. A bar at the top reads "Demo · nothing is saved" and has "Exit". Things to try:
+- Today: the day's plan, the streak and the exam countdown.
+- The course: estimated grade, a lesson with figures, exercises graded instantly, flashcards (flip and rate), the mock exam and the mistakes.
+- The calendar (and, on iPad, statistics and tools in the sidebar).
+- The chat with Aula (the "Aula" tab on iPhone): the sample quiz is graded, and any new question gets a short reply saying this is the demo.
+Creating a course and adding files need the student's computer, so in the demo they answer "This isn't part of the demo". The attached video shows the app connected to a real Mac.
+
+THE REAL CONNECTION
+"Sign in to Tailscale" shows Tailscale's own sign-in page in a Safari view inside the app. Tailscale is a third-party service the student signs in to with their own account (Apple, Google, Microsoft, GitHub or a passkey). Tailscale accounts are created and managed at tailscale.com, not in this app. The app embeds Tailscale's open-source client library only to reach the student's own computer: it does not install a VPN configuration, does not use Network Extension and does not route any other traffic of the device. The app then finds the student's Aula and asks for the 6-digit code that Aula shows on that computer. "Sign out of Tailscale" removes this device from the network and deletes its state.
+
+ACCOUNTS, DATA AND AI
+- There is no Aula account and no Aula server. The developer receives no data. No ads, analytics or tracking.
+- The tutor's answers are produced by Aula on the student's own computer, with the AI provider the student chose and set up there (or a local model). This app never contacts an AI provider.
+- Everything the student creates is private to them. There is no sharing between users and no social feature.
+- Camera and microphone: requested only when the student picks "Take Photo or Video" in the system file picker to add their notes or a class to a course. The file goes to their own computer. Local network: to reach that computer directly when both are on the same network.
+- The privacy policy is linked on the first screen and at https://github.com/luumlabs/aula/blob/main/docs/PRIVACY.md
+- Links to outside pages open in Safari.
+<!-- /reviewnotes -->
+
+The notes are true only if, in the build sent for review: the demo was recorded again with the current interface, the
+camera and microphone were tried on a real device, and the video is attached. Don't call Tailscale a "VPN" anywhere
+(guideline 5.4).
+
+## Version and build
+
+- **Version** (`MARKETING_VERSION` in `native/ios/Aula.xcodeproj`, the `CFBundleShortVersionString`): the version of
+  Aula for Mac the app ships with. While that Mac version is being prepared, `package.json` may still have the previous
+  one; `app-store-check.mjs` accepts the same version or the next one.
+- **Build** (`CURRENT_PROJECT_VERSION`, the `CFBundleVersion`): a whole number that only goes up with each upload (1, 2,
+  3…) and is never reset when the version changes. If an upload has to be repeated, raise only the build.
+- The team is passed on the command line (`DEVELOPMENT_TEAM=<team>`), so the project stays neutral for anyone who
+  clones it.
 
 ## Screenshots
 
-Apple asks for iPhone 6.9" (1320 × 2868) and iPad 13" (2064 × 2752), without transparency. They are in
-`docs/app-store/screenshots/` (`iphone-6.9/` and `ipad-13/`, five each, JPEG; git does not keep them), taken from the
-app's demo in the simulators, in English:
+Apple asks for iPhone with Dynamic Island, medium display (6.3", 1206 × 2622), and iPad 13" (2064 × 2752), without
+transparency; upload the 6.9" set (1320 × 2868) too. They go in `docs/app-store/screenshots/` (`iphone-6.9/`,
+`iphone-6.3/` and `ipad-13/`, five each, JPEG; git does not keep them), taken from the app's demo in the simulators, in
+English, after recording the demo with the current interface:
 
 | | iPhone | iPad |
 | --- | --- | --- |
@@ -172,8 +242,8 @@ app's demo in the simulators, in English:
 | 5 | The chat with Aula, with a quiz | The chat with Aula, with a quiz |
 
 To take them again (after recording the demo, see `docs/DEVICES.md`): build the app for the simulator in Debug, install
-it on *iPhone 18 Pro Max* and *iPad Pro 13-inch (M5)*, and launch it with the argument `-AulaStoreShots`, which shows
-the demo without its bar, as Aula looks when connected to the Mac (Debug builds only):
+it on *iPhone 18 Pro Max*, *iPhone 18 Pro* and *iPad Pro 13-inch (M5)*, and launch it with the argument
+`-AulaStoreShots`, which shows the demo without its bar, as Aula looks when connected to the Mac (Debug builds only):
 
 ```bash
 xcrun simctl status_bar <device> override --time "9:41" --batteryState charged --batteryLevel 100
@@ -184,8 +254,11 @@ sips -s format jpeg -s formatOptions 92 shot.png --out shot.jpg     # Apple refu
 
 ## What only the account owner can do
 
-1. Create the app in App Store Connect (*Apps → +*) with the bundle ID above.
-2. Paste this listing, upload the screenshots, answer App privacy (*Data not collected*), the age rating and the
-   export-compliance question.
-3. Upload the build (*Product → Archive → Distribute App* in Xcode, or ask for it to be uploaded from this Mac) and
-   submit it for review with the notes above.
+1. Register the App ID `com.luumlabs.aula.ios` (explicit, no capabilities) and check that the latest Apple Developer
+   Program License Agreement is accepted and the DSA trader status is declared.
+2. Create the app in App Store Connect (*Apps → +*): iOS, the name above, English (U.S.), the bundle ID and the SKU.
+   Change the version to 0.2.7.
+3. Fill in App Information, Pricing and Availability and App Privacy with the answers above.
+4. Upload the build (Xcode *Organizer → Distribute App*, or Transporter), answer export compliance on it and try it in
+   TestFlight.
+5. Fill in the version page (screenshots, texts, App Review information) and submit it for review.

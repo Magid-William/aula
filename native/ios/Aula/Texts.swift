@@ -9,7 +9,7 @@ enum Texts {
     static var signInTitle: String { t("Conecta con tu Aula", "Connect to your Aula") }
     static var signInBody: String { t("Aula vive en tu Mac o en tu servidor. Para llegar a ella desde aquí, inicia sesión en Tailscale con la misma cuenta que usaste allí. Solo se hace una vez.", "Aula lives on your Mac or your server. To reach it from here, sign in to Tailscale with the same account you used there. You only do this once.") }
     static var signInAction: String { t("Iniciar sesión en Tailscale", "Sign in to Tailscale") }
-    static var signInAfter: String { t("Cuando termines, vuelve a Aula: sigue sola.", "When you’re done, come back to Aula: it carries on by itself.") }
+    static var signInAfter: String { t("Cuando termines, la página se cierra sola y Aula sigue.", "When you’re done, the page closes by itself and Aula carries on.") }
     static var approvalTitle: String { t("Falta aprobar este dispositivo", "This device needs approval") }
     static var approvalBody: String { t("Tu red de Tailscale pide aprobar los dispositivos nuevos. Quien la administra puede hacerlo en su panel; en cuanto lo haga, Aula sigue sola.", "Your Tailscale network asks for new devices to be approved. Whoever manages it can do so in the admin panel; Aula carries on by itself once they do.") }
     static var lookingTitle: String { t("No encuentro tu Aula", "I can’t find your Aula") }
@@ -42,6 +42,14 @@ enum Texts {
     static var macShare: String { t("Enviar el enlace a mi Mac", "Send the link to my Mac") }
     static var macAddress: String { "github.com/luumlabs/aula" }
     static var done: String { t("Hecho", "Done") }
+
+    // Lo legal: la política de privacidad y las licencias, a mano en todas las pantallas de espera
+    static var privacyLink: String { t("Política de privacidad", "Privacy policy") }
+    static var licensesLink: String { t("Licencias", "Licenses") }
+    static var licensesTitle: String { t("Licencias", "Licenses") }
+    static var licensesIntro: String { t("Aula es software libre de Luum Labs, con la licencia GNU AGPL v3 y sin ninguna garantía: puedes conseguir su código y compartirlo con esa misma licencia. La app lleva dentro el componente de Tailscale (TailscaleKit) y el código de Go que usa; aquí están sus licencias.", "Aula is free software by Luum Labs, under the GNU AGPL v3 and with no warranty: you can get its source code and share it under the same license. The app also carries Tailscale’s component (TailscaleKit) and the Go code it uses; here are their licenses.") }
+    static var licensesSource: String { t("El código de Aula", "Aula’s source code") }
+    static var licensesMissing: String { t("Esta copia de la app no trae los avisos de licencia. Están en github.com/luumlabs/aula.", "This copy of the app doesn’t carry the license notices. They are at github.com/luumlabs/aula.") }
 
     // La demostración
     static var demoAction: String { t("Probar con un curso de ejemplo", "Try it with an example course") }
