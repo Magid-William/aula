@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next'
 import { animate, motion, useMotionValue, useTransform } from 'motion/react'
 import { Card, cx, focusRing, toast, useTheme, type CardProps } from '@renderer/design'
+import { api } from '@renderer/lib/api'
+import { signedNumberKeyboard } from '@renderer/lib/device'
 import { formatFixed, formatNumber, parseNumber, texNumber, type NumberStyle } from './lib/num'
 
 /** Coma decimal si la interfaz está en español. */
@@ -122,7 +124,8 @@ export function NumField({ label, value, onChange, unit, placeholder, className,
       {label && <span className="block t-ui font-medium text-text2 mb-1.5 truncate">{label}</span>}
       <span className="relative flex items-center">
         <input
-          inputMode="decimal"
+          // con «−» también en el iPhone (su teclado decimal no lo tiene)
+          inputMode={signedNumberKeyboard(api.platform)}
           aria-label={ariaLabel}
           aria-invalid={bad || undefined}
           value={value}

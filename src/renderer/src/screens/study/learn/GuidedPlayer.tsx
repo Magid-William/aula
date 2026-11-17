@@ -294,6 +294,7 @@ export function GuidedPlayer({ data, skill, ctx, ink, modeMenu, onExit, onFinish
       label={<RichText text={skill.title} inline />}
       onExit={onExit}
       tutor
+      brief={<span className="t-ui tabular text-text2 whitespace-nowrap">{t('common.nOfM', { n: index + 1, m: concepts.length })}</span>}
       trailing={
         <>
           {canSpeak() && (

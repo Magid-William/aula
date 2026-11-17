@@ -299,12 +299,13 @@ export function ExerciseActions({ controller: c, continueLabel, variant = 'inlin
       </Button>
     )
   }
+  // en el teléfono la barra no cabe en una fila: lo secundario se reparte arriba y la acción principal ocupa la de abajo
   if (variant === 'bar')
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 phone:w-full phone:flex-wrap phone:justify-center phone:gap-y-1.5">
         {secondary}
-        {primary && <span className="mx-1 h-5 w-[0.5px] bg-line" aria-hidden />}
-        {primary}
+        {primary && <span className="mx-1 h-5 w-[0.5px] bg-line phone:hidden" aria-hidden />}
+        {primary && <span className="contents phone:flex phone:basis-full phone:[&>button]:grow">{primary}</span>}
       </div>
     )
   return (

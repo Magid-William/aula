@@ -38,6 +38,9 @@ export function App() {
   // desde un dispositivo (iPad, iPhone, Android): sin ventana que arrastrar; en el teléfono, pestañas abajo en vez de barra lateral
   const remote = api.remote
   const compact = useCompact()
+  // estudiando en el teléfono, la sesión ocupa la pantalla: sin la barra de arriba ni las pestañas (se sale con el «✕» de su
+  // cápsula, o con «atrás» del sistema); quedaba poco sitio para el ejercicio, sobre todo en un iPhone SE
+  const immersive = useNav((s) => compact && s.route.name === 'study')
 
   useEffect(() => {
     if (api.platform === 'darwin') document.documentElement.classList.add('vibrant')
@@ -100,10 +103,10 @@ export function App() {
         {!remote && <div aria-hidden className="drag absolute inset-x-0 top-0 h-2" />}
         {!compact && <Sidebar />}
         <Sheet compact={compact}>
-          <Bar compact={compact} />
+          {!immersive && <Bar compact={compact} />}
           <Screens />
         </Sheet>
-        {compact && <CompactTabs />}
+        {compact && !immersive && <CompactTabs />}
       </div>
       {/* la bienvenida se hace en el Mac (allí se elige la IA); un dispositivo entra directo */}
       <AnimatePresence>{settings && !settings.onboarded && !remote && <Onboarding key="onboarding" />}</AnimatePresence>

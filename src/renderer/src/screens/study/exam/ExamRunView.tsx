@@ -15,6 +15,7 @@ import { GlassCapsule, StudyFrame, TopCapsule, CapsuleDivider } from '../Chrome'
 import { updateProgress, type CourseData } from '../data'
 import { useBlockCtx, useInk } from '../kit'
 import { useExamGuard } from './examGuard'
+import { useCompact } from '@renderer/app/shell/CompactTabs'
 
 const answeredItem = (it: ExamRunItem, ex: Exercise | undefined): boolean => !!ex && it.answer !== undefined && it.answer !== null && !inputIsEmpty(snapshotInput(ex, it.answer))
 
@@ -36,6 +37,9 @@ export function ExamRunView({ data, run: initial, notice, onExit, onSubmit }: { 
   const item = run.items[index]
   const ex = item ? exercises[item.exerciseID] : undefined
   const [dialog, setDialog] = useState<'map' | 'submit' | null>(null)
+  // en el teléfono la barra de abajo no cabe: «Anterior» y «Siguiente» solo con su flecha, y «Entregar» (salvo en la última)
+  // pasa al mapa de preguntas
+  const compact = useCompact()
   const since = useRef(Date.now())
   const [, setTick] = useState(0)
   // el menú de examen solo con el simulacro en marcha a la vista: no en la portada ni en el informe y su práctica, ni en la
@@ -136,7 +140,7 @@ export function ExamRunView({ data, run: initial, notice, onExit, onSubmit }: { 
       ) : (
         <span className="t-ui text-text2">{t('exam.noLimit')}</span>
       )}
-      <span className="t-ui tabular text-text2 whitespace-nowrap">{t('exam.answeredOf', { n: answered, m: run.items.length })}</span>
+      <span className="t-ui tabular text-text2 whitespace-nowrap phone:hidden">{t('exam.answeredOf', { n: answered, m: run.items.length })}</span>
     </TopCapsule>
   )
 
@@ -144,8 +148,8 @@ export function ExamRunView({ data, run: initial, notice, onExit, onSubmit }: { 
   const bottom = (
     <GlassCapsule>
       <Tooltip label={t('exam.prevHelp')}>
-        <Button variant="ghost" size="md" className="rounded-full!" icon={<Icon name="chevron-left" size={15} />} disabled={index === 0} onClick={() => go(index - 1)}>
-          {t('exam.prev')}
+        <Button variant="ghost" size="md" className="rounded-full!" icon={<Icon name="chevron-left" size={15} />} disabled={index === 0} onClick={() => go(index - 1)} aria-label={compact ? t('exam.prev') : undefined}>
+          {compact ? null : t('exam.prev')}
         </Button>
       </Tooltip>
       <Button variant="ghost" size="md" className="rounded-full! tabular" onClick={() => setDialog('map')}>
@@ -156,8 +160,8 @@ export function ExamRunView({ data, run: initial, notice, onExit, onSubmit }: { 
         <Button variant="primary" size="md" className="rounded-full! px-4" onClick={() => setDialog('submit')}>{t('exam.submit')}</Button>
       ) : (
         <>
-          <Button variant="ghost" size="md" className="rounded-full!" onClick={() => setDialog('submit')}>{t('exam.submit')}</Button>
-          <Button variant="primary" size="md" className="rounded-full! px-4" iconRight={<Icon name="chevron-right" size={15} />} onClick={() => go(index + 1)}>{t('exam.next')}</Button>
+          {!compact && <Button variant="ghost" size="md" className="rounded-full!" onClick={() => setDialog('submit')}>{t('exam.submit')}</Button>}
+          <Button variant="primary" size="md" className="rounded-full! px-4" iconRight={<Icon name="chevron-right" size={15} />} onClick={() => go(index + 1)} aria-label={compact ? t('exam.next') : undefined}>{compact ? null : t('exam.next')}</Button>
         </>
       )}
     </GlassCapsule>
@@ -184,7 +188,7 @@ export function ExamRunView({ data, run: initial, notice, onExit, onSubmit }: { 
         </motion.div>
       </AnimatePresence>
 
-      <Dialog open={dialog === 'map'} onClose={() => setDialog(null)} title={t('exam.mapTitle')} size="md">
+      <Dialog open={dialog === 'map'} onClose={() => setDialog(null)} title={t('exam.mapTitle')} size="md" footer={compact && !last ? <Button variant="secondary" size="lg" onClick={() => setDialog('submit')}>{t('exam.submit')}</Button> : undefined}>
         <QuestionMap run={run} exercises={exercises} current={index} ink={ink} onPick={(i) => { go(i); setDialog(null) }} />
       </Dialog>
       <Dialog

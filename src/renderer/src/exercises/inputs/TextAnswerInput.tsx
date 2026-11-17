@@ -7,7 +7,9 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { Answer } from '@shared/schema/exercises'
 import { RichText } from '@renderer/lib/RichText'
 import { canAutoFocus, cx, InkStrike, Tooltip } from '@renderer/design'
-import { keysFor, type AnswerKey } from '../keys'
+import { answerInputMode, keysFor, type AnswerKey } from '../keys'
+import { api } from '@renderer/lib/api'
+import { signedNumberKeyboard } from '@renderer/lib/device'
 import { chemTex, insertAt, mathPreview, previewIsUseful, usesDecimalComma } from '../normalize'
 import { Tex } from '../ui'
 import { partTone, type InputProps } from './shared'
@@ -22,7 +24,6 @@ interface Spec {
   suffix?: string
   preview: 'math' | 'chem' | 'none'
   note?: string
-  numeric?: boolean
   /** La barra de símbolos se abre sola (expresiones, ecuaciones, intervalos, química). */
   keysOpen: boolean
 }
@@ -31,7 +32,7 @@ function useSpec(answer: Answer): Spec {
   const { t } = useTranslation('study')
   switch (answer.kind) {
     case 'numeric':
-      return { placeholder: answer.placeholder ?? t('ex.ph.answer'), prefix: answer.prefix, suffix: answer.suffix ?? answer.unit, preview: 'math', numeric: true, keysOpen: false }
+      return { placeholder: answer.placeholder ?? t('ex.ph.answer'), prefix: answer.prefix, suffix: answer.suffix ?? answer.unit, preview: 'math', keysOpen: false }
     case 'expression':
       return { placeholder: answer.placeholder ?? t('ex.ph.expression'), prefix: answer.prefix, preview: 'math', keysOpen: true }
     case 'equation':
@@ -47,7 +48,7 @@ function useSpec(answer: Answer): Spec {
         case 'formula': return { placeholder: t('ex.ph.chemFormula'), preview: 'chem', note: t('ex.note.chemFormula'), keysOpen: true }
         case 'equation': return { placeholder: t('ex.ph.chemEquation'), preview: 'chem', note: t('ex.note.chemEquation'), keysOpen: true }
         case 'name': return { placeholder: t('ex.ph.chemName'), preview: 'none', note: t('ex.note.chemName'), keysOpen: false }
-        case 'number': return { placeholder: t('ex.ph.value'), suffix: answer.unit, preview: 'none', numeric: true, note: answer.sigFigs ? t('ex.note.sigFigs', { count: answer.sigFigs }) : undefined, keysOpen: false }
+        case 'number': return { placeholder: t('ex.ph.value'), suffix: answer.unit, preview: 'none', note: answer.sigFigs ? t('ex.note.sigFigs', { count: answer.sigFigs }) : undefined, keysOpen: false }
         case 'configuration': return { placeholder: t('ex.ph.chemConfig'), preview: 'chem', note: t('ex.note.chemConfig'), keysOpen: true }
       }
       break
@@ -150,7 +151,8 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
             readOnly={locked}
             spellCheck={answer.kind === 'short' || (answer.kind === 'chem' && answer.mode === 'name')}
             autoComplete="off"
-            inputMode={spec.numeric ? 'decimal' : 'text'}
+            // un número exacto (√3/3, −1/2) se escribe con el teclado entero: el decimal no tiene «−» ni «/» (keys.ts)
+            inputMode={answerInputMode(answer, signedNumberKeyboard(api.platform))}
             aria-label={t('ex.yourAnswer')}
             placeholder={spec.placeholder}
             onChange={(e) => set((d) => ({ ...d, text: e.target.value }))}
