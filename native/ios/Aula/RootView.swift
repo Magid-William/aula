@@ -299,7 +299,13 @@ private struct Message<Action: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
             action().padding(.top, 14)
             if let footnote {
-                Text(footnote).font(.footnote).foregroundStyle(.tertiary).multilineTextAlignment(.center).padding(.top, 4)
+                // entera también en pantallas bajas (iPhone SE): encoge el dibujo, no la frase
+                Text(footnote)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
             }
         }
     }

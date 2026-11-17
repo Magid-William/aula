@@ -232,8 +232,9 @@ Verified on a Mac, by tests in this repository:
   device, unsigned, carries both manifests and `Licenses.json`): in the iPhone simulator, *Sign in to Tailscale* shows
   Tailscale's page in a sheet inside the app and its close button dismisses it; *Licenses* lists Aula and every
   component with its license and opens each full text; *Privacy policy* opens the policy in Safari (at its Spanish half
-  on a Spanish device). Checked in English (light) and Spanish (dark). The sheet closing by itself after a real sign-in
-  is not tried yet.
+  on a Spanish device). Checked in English (light) and Spanish (dark). On the smallest iPhone (SE, 3rd generation),
+  with the demo button, the whole connect screen fits in both languages: the sign-in note is whole and *Privacy policy ·
+  Licenses* is at the bottom. The sheet closing by itself after a real sign-in is not tried yet.
 - The demo, in both simulators: it opens on *Today* with the example course, the course and the inbox open, the
   sample quiz in the chat grades answers, a new question gets the demo reply, and *Exit* returns to the connect
   screen. On the iPad also: the day's plan, a flashcard review (flip and rate), the calendar, statistics, tools, and
