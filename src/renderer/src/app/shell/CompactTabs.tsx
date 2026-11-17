@@ -1,30 +1,33 @@
-// Aula en una pantalla estrecha (el iPhone del estudiante, a distancia): sin barra lateral, con cuatro pestañas abajo. Allí
-// Aula es sobre todo su asistente: qué hizo por ti, qué hay pendiente, hablar con ella y el calendario; los cursos se
-// estudian mejor en el iPad o en el Mac, pero «Hoy» los deja a un toque.
+// Aula en una pantalla de teléfono (el del estudiante, a distancia): sin barra lateral, con cuatro pestañas abajo. «Hoy» va
+// primero y es donde se abre la app: lo que toca estudiar hoy, a un toque de cada curso; luego hablar con Aula, el calendario
+// y las novedades (lo que hizo por ti y lo pendiente).
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx, Icon, type IconName } from '@renderer/design'
 import { navigate, useNav, type Route } from '../router'
 import { useInboxCount } from './inboxCount'
 
-/** ¿La ventana es estrecha como un teléfono? (se entera si cambia: girar el dispositivo, partir la pantalla del iPad). */
+/** Pantalla de teléfono: estrecha, o baja y táctil (un teléfono girado; si no, cabría la barra lateral en 360 px de alto). */
+export const COMPACT_QUERY = '(max-width: 700px), (max-height: 500px) and (pointer: coarse)'
+
+/** ¿La ventana es de teléfono? (se entera si cambia: girar el dispositivo, partir la pantalla del iPad). */
 export function useCompact(): boolean {
-  const query = '(max-width: 700px)'
-  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
+  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia(COMPACT_QUERY).matches)
   useEffect(() => {
-    const m = window.matchMedia(query)
+    const m = window.matchMedia(COMPACT_QUERY)
     const on = (): void => setCompact(m.matches)
+    on()
     m.addEventListener('change', on)
     return () => m.removeEventListener('change', on)
   }, [])
   return compact
 }
 
-const TABS: ReadonlyArray<{ route: Route; icon: IconName; label: string }> = [
-  { route: { name: 'inbox' }, icon: 'inbox', label: 'nav.inbox' },
+export const TABS: ReadonlyArray<{ route: Route; icon: IconName; label: string }> = [
+  { route: { name: 'home' }, icon: 'today', label: 'nav.home' },
   { route: { name: 'chat' }, icon: 'tutor', label: 'nav.chat' },
   { route: { name: 'calendar' }, icon: 'calendar', label: 'nav.calendar' },
-  { route: { name: 'home' }, icon: 'today', label: 'nav.home' }
+  { route: { name: 'inbox' }, icon: 'inbox', label: 'nav.inbox' }
 ]
 
 export function CompactTabs() {
@@ -32,7 +35,8 @@ export function CompactTabs() {
   const current = useNav((s) => s.route.name)
   const unread = useInboxCount()
   return (
-    <nav aria-label="Aula" className="shrink-0 border-t-[0.5px] border-line bg-surface" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    // mientras se escribe con el teclado de la pantalla las pestañas se apartan (styles.css: html.kb-open), para dejar sitio
+    <nav aria-label="Aula" data-compact-tabs className="shrink-0 border-t-[0.5px] border-line bg-surface" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <ul className="m-0 flex list-none items-stretch p-0">
         {TABS.map((tab) => {
           const on = current === tab.route.name

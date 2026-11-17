@@ -30,7 +30,7 @@ export function AchievementToast() {
   }, [current, reducedMotion])
 
   return (
-    <div className="pointer-events-none fixed right-6 top-[60px] z-[120] flex justify-end" aria-live="polite">
+    <div className="pointer-events-none fixed right-6 top-[calc(60px+env(safe-area-inset-top))] z-[120] flex justify-end phone:left-3 phone:right-3 phone:top-[calc(env(safe-area-inset-top)+52px)]" aria-live="polite">
       <AnimatePresence mode="wait">
         {current && (
           <motion.button

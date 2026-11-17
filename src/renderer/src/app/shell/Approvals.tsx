@@ -50,7 +50,7 @@ export function Approvals() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
           transition={spring.smooth}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[min(520px,92vw)] rounded-[22px] bg-raised border-[0.5px] border-line shadow-[var(--e4)] p-5"
+          className="fixed bottom-[calc(var(--dock)+1.5rem)] left-1/2 -translate-x-1/2 z-[60] w-[min(520px,92vw)] rounded-[22px] bg-raised border-[0.5px] border-line shadow-[var(--e4)] p-5 phone:bottom-[calc(var(--dock)+12px)] phone:w-[calc(100vw-24px)]"
         >
           <div className="flex items-start gap-3.5">
             <AulaMark size={34} state="waiting" />

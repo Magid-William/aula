@@ -1,4 +1,4 @@
-// Avisos breves que entran por abajo a la derecha y se apilan.
+// Avisos breves que entran por abajo a la derecha y se apilan. En el teléfono, a lo ancho y encima de las pestañas.
 import { create } from 'zustand'
 import { AnimatePresence, motion } from 'motion/react'
 import { CheckCircle2, Info, AlertTriangle, XCircle, X } from 'lucide-react'
@@ -73,7 +73,7 @@ const icons: Record<Kind, ReactNode> = {
 export function Toaster() {
   const { items, dismiss } = useToasts()
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-[90] flex w-[360px] flex-col gap-2.5" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-[calc(var(--dock)+1.25rem)] right-5 z-[90] flex w-[360px] max-w-[calc(100vw-24px)] flex-col gap-2.5 phone:bottom-[calc(var(--dock)+12px)] phone:left-3 phone:right-3 phone:w-auto phone:max-w-none" aria-live="polite">
       <AnimatePresence initial={false}>
         {items.map((t) => (
           <motion.div
@@ -95,7 +95,7 @@ export function Toaster() {
                 </button>
               )}
             </div>
-            <button aria-label={i18n.t('common:actions.close')} className="text-text3 hover:text-text" onClick={() => dismiss(t.id)}>
+            <button aria-label={i18n.t('common:actions.close')} className="relative touch-target text-text3 hover:text-text" onClick={() => dismiss(t.id)}>
               <X size={15} />
             </button>
           </motion.div>

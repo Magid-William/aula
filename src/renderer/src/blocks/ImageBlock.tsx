@@ -192,7 +192,7 @@ function Lightbox({ open, onClose, src, alt, caption, spots, ctx }: { open: bool
     <AnimatePresence>
       {open && (
         <motion.div className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-[rgba(16,13,10,0.82)] p-8 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} onClick={onClose} role="dialog" aria-modal aria-label={alt || t('image.image')}>
-          <IconButton label={t('common.close')} variant="raised" className="absolute right-5 top-5" onClick={onClose}>
+          <IconButton label={t('common.close')} variant="raised" className="absolute right-[calc(1.25rem+env(safe-area-inset-right))] top-[calc(1.25rem+env(safe-area-inset-top))]" onClick={onClose}>
             <Icon name="close" size={16} />
           </IconButton>
           <motion.div className="relative max-h-[84vh] max-w-[92vw] overflow-hidden rounded-[16px]" initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }} transition={{ type: 'spring', stiffness: 224, damping: 30 }} onClick={(e) => e.stopPropagation()}>

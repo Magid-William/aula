@@ -24,21 +24,22 @@ export function TopBar({ title, right, compact }: { title?: ReactNode; right?: R
     const showBack = canBack && !COMPACT_ROOTS.has(route.name)
     return (
       <div className="relative z-10 flex h-[48px] shrink-0 items-center gap-1 px-2">
+        {/* con el dedo: botones de 40 px (y zona de toque de 44) */}
         {showBack && (
-          <IconButton label={t('nav.back')} size="sm" onClick={back}>
-            <Icon name="chevron-left" size={18} />
+          <IconButton label={t('nav.back')} size="lg" onClick={back}>
+            <Icon name="chevron-left" size={20} />
           </IconButton>
         )}
-        <div className={cx('min-w-0 flex-1 truncate font-serif text-[19px] font-medium tracking-[-0.2px]', !showBack && 'pl-2')}>{title}</div>
+        <div className={cx('min-w-0 flex-1 truncate font-serif text-[19px] font-medium tracking-[-0.2px]', !showBack && 'pl-2.5')}>{title}</div>
         {right && <div className="flex items-center gap-1.5">{right}</div>}
         {/* sin barra lateral, los ajustes se abren desde «Hoy» (las cuatro pestañas de abajo se quedan como están) */}
         {route.name === 'home' && (
-          <IconButton label={t('nav.settings')} size="sm" onClick={() => navigate({ name: 'settings' })}>
-            <Icon name="settings" size={18} />
+          <IconButton label={t('nav.settings')} size="lg" onClick={() => navigate({ name: 'settings' })}>
+            <Icon name="settings" size={20} />
           </IconButton>
         )}
-        <IconButton label={t('search.placeholder')} size="sm" onClick={openPalette}>
-          <Icon name="search" size={18} />
+        <IconButton label={t('search.placeholder')} size="lg" onClick={openPalette}>
+          <Icon name="search" size={20} />
         </IconButton>
       </div>
     )
