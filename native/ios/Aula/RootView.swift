@@ -6,22 +6,46 @@ struct RootView: View {
     let model: AppModel
 
     var body: some View {
-        ZStack {
-            Color("Paper").ignoresSafeArea()
-            switch model.stage {
-            case .ready(let base):
-                VStack(spacing: 0) {
-                    if model.showsDemoBar { DemoBar { Task { await model.exitDemo() } } }
-                    WebView(base: base, onFailure: { Task { await model.webFailed() } }, onSwitch: { model.chooseAnother() })
-                        .ignoresSafeArea(edges: model.showsDemoBar ? [.horizontal, .bottom] : .all)
-                }
-                .transition(.opacity)
-            default:
-                ConnectView(model: model)
+        GeometryReader { geo in
+            ZStack {
+                Color("Paper").ignoresSafeArea()
+                switch model.stage {
+                case .ready(let base):
+                    VStack(spacing: 0) {
+                        if model.showsDemoBar {
+                            DemoBar(tint: Color(hex: model.pageTop) ?? Color("Paper"), safeTop: geo.safeAreaInsets.top) { Task { await model.exitDemo() } }
+                        }
+                        // solo la zona del sistema (muesca, barra de inicio), no la del teclado: con el teclado abierto la
+                        // vista web acaba encima de él y la página no tiene que moverse para enseñar el campo
+                        WebView(base: base, events: events)
+                            .ignoresSafeArea(.container, edges: model.showsDemoBar ? [.horizontal, .bottom] : .all)
+                    }
                     .transition(.opacity)
+                default:
+                    ConnectView(model: model)
+                        .transition(.opacity)
+                }
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isReady)
+        // el tema de Aula, si no es el del sistema: la hora y la batería se leen sobre la página
+        .preferredColorScheme(model.pageDark.map { $0 ? .dark : .light })
+        .sheet(isPresented: Binding(get: { model.showingLicenses }, set: { model.showingLicenses = $0 })) {
+            LicensesView { model.showingLicenses = false }
+        }
+    }
+
+    /// Lo que la interfaz le pide a la app.
+    private var events: WebEvents {
+        let model = model
+        return WebEvents(
+            failed: { Task { await model.webFailed() } },
+            switchAula: { model.chooseAnother() },
+            look: { look, systemDark in model.pageLook(look, systemDark: systemDark) },
+            licenses: { model.showingLicenses = true },
+            exitDemo: { Task { await model.exitDemo() } },
+            demoNotice: { model.demoNotice($0) }
+        )
     }
 
     private var isReady: Bool {
@@ -255,9 +279,6 @@ private struct LegalLinks: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .frame(minHeight: 28)
-        .sheet(isPresented: Binding(get: { model.showingLicenses }, set: { model.showingLicenses = $0 })) {
-            LicensesView { model.showingLicenses = false }
-        }
     }
 }
 
@@ -369,8 +390,13 @@ private struct Steps: View {
     }
 }
 
-/// La franja de la demostración: dice que lo es y deja salir.
+/// La franja de la demostración: dice que lo es y deja salir. Es del mismo papel que lo de arriba de la página (con su
+/// grano y su velo, si un diálogo lo tapa) y sigue por debajo de la hora y la batería: la única luz, el punto de ladrillo.
 private struct DemoBar: View {
+    let tint: Color
+    /// El margen seguro de arriba de la ventana: si la barra de estado mide más (el iPad apaisado a pantalla completa), la
+    /// franja baja lo que falte para no pisar la hora.
+    let safeTop: CGFloat
     let exit: () -> Void
 
     var body: some View {
@@ -378,16 +404,43 @@ private struct DemoBar: View {
             Circle().fill(Color.accentColor).frame(width: 7, height: 7)
             Text(Texts.demoBar)
                 .font(.footnote.weight(.medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             Spacer(minLength: 8)
-            Button(Texts.demoExit, action: exit)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+            Button(action: exit) {
+                Text(Texts.demoExit)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 12)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 7)
-        .background(Color.accentColor.opacity(0.1))
-        .background(Color("Paper"))
+        .padding(.leading, 18)
+        .padding(.trailing, 6)
+        .padding(.top, gap)
+        .background(alignment: .top) { tint.ignoresSafeArea(edges: .top) }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 0.5)
+        }
+    }
+
+    private var gap: CGFloat {
+        #if canImport(UIKit)
+        return max(0, StatusBar.height - safeTop)
+        #else
+        return 0
+        #endif
+    }
+}
+
+extension Color {
+    /// «#rrggbb» (lo que dice Shell.js) → color; nil si no lo es.
+    init?(hex: String?) {
+        guard let hex, hex.count == 7, hex.hasPrefix("#"), let v = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
 }
 
