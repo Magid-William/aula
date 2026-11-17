@@ -14,7 +14,7 @@ type Lang = 'es' | 'en'
 const TEXT = {
   es: {
     about: 'Acerca de Aula', settings: 'Ajustes…', services: 'Servicios', hide: 'Ocultar Aula', hideOthers: 'Ocultar otros', showAll: 'Mostrar todo', quit: 'Salir de Aula',
-    file: 'Archivo', newCourse: 'Nuevo curso con Aula…', importCourse: 'Importar curso…', close: 'Cerrar ventana',
+    file: 'Archivo', newCourse: 'Nuevo curso…', importCourse: 'Importar curso…', close: 'Cerrar ventana',
     edit: 'Edición', undo: 'Deshacer', redo: 'Rehacer', cut: 'Cortar', copy: 'Copiar', paste: 'Pegar', pasteMatch: 'Pegar con el mismo estilo', del: 'Eliminar', selectAll: 'Seleccionar todo', find: 'Buscar en Aula…',
     view: 'Ver', sidebar: 'Mostrar u ocultar la barra lateral', zoomIn: 'Aumentar', zoomOut: 'Reducir', zoomReset: 'Tamaño real', fullscreen: 'Pantalla completa', reload: 'Recargar', devtools: 'Herramientas de desarrollo',
     go: 'Ir', home: 'Hoy', chat: 'Aula', calendar: 'Calendario', tools: 'Herramientas', documents: 'Documentos', inbox: 'Novedades', stats: 'Estadísticas', back: 'Atrás', forward: 'Adelante', ask: 'Preguntar a Aula',
@@ -24,7 +24,7 @@ const TEXT = {
   },
   en: {
     about: 'About Aula', settings: 'Settings…', services: 'Services', hide: 'Hide Aula', hideOthers: 'Hide Others', showAll: 'Show All', quit: 'Quit Aula',
-    file: 'File', newCourse: 'New Course with Aula…', importCourse: 'Import Course…', close: 'Close Window',
+    file: 'File', newCourse: 'New Course…', importCourse: 'Import Course…', close: 'Close Window',
     edit: 'Edit', undo: 'Undo', redo: 'Redo', cut: 'Cut', copy: 'Copy', paste: 'Paste', pasteMatch: 'Paste and Match Style', del: 'Delete', selectAll: 'Select All', find: 'Search Aula…',
     view: 'View', sidebar: 'Show or Hide Sidebar', zoomIn: 'Zoom In', zoomOut: 'Zoom Out', zoomReset: 'Actual Size', fullscreen: 'Full Screen', reload: 'Reload', devtools: 'Developer Tools',
     go: 'Go', home: 'Today', chat: 'Aula', calendar: 'Calendar', tools: 'Tools', documents: 'Documents', inbox: 'Inbox', stats: 'Statistics', back: 'Back', forward: 'Forward', ask: 'Ask Aula',
@@ -112,11 +112,11 @@ export function buildMenuTemplate(lang: Lang, platform: NodeJS.Platform, dev: bo
       // en el orden de la barra lateral
       cmd(t.home, 'goHome', 'CmdOrCtrl+1'),
       cmd(t.chat, 'goChat', 'CmdOrCtrl+2'),
-      cmd(t.calendar, 'goCalendar', 'CmdOrCtrl+3'),
-      cmd(t.stats, 'goStats', 'CmdOrCtrl+4'),
-      cmd(t.tools, 'goTools', 'CmdOrCtrl+5'),
-      cmd(t.documents, 'goDocuments', 'CmdOrCtrl+6'),
-      cmd(t.inbox, 'goInbox', 'CmdOrCtrl+7'),
+      cmd(t.inbox, 'goInbox', 'CmdOrCtrl+3'),
+      cmd(t.calendar, 'goCalendar', 'CmdOrCtrl+4'),
+      cmd(t.documents, 'goDocuments', 'CmdOrCtrl+5'),
+      cmd(t.tools, 'goTools', 'CmdOrCtrl+6'),
+      cmd(t.stats, 'goStats', 'CmdOrCtrl+7'),
       { type: 'separator' },
       cmd(t.back, 'back', mac ? 'Cmd+[' : 'Alt+Left'),
       cmd(t.forward, 'forward', mac ? 'Cmd+]' : 'Alt+Right'),

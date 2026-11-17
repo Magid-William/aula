@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { archLightFor, leanFrom } from './InkArt'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { archLightFor, INK_SPOT_NAMES, InkSpot, leanFrom, type InkSpotName } from './InkArt'
 import { isViolet } from './colorGuard'
 
 const css = readFileSync(join(__dirname, 'inkArt.css'), 'utf8')
@@ -40,5 +42,34 @@ describe('dibujos a tinta', () => {
     const hexes = css.match(/#[0-9a-f]{6}/gi) ?? []
     expect(hexes.length).toBeGreaterThanOrEqual(20)
     for (const h of hexes) expect(isViolet(h), h).toBe(false)
+  })
+})
+
+describe('los objetos a tinta', () => {
+  const svgOf = (name: InkSpotName): string => renderToStaticMarkup(createElement(InkSpot, { name, label: name }))
+  it('hay reloj de arena (el vacío del simulacro), con la misma receta que el flexo', () => {
+    expect(INK_SPOT_NAMES).toContain('hourglass')
+    const lamp = svgOf('lamp')
+    const glass = svgOf('hourglass')
+    // aguada suelta, color con su borde de agua y la tinta a pulso, por este orden
+    for (const svg of [lamp, glass]) {
+      const order = ['-wash)', '-fill)', '-hand)'].map((f) => svg.indexOf(f))
+      expect(order.every((i) => i > 0), svg.slice(0, 80)).toBe(true)
+      expect([...order].sort((a, b) => a - b)).toEqual(order)
+    }
+    expect(glass).toContain('role="img"')
+    expect(glass).toContain('aria-label="hourglass"')
+  })
+  it('cada objeto pinta solo con la paleta de acuarela y su tinta se dibuja una vez', () => {
+    for (const name of INK_SPOT_NAMES) {
+      const svg = svgOf(name)
+      const fills = [...svg.matchAll(/fill="([^"]+)"/g)].map((m) => m[1]).filter((f) => f !== 'none')
+      expect(fills.length, name).toBeGreaterThan(0)
+      for (const f of fills) expect(f, `${name} ${f}`).toMatch(/^var\(--wc-[a-z-]+\)$/)
+      const line = svg.slice(svg.indexOf('ink-art-line'))
+      const strokes = line.match(/<(path|circle|rect)\b/g) ?? []
+      expect(strokes.length, name).toBeGreaterThan(2)
+      expect((line.match(/pathLength="1"/g) ?? []).length, name).toBe(strokes.length)
+    }
   })
 })

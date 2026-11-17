@@ -36,6 +36,27 @@ describe('ExerciseGrader', () => {
     expect(r2.matchedWrong).toBeDefined()
   })
 
+  it('sin más diagnóstico, dice la forma que se espera: «la respuesta exacta lleva π»', () => {
+    const a = '{"kind":"numeric","value":"3*pi"}'
+    const r = grade(ex(a), Input.text('27'), { lang: 'en' })
+    expect(r.status).toBe('incorrect')
+    expect(r.diagnosis).toEqual(['exactPi'])
+    expect(r.feedback.map((f) => f.markdown)).toEqual(['The exact answer has π in it.'])
+    // con π en lo escrito, o con un error típico del autor, no se toca
+    expect(g(a, Input.text('2*pi')).diagnosis).not.toContain('exactPi')
+    // «3pi» (sin signo de por) también lleva π: es otro error, no la forma
+    expect(g(a, Input.text('4pi')).diagnosis).not.toContain('exactPi')
+    expect(g(a, Input.text('4π')).diagnosis).not.toContain('exactPi')
+    expect(g('{"kind":"numeric","value":"sqrt(3)/2"}', Input.text('2sqrt(3)')).diagnosis).not.toContain('exactRoot')
+    expect(g(a, Input.text('3'), '[{"input":"3","why":"Deja π."}]').matchedWrong?.why).toBe('Deja π.')
+    // sin π en la clave, tampoco
+    expect(g('{"kind":"numeric","value":"5"}', Input.text('7')).diagnosis).not.toContain('exactPi')
+    // la raíz y la fracción, igual
+    expect(grade(ex('{"kind":"numeric","value":"sqrt(3)/2"}'), Input.text('5'), { lang: 'en' }).feedback.map((f) => f.markdown)).toEqual(['The exact answer has a square root in it.'])
+    expect(grade(ex('{"kind":"numeric","value":"-12/13"}'), Input.text('27'), { lang: 'es' }).feedback.map((f) => f.markdown)).toEqual(['La respuesta exacta es una fracción.'])
+    expect(g('{"kind":"numeric","value":"-12/13"}', Input.text('5/13')).diagnosis).not.toContain('exactFraction')
+  })
+
   it('expresión, ecuación, conjunto, intervalo y punto', () => {
     expect(g('{"kind":"expression","expected":"(x+1)^2"}', Input.text('x^2+2x+1')).status).toBe('correct')
     expect(g('{"kind":"expression","expected":"(x+1)^2"}', Input.text('x^2+1')).status).not.toBe('correct')

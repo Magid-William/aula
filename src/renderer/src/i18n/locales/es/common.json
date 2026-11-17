@@ -13,7 +13,7 @@
     "stats": "Estadísticas",
     "settings": "Ajustes",
     "courses": "Tus cursos",
-    "newCourse": "Nuevo curso con Aula",
+    "newCourse": "Nuevo curso",
     "collapse": "Plegar la barra",
     "expand": "Desplegar la barra",
     "back": "Atrás",
@@ -28,13 +28,7 @@
   "search": {
     "placeholder": "Buscar en Aula",
     "hint": "Cursos, lecciones, herramientas, acciones",
-    "empty": "Nada por aquí. Prueba con otras palabras.",
-    "groups": {
-      "navigate": "Ir a",
-      "courses": "Cursos",
-      "tools": "Herramientas",
-      "actions": "Acciones"
-    }
+    "empty": "Nada por aquí. Prueba con otras palabras."
   },
   "actions": {
     "cancel": "Cancelar",
@@ -73,9 +67,6 @@
     "retry": "Vuelve a intentarlo en un momento.",
     "screen": "Esta pantalla no se pudo mostrar. Tus cursos y tu progreso están a salvo.",
     "details": "Detalles técnicos"
-  },
-  "orb": {
-    "ask": "Pregúntale a Aula"
   },
   "approval": {
     "action": {

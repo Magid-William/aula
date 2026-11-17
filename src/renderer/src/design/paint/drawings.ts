@@ -264,6 +264,19 @@ export function strikeInk(w: number, h: number, seed: string | number): InkDrawi
   })
 }
 
+/**
+ * Filete a pluma seca (un corte de sección, un subrayado fino al pasar el ratón): una línea casi recta que se posa fina,
+ * aprieta un poco y se levanta seca, con huecos de papel hacia el final.
+ */
+export function ruleInk(w: number, h: number, seed: string | number, line = 1.2): InkDrawing {
+  return cached(`r:${seed}:${w}x${h}:${line}`, () => {
+    const { rng, noise } = tools(seed)
+    const path = handLine(1, w - 1, h * 0.5, rng, Math.min(0.012, 6 / Math.max(60, w)), 0.006)
+    const pressure = (t: number) => (0.35 + 0.65 * Math.min(1, t / 0.12)) * (t > 0.7 ? Math.max(0.25, 1 - (t - 0.7) * 2.2) : 1) * (1 + 0.12 * Math.sin(t * 7 + 1))
+    return drawing(w, h, [inkStroke(path, { tool: 'pen', width: line, pressure, dryness: 0.55, speed: 1100, minMs: 240, maxMs: 560 }, noise, rng)])
+  })
+}
+
 /** Visto bueno a mano: un trazo corto que baja y otro largo que sube, de una vez. */
 export function checkInk(size: number, seed: string | number): InkDrawing {
   return cached(`k:${seed}:${size}`, () => {
@@ -283,17 +296,21 @@ export function checkInk(size: number, seed: string | number): InkDrawing {
  * Rayitas de alegría alrededor de algo (un logro): trazos cortos que salen hacia fuera, uno detrás de otro, como los que se
  * dibujan alrededor de una estrella en un cuaderno.
  */
-export function burstInk(w: number, h: number, seed: string | number, count = 6): InkDrawing {
-  return cached(`x:${seed}:${w}x${h}:${count}`, () => {
+/** El abanico de las rayitas de alegría: por arriba y los lados (no por debajo, donde va el texto). Ángulos en radianes. */
+export const BURST_ARC: readonly [number, number] = [-Math.PI * 0.98, -Math.PI * 0.02]
+/** Por arriba y a la izquierda: junto a una marca que tiene texto a su derecha (un ✓ y su respuesta). */
+export const BURST_ARC_LEFT: readonly [number, number] = [-Math.PI * 0.98, -Math.PI * 0.4]
+
+export function burstInk(w: number, h: number, seed: string | number, count = 6, arc: readonly [number, number] = BURST_ARC): InkDrawing {
+  const [from, to] = arc
+  const key = arc === BURST_ARC ? '' : `:${from.toFixed(3)}..${to.toFixed(3)}`
+  return cached(`x:${seed}:${w}x${h}:${count}${key}`, () => {
     const { rng, noise } = tools(seed)
     const cx = w / 2
     const cy = h / 2
     const r0 = Math.min(w, h) * 0.36
     const strokes: InkStroke[] = []
     let at = 0
-    // en abanico por arriba y los lados (no por debajo, donde va el texto)
-    const from = -Math.PI * 0.98
-    const to = -Math.PI * 0.02
     for (let k = 0; k < count; k++) {
       const a = from + ((to - from) * (k + 0.5)) / count + gauss(rng) * 0.08
       const r1 = r0 * between(rng, 1.08, 1.16)

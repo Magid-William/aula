@@ -1,11 +1,12 @@
 // Opción múltiple: tarjetas que se levantan, con su letra (A, B, C… o 1, 2, 3 con el teclado); varias correctas, casillas.
-// Tras comprobar: la elegida mal en rojo; al terminar, la correcta en verde y el porqué de cada una.
+// Tras comprobar: la elegida mal con una «×» a tinta ladrillo y, debajo, la nota al margen con el porqué del autor; al
+// terminar, la correcta en verde con el suyo.
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { AnswerOf, ChoiceOption } from '@shared/schema/exercises'
 import { RichText } from '@renderer/lib/RichText'
-import { cx } from '@renderer/design'
+import { cx, MarginNote } from '@renderer/design'
 import { choiceOrder } from '../model'
 import { optionIndexForKey, optionLetter } from '../normalize'
 import { OptionCard, type Mark } from '../ui'
@@ -48,29 +49,41 @@ export function ChoiceInput({ answer, draft, set, locked, reveal, exerciseId, ac
         {options.map((o, i) => {
           const selected = draft.choice.includes(o.id)
           const m = choiceMark(o, selected, reveal)
+          const note = o.why && m === 'wrong'
           return (
-            <OptionCard
-              key={o.id}
-              index={i}
-              letter={optionLetter(i)}
-              selected={selected}
-              mark={m}
-              multi={answer.multi}
-              role={answer.multi ? 'checkbox' : 'radio'}
-              locked={locked}
-              onSelect={() => toggle(o.id)}
-              detail={
-                <AnimatePresence initial={false}>
-                  {o.why && (m === 'right' || m === 'wrong') && (
-                    <motion.span className="mt-1.5 block t-callout text-text2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                      <RichText text={o.why} inline />
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              }
-            >
-              <RichText text={o.md} inline />
-            </OptionCard>
+            <div key={o.id} className="flex flex-col gap-1">
+              <OptionCard
+                index={i}
+                letter={optionLetter(i)}
+                selected={selected}
+                mark={m}
+                multi={answer.multi}
+                role={answer.multi ? 'checkbox' : 'radio'}
+                locked={locked}
+                onSelect={() => toggle(o.id)}
+                detail={
+                  <AnimatePresence initial={false}>
+                    {o.why && m === 'right' && (
+                      <motion.span className="mt-1.5 block t-callout text-text2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                        <RichText text={o.why} inline />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                }
+              >
+                <RichText text={o.md} inline />
+              </OptionCard>
+              {/* el porqué del error, al margen y debajo de la opción, como lo apuntaría quien corrige */}
+              <AnimatePresence initial={false}>
+                {note && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden pl-5">
+                    <MarginNote arrow seed={`${exerciseId}:${o.id}`}>
+                      <RichText text={o.why ?? ''} inline />
+                    </MarginNote>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )
         })}
       </div>

@@ -240,7 +240,7 @@ function PageInput({ page, count, onGo }: { page: number; count: number; onGo: (
         onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 5))}
         onBlur={() => setDraft(null)}
         onKeyDown={(e) => { if (e.key === 'Enter') { const n = Number(draft); if (n >= 1) onGo(n); (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') (e.target as HTMLInputElement).blur() }}
-        className="selectable h-7 w-11 rounded-[8px] bg-fill1 text-center font-medium text-text outline-none focus:bg-field focus:ring-1 focus:ring-accent-line"
+        className="selectable h-7 w-11 rounded-[8px] bg-fill1 text-center font-medium text-text outline-none focus:bg-field focus:ring-2 focus:ring-[color:var(--focus)]"
       />
       <span>/ {count}</span>
     </span>

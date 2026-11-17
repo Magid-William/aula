@@ -13,6 +13,13 @@ interface ThemeState {
 
 const ThemeContext = createContext<ThemeState>({ dark: false, reducedMotion: false, mode: 'system' })
 
+/** Tamaño de la raíz en px para el ajuste «Tamaño del texto» (15 px al 100 %). Sin redondear: la escala `t-*` va en rem y
+ *  tiene que crecer en la misma proporción que el ajuste. */
+export function rootFontSize(textScale: number): number {
+  const k = Number.isFinite(textScale) ? Math.min(1.4, Math.max(0.85, textScale)) : 1
+  return Math.round(15 * k * 100) / 100
+}
+
 function useMedia(query: string): boolean {
   const [match, setMatch] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(query).matches : false))
   useEffect(() => {
@@ -34,7 +41,7 @@ export function ThemeProvider({ mode, motion, textScale = 1, children }: { mode:
     const root = document.documentElement
     root.classList.toggle('dark', dark)
     root.classList.toggle('reduce-motion', reducedMotion)
-    root.style.fontSize = `${Math.round(15 * Math.min(1.4, Math.max(0.85, textScale)))}px`
+    root.style.fontSize = `${rootFontSize(textScale)}px`
     document.body.style.fontSize = 'inherit'
   }, [dark, reducedMotion, textScale])
 

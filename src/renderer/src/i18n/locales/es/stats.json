@@ -1,23 +1,18 @@
 {
   "title": "Estadísticas",
-  "subtitleAll": "Últimas 12 semanas · todos tus cursos",
-  "subtitleOne": "Últimas 12 semanas · {{course}}",
   "allCourses": "Todos los cursos",
   "pickCourse": "Elige qué curso ver",
   "loading": "Cargando tus estadísticas",
   "summary": {
-    "study": "de estudio",
-    "activeDays": "{{active}} de {{total}}",
-    "activeDaysLabel": "días con estudio",
-    "accuracy": "de acierto",
-    "streak_one": "día de racha",
-    "streak_other": "días de racha",
-    "streakBest": "Racha de {{current}} días (tu mejor: {{best}})",
-    "streakIsBest": "Racha de {{current}} días, la mejor hasta ahora",
-    "streakOne": "Llevas 1 día: mañana empieza la racha",
-    "bestOnly": "Tu mejor racha: {{best}} días",
-    "exercises_one": "{{count}} ejercicio resuelto",
-    "exercises_other": "{{count}} ejercicios resueltos"
+    "lead_one": "En las últimas 12 semanas has estudiado {{time}} en {{days}} día.",
+    "lead_other": "En las últimas 12 semanas has estudiado {{time}} en {{days}} días.",
+    "leadAccuracy_one": "En las últimas 12 semanas has estudiado {{time}} en {{days}} día, con un {{percent}} de aciertos.",
+    "leadAccuracy_other": "En las últimas 12 semanas has estudiado {{time}} en {{days}} días, con un {{percent}} de aciertos.",
+    "underMinute": "menos de un minuto",
+    "streakBest": "Llevas {{current}} días seguidos (tu mejor racha: {{best}}).",
+    "streakIsBest": "Llevas {{current}} días seguidos, tu mejor racha hasta ahora.",
+    "streakOne": "Llevas 1 día: mañana empieza la racha.",
+    "bestOnly": "Tu mejor racha: {{best}} días."
   },
   "heat": {
     "title": "Constancia",
@@ -25,8 +20,11 @@
     "less": "Menos",
     "more": "Más",
     "cell": "{{date}}: {{minutes}}",
+    "cellNone": "{{date}}: sin estudio",
     "cellExercises_one": "{{date}}: {{minutes}} · {{count}} ejercicio",
-    "cellExercises_other": "{{date}}: {{minutes}} · {{count}} ejercicios"
+    "cellExercises_other": "{{date}}: {{minutes}} · {{count}} ejercicios",
+    "cellOnlyExercises_one": "{{date}}: {{count}} ejercicio",
+    "cellOnlyExercises_other": "{{date}}: {{count}} ejercicios"
   },
   "rhythm": {
     "title": "Tu ritmo",
@@ -73,14 +71,7 @@
     "pass": "Aprobado",
     "exam": "Examen",
     "footnote": "Se reconstruye con tus ejercicios guardados; el último punto es tu estado de hoy (incluye las tarjetas).",
-    "open": "Ver «{{course}}»",
-    "labels": {
-      "notStarted": "Sin empezar",
-      "early": "Empezando",
-      "gettingThere": "Avanzando",
-      "almostReady": "Casi listo",
-      "ready": "Listo"
-    }
+    "open": "Ver «{{course}}»"
   },
   "empty": {
     "noCourses": "Aún no hay nada que medir",

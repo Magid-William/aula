@@ -786,7 +786,7 @@ function NoteInput({ at, width, height, placeholder, label, onDone, onCancel }: 
       aria-label={label}
       placeholder={placeholder}
       maxLength={MARK_LIMITS.noteChars}
-      className="pointer-events-auto absolute h-8 w-[210px] rounded-[9px] border-[0.5px] border-accent-line bg-field px-2.5 font-serif text-[15px] italic text-[color:var(--pigment-brick)] shadow-[var(--e2)] outline-none placeholder:not-italic placeholder:font-sans placeholder:text-[13px] placeholder:text-text3 focus:shadow-[0_0_0_3px_var(--accent-wash)]"
+      className="pointer-events-auto absolute h-8 w-[210px] rounded-[9px] border-[0.5px] border-accent-line bg-field px-2.5 font-serif text-[15px] italic text-[color:var(--pigment-brick)] shadow-[var(--e2)] outline-none placeholder:not-italic placeholder:font-sans placeholder:text-[13px] placeholder:text-text3 focus:border-[color:var(--focus)] focus:shadow-[0_0_0_1.5px_var(--focus),var(--e2)]"
       style={{ left, top }}
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {

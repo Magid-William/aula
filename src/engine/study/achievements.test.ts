@@ -1,7 +1,7 @@
 // Logros: se calculan con el progreso y se celebran una sola vez.
 import { describe, expect, it } from 'vitest'
 import { makePack, decodeProgress, type StudyProgress } from '@shared/schema'
-import { ACHIEVEMENTS, achievementMeasures, achievementViews, newlyEarned } from './achievements'
+import { ACHIEVEMENTS, achievementMeasures, achievementReachedOn, achievementViews, newlyEarned } from './achievements'
 
 const now = new Date(2026, 9, 26, 18)
 const day = (offset: number): string => {
@@ -52,5 +52,39 @@ describe('logros', () => {
   it('sin progreso no hay nada conseguido', () => {
     const v = achievementViews(achievementMeasures([], now), {})
     expect(v.every((x) => !x.earned && x.value === 0)).toBe(true)
+  })
+
+  it('el día de cada logro sale del historial: sumas, primera respuesta, rachas, simulacro y primer curso', () => {
+    const pack = makePack({ id: 'a', title: 'A' })
+    pack.created = new Date(2026, 9, 18, 9).toISOString()
+    const passed = { id: 'x1', date: new Date(2026, 9, 23, 17).toISOString(), kind: 'mock', scorePoints: 80, totalPoints: 100, durationSeconds: 3600, items: [] }
+    const failed = { id: 'x0', date: new Date(2026, 9, 21, 17).toISOString(), kind: 'mock', scorePoints: 20, totalPoints: 100, durationSeconds: 3600, items: [] }
+    const r = achievementReachedOn([{ pack, progress: progress({ exams: [failed, passed] }) }], now)
+    // 20 min al día desde hace 6 días: la primera hora llega el tercer día, y la racha de 3 también
+    expect(r.firstAnswer).toBe(day(6))
+    expect(r.hour1).toBe(day(4))
+    expect(r.streak3).toBe(day(4))
+    expect(r.streak7).toBe(day(0))
+    expect(r.mockPassed).toBe(day(3))
+    expect(r.creator).toBe('2026-10-18')
+    // lo que no llega (100 aciertos, 30 días) o el historial no dice (tarjetas) no tiene día
+    expect(r.correct100).toBeUndefined()
+    expect(r.streak30).toBeUndefined()
+    expect(r.cards100).toBeUndefined()
+  })
+
+  it('la estantería fecha cada logro el día en que se cumplió, no el día en que Aula lo vio', () => {
+    const m = achievementMeasures([{ pack: makePack({ id: 'a', title: 'A' }), progress: progress() }], now)
+    // visto hoy, pero la racha de 3 se cumplió hace 4 días
+    const seen = { streak3: now.toISOString(), streak7: now.toISOString() }
+    const v = achievementViews(m, seen)
+    const at = (id: string) => v.find((x) => x.id === id)?.earnedAt
+    expect(new Date(at('streak3')!).getDate()).toBe(new Date(now.getTime() - 4 * 86_400_000).getDate())
+    // cumplido el mismo día en que se vio: se queda la hora exacta
+    expect(at('streak7')).toBe(now.toISOString())
+    // conseguido sin apuntar todavía: ya lleva su día
+    expect(at('hour1')).toBeDefined()
+    // lo que no está conseguido no lleva fecha
+    expect(at('streak30')).toBeUndefined()
   })
 })

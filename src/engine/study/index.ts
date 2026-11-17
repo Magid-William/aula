@@ -40,8 +40,8 @@ export { learningContentRequest, type LearningContentRequest } from './content-r
 // Piezas internas (paridad con los tipos de Swift), para el proceso principal y las pruebas
 export { LearningController, LearnBridge, Recorder, PracticeQueue, CardReview, ExamBuilder, StudyStatsCalc }
 export { MISTAKE_STAGES } from './recorder'
-export { readinessLabel, toHomePlanItem } from './overview'
-export { combinedPlan, dueTitle } from './home'
+export { planBudget, readinessLabel, toHomePlanItem } from './overview'
+export { combinedPlan, dueTitle, type DueFit } from './home'
 export type { AnswerInput, FeedbackKind, FeedbackLine, GradeLang, GradeOptions, GradeResult, GradeStatus } from '@engine/grading'
 export { Input, answerInputIsEmpty, canonicalInput, correctAnswerMarkdown, grade, instantiateTemplate } from '@engine/grading'
 

@@ -1,14 +1,12 @@
 // Los dibujos pequeños de Aula, a mano (antes pixel art): los glifos de `Sprite` (filas de texto con colores de la
-// interfaz: el sobre, el papel, la calculadora…), el cielo del saludo (sol con rayos, luna con estrellas), la medalla de
-// logro, la marca de acierto que se dibuja de un trazo y la cortina de pintura que se retira al entrar en un curso.
+// interfaz: el papel, la calculadora…), la marca de acierto que se dibuja de un trazo y la cortina de pintura que se retira
+// al entrar en un curso.
 // Todo con la misma mano que los personajes (pixel/brush): se pinta una vez, en un hilo aparte, y se guarda.
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from './theme'
-import { useAmbient } from './ambient'
 import type { CompiledAnim, Px } from './pixel/anim'
-import { PRIORITY, peekDrawing, peekFrame, requestDrawing, requestFrame, type DrawingSpec, type FrameImage } from './pixel/brush/frames'
+import { PRIORITY, peekFrame, requestFrame, type FrameImage } from './pixel/brush/frames'
 import { cssColor } from './pixel/brush/css'
-import type { DrawingName } from './pixel/brush/drawings'
 import { Ink } from './paint/Ink'
 import { checkInk } from './paint/drawings'
 
@@ -108,59 +106,6 @@ export const Sprite = memo(function Sprite({ rows, legend, size, className }: { 
     </span>
   )
 })
-
-/** Un dibujo suelto (medalla, llama, sol, luna) a `size` px, en su fotograma. */
-export const Drawn = memo(function Drawn({ name, colors, frame = 0, size, className }: { name: DrawingName; colors: Record<string, string>; frame?: number; size: number; className?: string }) {
-  const { dark } = useTheme()
-  const colorKey = Object.entries(colors).map(([k, v]) => k + v).join('|')
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- la clave resume los colores; `dark` cambia las variables CSS
-  const resolved = useMemo(() => Object.fromEntries(Object.entries(colors).map(([k, v]) => [k, cssColor(v)])), [colorKey, dark])
-  const spec: DrawingSpec = { name, colors: resolved, frame }
-  const ref = useRef<HTMLCanvasElement>(null)
-  // el dibujo vive en un tablero de 28 con 2 de margen: lo visible (24) mide `size`
-  const unit = size / 24
-  const css = 28 * unit
-  const W = Math.max(1, Math.round(css * dprNow()))
-  useBlit(
-    ref,
-    (W) => peekDrawing(spec, W, dark),
-    (W, done) => requestDrawing(spec, W, dark, dprNow(), done),
-    W,
-    `${name}|${frame}|${dark}|${JSON.stringify(resolved)}`
-  )
-  return (
-    <span aria-hidden className={className} style={{ position: 'relative', display: 'inline-block', width: size, height: size, flexShrink: 0, verticalAlign: 'middle' }}>
-      <canvas ref={ref} style={{ position: 'absolute', left: -2 * unit, top: -2 * unit, width: css, height: css, pointerEvents: 'none' }} />
-    </span>
-  )
-})
-
-/** Alterna fotogramas a `fps` (quieto con «Reducir movimiento»). */
-function useFrame(count: number, fps: number, active = true): number {
-  const { reducedMotion } = useTheme()
-  const [f, setF] = useState(0)
-  const moving = useAmbient()
-  useEffect(() => {
-    if (!active || reducedMotion || !moving || count < 2) return
-    const id = setInterval(() => setF((v) => (v + 1) % count), 1000 / fps)
-    return () => clearInterval(id)
-  }, [count, fps, active, reducedMotion, moving])
-  return f
-}
-
-/** El cielo según la hora: sol con rayos que se alternan de día, luna con estrellas que titilan de noche. */
-export function PixelSky({ size = 22, hour = new Date().getHours() }: { size?: number; hour?: number }) {
-  const night = hour < 7 || hour >= 20
-  const f = useFrame(2, night ? 1.4 : 1.8)
-  if (night) return <Drawn name="moon" colors={{ moon: '#f2e3c0', shade: '#d9c49a', star: 'var(--sun)' }} frame={f} size={size} />
-  return <Drawn name="sun" colors={{ sun: 'var(--sun)', light: '#ffe2a8' }} frame={f} size={size} />
-}
-
-/** Medalla de logro (dominar una habilidad, terminar un simulacro): el brillo se mueve. */
-export function PixelMedal({ size = 40 }: { size?: number }) {
-  const f = useFrame(2, 1.6)
-  return <Drawn name="medal" colors={{ ribbon: 'var(--accent)', ribbonDark: 'var(--accent-pressed)', gold: '#d39a3e', goldLight: '#f2c275', star: '#fff6dc' }} frame={f} size={size} />
-}
 
 /** Marca de acierto dibujada a pluma, de un trazo (con la misma mano que la interfaz). */
 export function PixelCheck({ size = 20, color = 'var(--success)', delay = 0 }: { size?: number; color?: string; delay?: number }) {

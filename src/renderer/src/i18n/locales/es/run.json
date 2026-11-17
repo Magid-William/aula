@@ -51,7 +51,9 @@
   "limitBody": "No se pierde nada y lo que ya está listo se puede estudiar. Reanuda cuando se renueve el límite, cambia de proveedor o quédate con lo que hay.",
   "cancelled": "Creación detenida",
   "elapsed": "{{min}} min",
-  "notFound": "No encuentro esta creación",
+  "notFound": "Este curso ya no se está creando",
+  "notFoundBody": "Si terminó, lo tienes en Tus cursos.",
+  "notFoundAction": "Volver a Hoy",
   "canClose": "Puedes seguir usando Aula: el curso se crea en segundo plano.",
   "header": {
     "done": "Curso listo",

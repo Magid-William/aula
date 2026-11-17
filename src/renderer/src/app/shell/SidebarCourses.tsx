@@ -1,8 +1,10 @@
-// Cursos en la barra lateral: icono pixel-art (cae en su sitio al aparecer), título y la cuenta atrás del examen.
+// Cursos en la barra lateral: icono pixel-art (cae en su sitio al aparecer), título y la cuenta atrás del examen. La última fila
+// es «Nuevo curso» (antes iba en el pie de la barra): crear un curso está donde están los cursos.
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { CourseIcon, Tooltip, cx, spring, SelectionPaint } from '@renderer/design'
-import { useNav, navigate } from '../router'
+import { CourseIcon, Icon, Tooltip, cx, spring, SelectionPaint } from '@renderer/design'
+import { useNav } from '../router'
+import { goFromSidebar } from './sidebarNav'
 import { useCourses } from '@renderer/lib/courses'
 import { daysUntil } from '@renderer/lib/format'
 import { courseBuilding, courseRunIssue, coursePartial } from '@renderer/screens/course/failure'
@@ -16,10 +18,9 @@ export function SidebarCourses({ collapsed }: { collapsed: boolean }) {
   const route = useNav((s) => s.route)
   const activeId = route.name === 'course' || route.name === 'study' ? route.id : null
 
-  if (!courses.length) return <div className={cx('px-2.5 py-1 t-ui text-text3', collapsed && 'hidden')}>{t('nav.noCourses')}</div>
-
   return (
     <div className="flex flex-col gap-px">
+      {!courses.length && <div className={cx('px-2.5 py-1 t-ui text-text3', collapsed && 'hidden')}>{t('nav.noCourses')}</div>}
       {courses.map((c, i) => {
         const active = c.id === activeId
         // un curso de ejemplo dice que lo es, no la cuenta atrás de un examen que no es del estudiante (A4-P1-1)
@@ -43,7 +44,7 @@ export function SidebarCourses({ collapsed }: { collapsed: boolean }) {
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.03 * i }}
-            onClick={() => navigate({ name: 'course', id: c.id })}
+            onClick={(e) => goFromSidebar(e, { name: 'course', id: c.id })}
             aria-label={collapsed ? c.title : undefined}
             aria-current={active ? 'page' : undefined}
             className={cx('no-drag relative flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition-colors', !active && 'hover:bg-fill1', collapsed && 'justify-center')}
@@ -79,6 +80,38 @@ export function SidebarCourses({ collapsed }: { collapsed: boolean }) {
           row
         )
       })}
+      <NewCourseRow collapsed={collapsed} delay={0.03 * courses.length} />
     </div>
+  )
+}
+
+/** «+ Nuevo curso»: el icono, en ladrillo, ocupa el sitio del de un curso para que todo quede en la misma columna. */
+function NewCourseRow({ collapsed, delay }: { collapsed: boolean; delay: number }) {
+  const { t } = useTranslation()
+  const active = useNav((s) => s.route.name === 'create')
+  const label = t('nav.newCourse')
+  const row = (
+    <motion.button
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay }}
+      onClick={(e) => goFromSidebar(e, { name: 'create' })}
+      aria-label={collapsed ? label : undefined}
+      aria-current={active ? 'page' : undefined}
+      className={cx('no-drag relative flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1 text-left transition-colors', !active && 'hover:bg-fill1', collapsed && 'justify-center')}
+    >
+      {active && <motion.span layoutId="sidebar-selection" transition={spring.snappy} className="absolute inset-0"><SelectionPaint seed="barra" /></motion.span>}
+      <span className="relative grid h-[30px] w-[30px] shrink-0 place-items-center text-accent-text">
+        <Icon name="create" size={17} />
+      </span>
+      {!collapsed && <span className={cx('relative min-w-0 flex-1 truncate t-ui', active ? 'font-medium text-text' : 'text-text2')}>{label}</span>}
+    </motion.button>
+  )
+  return collapsed ? (
+    <Tooltip label={label} side="right">
+      {row}
+    </Tooltip>
+  ) : (
+    row
   )
 }

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { cx } from '../cx'
 import { paintKey, peekPaint, requestPaint } from './cache'
 import { Ink } from './Ink'
-import { arrowInk, borderInk, burstInk, checkInk, coverLineInk, raysInk, ringInk, strikeInk, tileInk, underlineInk, type InkDrawing } from './drawings'
+import { arrowInk, borderInk, burstInk, checkInk, coverLineInk, raysInk, ringInk, ruleInk, strikeInk, tileInk, underlineInk, type InkDrawing } from './drawings'
 import type { Pt } from './brush'
 import { seedOf } from './random'
 import type { PaintKind, PaintSpec } from './recipes'
@@ -177,6 +177,14 @@ export function InkStrike({ seed, color = 'var(--pigment-brick)', alpha = 0.85, 
   )
 }
 
+/**
+ * Filete a pluma seca que ocupa el ancho de su caja: para un corte de sección (nunca en cada fila) o, montado al pasar el
+ * ratón, como subrayado fino. Sin `drawKey` se dibuja cada vez que aparece.
+ */
+export function InkRule({ seed, color = 'var(--graphite)', alpha = 0.8, line = 1.2, drawKey, delay = 0, className, style }: { seed: string | number; color?: string; alpha?: number; line?: number; drawKey?: string; delay?: number; className?: string; style?: CSSProperties }) {
+  return <InkBox make={(b) => ruleInk(b.w, b.h, seed, line)} deps={[seed, line]} color={color} alpha={alpha} drawKey={drawKey} delay={delay} className={cx('ink-rule', className)} style={style} />
+}
+
 /** Visto bueno a mano (tamaño fijo). */
 export function InkCheck({ seed, size = 18, color = 'var(--success)', className }: { seed: string | number; size?: number; color?: string; className?: string }) {
   const drawing = useMemo(() => checkInk(size, seed), [size, seed])
@@ -184,8 +192,8 @@ export function InkCheck({ seed, size = 18, color = 'var(--success)', className 
 }
 
 /** Rayitas de alegría alrededor de algo que se celebra (un logro): se dibujan una tras otra al aparecer. */
-export function InkBurst({ seed, size, color = 'var(--pigment-brick)', delay = 380, className }: { seed: string | number; size: number; color?: string; delay?: number; className?: string }) {
-  const drawing = useMemo(() => burstInk(size, size, seed), [size, seed])
+export function InkBurst({ seed, size, color = 'var(--pigment-brick)', delay = 380, className, count = 6, arc }: { seed: string | number; size: number; color?: string; delay?: number; className?: string; count?: number; /** Abanico (radianes); por defecto, arriba y a los lados. */ arc?: readonly [number, number] }) {
+  const drawing = useMemo(() => burstInk(size, size, seed, count, arc), [size, seed, count, arc])
   return <Ink drawing={drawing} color={color} drawKey={`burst:${seed}`} delay={delay} className={cx('ink-fixed', className)} style={{ width: size, height: size }} />
 }
 

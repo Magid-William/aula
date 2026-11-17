@@ -1,12 +1,13 @@
-// Constancia: 12 semanas × 7 días (lunes arriba) en casillas tipo píxel que se encienden semana a semana, con los meses
-// encima, la leyenda «Menos … Más» y una línea que lee el día señalado (hoy si no se señala ninguno).
+// Constancia: 12 semanas × 7 días (lunes arriba) en casillas que se encienden semana a semana, con los meses encima, la
+// leyenda «Menos … Más» y una línea que lee el día señalado (hoy si no se señala ninguno). Es un dato de todo tu estudio:
+// va en aguada de grafito (los días sin estudio, solo con su contorno) y hoy lleva su anillo ladrillo, entero (no un velo).
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { Card, SectionTitle, cx } from '@renderer/design'
 import { capitalize, fmtDate, fmtMinutes, weekdayLetters } from '@renderer/lib/format'
 import type { StatsDay } from '@shared/ipc/stats'
-import { heatGrid, heatLevel, keyToDate } from './derive'
+import { heatGrid, heatLevel, keyToDate, washFor } from './derive'
 
 const CELL_MAX = 34
 const GAP = 5
@@ -55,11 +56,11 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1], delay: 0.1 + c.week * 0.03 + c.weekday * 0.01 }}
                   whileHover={{ scale: 1.18 }}
-                  className={cx('aspect-square rounded-[5px] cursor-default', isToday && 'ring-[1.5px] ring-offset-[1.5px] ring-offset-surface ring-accent-line', hover === c.day.date && 'ring-[1.5px] ring-text3')}
+                  className={cx('aspect-square rounded-[5px] cursor-default', isToday && 'ring-[1.5px] ring-offset-[1.5px] ring-offset-surface ring-accent', hover === c.day.date && 'ring-[1.5px] ring-text3')}
                   style={{ gridColumn: c.week + 2, gridRow: c.weekday + 1 }}
                 >
-                  {/* el color va en un toque de pincel de dentro: los anillos de hoy y del ratón no se recortan */}
-                  <span aria-hidden className={cx('dab block h-full w-full rounded-[5px]', `dab-${((c.week * 3 + c.weekday) % 4) + 1}`)} style={{ background: `var(--heat-${level})` }} />
+                  {/* el color va en una aguada de dentro: los anillos de hoy y del ratón no se recortan */}
+                  <Swatch level={level} className={cx('block h-full w-full rounded-[5px]', `dab-${((c.week * 3 + c.weekday) % 4) + 1}`)} />
                 </motion.div>
               )
             })}
@@ -71,7 +72,7 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
             <div className="flex items-center gap-1.5 shrink-0" aria-hidden>
               <span className="t-caption text-text3 mr-0.5">{t('heat.less')}</span>
               {[0, 1, 2, 3, 4].map((l) => (
-                <span key={l} className="dab h-2.5 w-2.5 rounded-[3px]" style={{ background: `var(--heat-${l})` }} />
+                <Swatch key={l} level={l} className="h-2.5 w-2.5 rounded-[3px]" />
               ))}
               <span className="t-caption text-text3 ml-0.5">{t('heat.more')}</span>
             </div>
@@ -82,8 +83,18 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
   )
 }
 
+/** Una casilla de color: la aguada de su nivel o, sin estudio, solo el contorno (el color nunca va solo). */
+function Swatch({ level, className }: { level: number; className?: string }) {
+  const wash = washFor(level)
+  return <span aria-hidden className={cx(wash ? 'dab' : 'bg-fill1 shadow-[inset_0_0_0_1px_var(--rule)]', className)} style={wash ? { background: wash } : undefined} />
+}
+
 function cellLabel(t: (k: string, o?: Record<string, unknown>) => string, d: StatsDay): string {
   const date = capitalize(fmtDate(keyToDate(d.date), { weekday: 'long', day: 'numeric', month: 'long' }))
+  // un día sin estudio no dice «0 min»; con ejercicios en menos de medio minuto, solo los ejercicios
+  const hasMinutes = Math.round(d.minutes) >= 1
+  if (!hasMinutes && !(d.attempts > 0)) return t('heat.cellNone', { date })
+  if (!hasMinutes) return t('heat.cellOnlyExercises', { date, count: d.attempts })
   const minutes = fmtMinutes(d.minutes)
   return d.attempts > 0 ? t('heat.cellExercises', { date, minutes, count: d.attempts }) : t('heat.cell', { date, minutes })
 }

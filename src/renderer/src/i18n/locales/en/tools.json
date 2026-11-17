@@ -1,6 +1,8 @@
 {
   "title": "Tools",
-  "subtitle": "Everything you need to study, one click away. Pin the calculator, converter or timer so they float over any screen.",
+  "subtitle": "Calculator, grapher, periodic table and more. Pin the calculator, converter or timer to keep it over any screen.",
+  "pinnedGroup": "Pinned",
+  "allGroup": "All tools",
   "open": "Open",
   "pin": "Pin as floating",
   "unpin": "Unpin",
@@ -538,7 +540,7 @@
     "breakLength": "Break"
   },
   "stats": {
-    "name": "Statistics",
+    "name": "Statistics calculator",
     "desc": "Mean, deviation, histograms and regression",
     "tab": {
       "describe": "Descriptive",

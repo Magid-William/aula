@@ -48,7 +48,7 @@ export function AchievementToast() {
               {/* unas rayitas de alegría a pincel, una tras otra, alrededor del dibujo */}
               <InkBurst seed={current} size={96} className="-left-5 -top-5 pointer-events-none" />
               <DrawnTile seed={current} size={56} radius={16} fill="color-mix(in oklab, var(--pigment-brick) 16%, var(--surface))" ink="var(--pigment-brick)" inkAlpha={0.85}>
-                <AchievementArt id={current} size={40} animation="dissolve" />
+                <AchievementArt id={current} size={40} />
               </DrawnTile>
             </div>
             <div>

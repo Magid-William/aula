@@ -248,6 +248,8 @@ for (const theme of ['light', 'dark'] as const) for (const fixture of DIAGRAM_FI
     try {
       await go(page, { name: 'study', id: PACK, mode: 'learn', skill: SKILLS[0] })
       const figure = page.locator('[data-block="diagram"]').first()
+      // al estudiar la barra lateral se pliega sola (modo concentración); abierta a mano, a 800 px la figura vuelve a ser estrecha
+      if (fixture.narrow) await page.getByRole('button', { name: /^(Expand sidebar|Desplegar la barra)$/ }).click()
       await page.setViewportSize({ width: fixture.narrow ? 800 : 1440, height: 1100 })
       await settle(page, figure)
       const progressPath = join(home, 'Packs', PACK, 'progress.json'), beforeProgress = readFileSync(progressPath, 'utf8')
@@ -877,7 +879,11 @@ for (const theme of ['light', 'dark'] as const) for (const edgeCount of [40, 41]
       const sourceShadow = await evaluateLiveElement<string>(node.locator('.viz-label'), 'element => getComputedStyle(element).boxShadow')
       await captureWithLiveComparison(app, page, figure, join(home, 'before-node-hover.png'), info, 'before-node-hover', { requireMath: true })
       const baseline = await scene(app, 0)
-      await node.hover()
+      // en la columna de lectura (700 px) el grafo denso se desborda y el nodo puede quedar a medias fuera de la ventana del
+      // diagrama: el ratón va a la parte que se ve
+      const [nodeBox, viewBox] = [(await node.boundingBox())!, (await figure.locator('.viz-dots').boundingBox())!]
+      const left = Math.max(nodeBox.x, viewBox.x + 4), right = Math.min(nodeBox.x + nodeBox.width, viewBox.x + viewBox.width - 4)
+      await page.mouse.move((left + right) / 2, nodeBox.y + nodeBox.height / 2)
       await expect.poll(() => evaluateLiveElement<string>(node.locator('.viz-label'), 'element => getComputedStyle(element).boxShadow')).not.toBe(sourceShadow)
       // Las transiciones de color/sombra terminan antes de comparar el énfasis final comprometido.
       await page.waitForTimeout(350)

@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { BarChart3, Bell, ScatterChart } from 'lucide-react'
-import { Card, SegmentedTabs, Slider, cx, useTheme } from '@renderer/design'
+import { Card, SegmentedTabs, Slider, cx, focusRing, useTheme } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { formatNumber, niceTicks, parseNumber, percentSign } from '../shared/lib/num'
 import { CardTitle, Examples, NumField, useComma, useElementSize, useStored } from '../shared/ui'
@@ -45,7 +45,7 @@ export default function StatsTool(_props: ToolProps) {
   )
 }
 
-const areaCls = 'w-full min-h-[150px] rounded-[12px] bg-field border-[0.5px] border-line-strong/40 px-3 py-2.5 font-mono text-[13px] leading-relaxed text-text outline-none resize-y focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)]'
+const areaCls = `w-full min-h-[150px] rounded-[12px] bg-field border-[0.5px] border-line-strong/40 px-3 py-2.5 font-mono text-[13px] leading-relaxed text-text outline-none resize-y ${focusRing}`
 
 // MARK: Descriptiva
 

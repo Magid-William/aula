@@ -1,10 +1,11 @@
 // «Novedades»: lo que Aula hizo sola (resúmenes, recordatorios, lo nuevo de tu plataforma, seguimientos, avisos), agrupado por
-// día con filtros por tipo, y la pestaña «Automatizaciones» con las del estudiante y su editor. A la derecha, «Aula siempre
-// activa» (estado, rutinas, uso de hoy) y lo próximo que hará, en una tarjeta que flota.
+// día, y la pestaña «Automatizaciones» con las del estudiante y su editor. Arriba, solo la cinta de las dos pestañas (el
+// título visible es el de la barra de arriba); el filtro (todo, sin leer, te necesita) es un menú. A la derecha, «Aula siempre
+// activa» (estado, rutinas, uso de hoy) y lo próximo que hará.
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { Button, Chip, EmptyState, Icon, IconButton, Menu, SegmentedTabs, TextField, cx } from '@renderer/design'
+import { Button, Chip, EmptyState, Icon, IconButton, Menu, SegmentedTabs, TextField, cx, type MenuItem } from '@renderer/design'
 import { useCompact } from '@renderer/app/shell/CompactTabs'
 import { useScreenTitle } from '@renderer/app/title'
 import { useRpc, useRpcEvent } from '@renderer/lib/useRpc'
@@ -13,7 +14,6 @@ import { INBOX_KIND_ORDER, isSnoozed, matchesView, needsYou, type InboxEntry } f
 import { AutomationEditor } from './AutomationEditor'
 import { AutomationsPanel } from './AutomationsPanel'
 import { InboxList } from './InboxList'
-import { PixelEnvelope } from './PixelEnvelope'
 import { ProactiveCard, UpNextCard } from './ProactiveCard'
 import { inboxOps } from './actions'
 import { KIND_ICONS } from './format'
@@ -58,28 +58,22 @@ export default function InboxScreen() {
   )
 
   return (
-    <div className={cx('@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-1 pb-24', phone ? 'px-4' : 'px-6')}>
+    <div className={cx('@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-1 pb-10', phone ? 'px-4' : 'px-6')}>
       {phone ? (
         <div className="flex flex-col gap-3 pt-1">
           {snap.data ? <ProactiveCard snapshot={snap.data} compact /> : <div className="h-[104px] skeleton rounded-[22px]" />}
           <div className="self-start">{tabs}</div>
         </div>
       ) : (
-      <motion.header initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="flex items-end justify-between gap-4 flex-wrap pt-3">
-        <div className="flex items-center gap-4 min-w-0">
-          <span className="grid place-items-center w-14 h-14 rounded-[16px] bg-surface border-[0.5px] border-line shadow-[var(--e1)] shrink-0">
-            <PixelEnvelope lit={unread > 0} size={40} />
-          </span>
-          <div className="min-w-0">
-            <h1 className="t-title1 text-text">{t('title')}</h1>
-            <p className="t-ui text-text2 mt-0.5">{summary}</p>
-          </div>
-        </div>
+      <motion.header initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="flex items-center gap-4 flex-wrap pt-2">
+        <h1 className="sr-only">{t('title')}</h1>
         {tabs}
+        {/* lo que importa, en una línea: cuánto hay sin leer y cuánto pide algo de ti */}
+        <p className="t-callout text-text2">{summary}</p>
       </motion.header>
       )}
 
-      <div className={cx('grid grid-cols-12 gap-4', phone ? 'mt-3' : 'mt-6')}>
+      <div className={cx('grid grid-cols-12 gap-4', phone ? 'mt-3' : 'mt-5')}>
         <main className="col-span-12 @5xl:col-span-8 flex flex-col gap-4 min-w-0">
           {ui.tab === 'inbox' ? (
             inbox.error && !inbox.data ? (
@@ -113,9 +107,9 @@ export default function InboxScreen() {
 }
 
 /**
- * Una sola fila: Todo · Sin leer · Te necesita, y a la derecha la lupa, «Marcar todo como leído» y un menú con lo que se usa
- * poco (pospuestas, archivadas, ver solo un tipo, agrupar). Si se está viendo otra cosa que lo abierto, una etiqueta lo dice
- * y vuelve con un toque.
+ * Una sola fila: el filtro (Todo · Sin leer · Te necesita) en un menú, y a la derecha la lupa, «Marcar todo como leído» y un
+ * menú con lo que se usa poco (pospuestas, archivadas, ver solo un tipo, agrupar). Si se está viendo otra cosa que lo
+ * abierto, una etiqueta lo dice y vuelve con un toque.
  */
 function Toolbar({ entries, unread }: { entries: InboxEntry[]; unread: number; phone?: boolean }) {
   const { t } = useTranslation('inbox')
@@ -131,14 +125,33 @@ function Toolbar({ entries, unread }: { entries: InboxEntry[]; unread: number; p
   // lo que se ve cuando no es «lo abierto, todo»: una vista (pospuestas, archivadas) o un solo tipo
   const special = ui.view !== 'open' ? t(`views.${ui.view}`) : !main ? t(`kinds.${ui.filter}`) : null
   const reset = (): void => ui.set({ view: 'open', filter: 'all', expanded: null })
+  const current = main ? ui.filter : 'all'
+  const counts: Record<'all' | 'unread' | 'attention', number> = { all: 0, unread, attention }
+  const filterItems: MenuItem[] = (['all', 'unread', 'attention'] as const).map((f) => ({
+    // el lector oye «Sin leer, 3, seleccionado»: la cifra separada del nombre y la opción elegida dicha (no solo la marca)
+    label: (
+      <span className="flex w-full items-center justify-between gap-6">
+        <span aria-hidden>{t(`filters.${f}`)}</span>
+        {counts[f] > 0 && <span aria-hidden className="tabular text-text3">{counts[f]}</span>}
+        <span className="sr-only">{[t(`filters.${f}`), counts[f] > 0 ? String(counts[f]) : '', f === current ? t('filters.selected') : ''].filter(Boolean).join(', ')}</span>
+      </span>
+    ),
+    // la opción elegida, con su marca; las otras, con el mismo hueco para que no bailen
+    icon: f === current ? <Icon name="check" size={14} /> : <span className="inline-block w-[14px]" />,
+    onSelect: () => ui.set({ filter: f, expanded: null })
+  }))
   return (
     <div className="flex flex-wrap items-center gap-2">
       {ui.view === 'open' && (
-        <SegmentedTabs size="sm" value={main ? ui.filter : 'all'} onChange={(filter) => ui.set({ filter, expanded: null })} items={[
-          { id: 'all', label: t('filters.all') },
-          { id: 'unread', label: t('filters.unread'), ...(unread ? { badge: unread } : {}) },
-          { id: 'attention', label: t('filters.attention'), ...(attention ? { badge: attention } : {}) }
-        ]} />
+        <Menu
+          align="start"
+          items={filterItems}
+          trigger={(openMenu, expanded) => (
+            <Button size="sm" variant="ghost" aria-haspopup="menu" aria-expanded={expanded} iconRight={<Icon name="chevron-down" size={13} />} onClick={openMenu} className="-ml-2">
+              {t('filters.show', { filter: t(`filters.${current}`) })}
+            </Button>
+          )}
+        />
       )}
       {special && (
         <Chip active icon={<Icon name="close" size={12} />} onClick={reset}>

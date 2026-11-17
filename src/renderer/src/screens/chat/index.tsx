@@ -1,23 +1,27 @@
 // Habla con Aula: conversaciones a la izquierda (en ventanas estrechas, en un panel que se abre con «Conversaciones»), la
 // conversación en el centro (ancho de lectura cómodo) y la cápsula para escribir abajo. Lo que se escribe mientras Aula responde
-// espera debajo de la respuesta y se envía al terminar. Vacío: la marca de Aula, una frase y sugerencias para empezar.
+// espera debajo de la respuesta y se envía al terminar. Vacío: Aula habla primero, en serif y con los datos del estudiante
+// (su examen, lo pendiente), con la lámpara a tinta al lado y tres sugerencias sacadas de sus cursos, en lista con filetes.
 // La conversación en sí (pensando, pasos, texto que fluye, desplazamiento) está en Conversation.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { studentTextOf } from '@engine/assistant/trust'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { LayoutGroup, motion } from 'motion/react'
-import { AulaMark, Button, Card, Chip, Companion, Drawer, Icon, InkSpot, toast, useMarkPhase } from '@renderer/design'
-import { useAmbient } from '@renderer/design/ambient'
+import { AulaMark, Button, Drawer, Icon, InkSpot, cx, toast, useMarkPhase } from '@renderer/design'
 import { useRoute } from '@renderer/app/router'
+import { useRpc } from '@renderer/lib/useRpc'
 import { useScreenTitle } from '@renderer/app/title'
 import { api } from '@renderer/lib/api'
 import { isDemo } from '@renderer/lib/demo'
+import { showsAsSample } from '@renderer/lib/sample'
 import { useConversation, useThreads, type Draft } from './data'
 import { usePendingDeletes } from './deletion'
 import { ThreadList } from './ThreadList'
 import { Conversation } from './Conversation'
 import { Composer, type ComposerHandle } from './Composer'
 import { ChatActionsContext, type ChatActions } from './actions'
+import { keepWhole, openingFor, type OpeningSuggestion } from './opening'
+import { IdeaList } from './IdeaList'
 
 export default function ChatScreen() {
   const { t, i18n } = useTranslation('chat')
@@ -89,38 +93,16 @@ export default function ChatScreen() {
     requestAnimationFrame(() => composer.current?.focus())
   }
 
-  const suggestions = t('suggestions', { returnObjects: true }) as string[]
-  const emptyMark = useMarkPhase(busy.busy)
-  // los compañeros del chat vacío son adorno: se mueven solo mientras alguien usa la app (design/ambient.ts)
-  const moving = useAmbient()
-  const emptyView = (
-    <div className="flex flex-col items-center text-center pt-[12vh]">
-      {/* el flexo encendido sobre la mesa: Aula está lista (mientras piensa, su marca) */}
-      {busy.busy ? <div className="text-text"><AulaMark size={72} state={emptyMark} hover /></div> : <InkSpot name="lamp" className="h-[150px] w-[180px]" />}
-      <h1 className="t-display text-[36px] mt-5">{t('emptyTitle')}</h1>
-      <p className="t-body text-text2 mt-2 max-w-[480px]">{t('emptyBody')}</p>
-      <div className="flex flex-wrap justify-center gap-2 mt-6 max-w-[620px]">
-        {suggestions.map((s, i) => (
-          <motion.div key={s} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.05 }}>
-            <Chip onClick={() => ask(s)}>{s}</Chip>
-          </motion.div>
-        ))}
-      </div>
-      <div className="flex gap-2 mt-10 opacity-80">
-        {['luna', 'buho', 'libro', 'pluma'].map((id, i) => (
-          <motion.div key={id} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 + i * 0.08 }}>
-            <Companion id={id} size={34} working={moving} />
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  )
+  const emptyView = <EmptyOpening busy={busy.busy} onAsk={ask} />
+  // «puede equivocarse»: cuando ya hay algo que comprobar, no antes (sin mover la caja de sitio)
+  const spoken = (thread?.messages.length ?? 0) > 0
   return (
     <ChatActionsContext.Provider value={actions}>
       <div className="@container flex min-h-0 flex-1 gap-4 px-6 pb-4">
-        <Card padded="sm" className="hidden @4xl:flex w-[280px] shrink-0 flex-col">
+        {/* las conversaciones, sobre el papel y separadas por un filete (no es un objeto: no va en tarjeta) */}
+        <div className="hidden @4xl:flex w-[268px] shrink-0 flex-col border-r border-rule pr-4 pt-1">
           <ThreadList threads={threads} active={activeId} onOpen={open} onNew={startNew} />
-        </Card>
+        </div>
         <div className="relative flex min-w-0 flex-1 flex-col">
           {/* ventana estrecha: la lista no cabe al lado; se abre en un panel */}
           <div className="@4xl:hidden flex items-center gap-1.5 pt-1">
@@ -138,10 +120,11 @@ export default function ChatScreen() {
             onCancelQueued={(id) => void cancel(id)}
             empty={emptyView}
             contentClassName="mx-auto max-w-[760px] px-2 pt-4 pb-6"
+            jumpClassName="max-w-[780px] px-2"
           />
           <div className="mx-auto w-full max-w-[780px] px-2">
             <Composer ref={composer} key={prompt ?? 'composer'} initial={prompt ?? ''} busy={busy.busy} awaiting={conv.awaiting} autoFocus onSend={(d) => void send(d)} onStop={conv.stop} />
-            <div className="t-caption text-center mt-2">{t('disclaimer')}</div>
+            <div className={cx('t-caption text-center mt-2', !spoken && 'invisible')} aria-hidden={!spoken || undefined}>{t('disclaimer')}</div>
           </div>
         </div>
         <Drawer open={listOpen} onClose={() => setListOpen(false)} side="left" width={320}>
@@ -155,4 +138,52 @@ export default function ChatScreen() {
       </div>
     </ChatActionsContext.Provider>
   )
+}
+
+/** El chat vacío: Aula habla primero, en serif, con el examen más cercano y lo pendiente de hoy, y propone tres ideas sacadas de
+ *  sus cursos. Sin cursos propios (o solo el de ejemplo), una pregunta y las ideas de siempre. Mientras llega el resumen no se
+ *  enseña nada (sin saltos). */
+function EmptyOpening({ busy, onAsk }: { busy: boolean; onAsk: (text: string) => void }) {
+  const { t } = useTranslation('chat')
+  const mark = useMarkPhase(busy)
+  const { data: summary, error } = useRpc('home.summary', undefined, { events: ['courses.changed', 'calendar.changed'] as never })
+  const ready = summary !== undefined || error !== null
+  const opening = summary ? openingFor(summary, new Date(), showsAsSample) : null
+  const ideas = opening ? opening.suggestions.map((s) => suggestionText(s, t)) : (t('suggestions', { returnObjects: true }) as string[]).slice(0, 3)
+  const pending: string[] = []
+  if (opening?.mistakes) pending.push(t('opening.mistakes', { count: opening.mistakes }))
+  if (opening?.dueCards) pending.push(t('opening.cards', { count: opening.dueCards }))
+  const exam = opening?.exam
+  // el nombre del examen, entero en su línea si es corto (y en español, con su «para»): el título no se parte por la mitad
+  const keep = <span className={exam && keepWhole(exam.title) ? 'whitespace-nowrap' : undefined} />
+  const title = exam ? (
+    exam.days === 0
+      ? <Trans t={t} i18nKey="opening.examToday" values={{ exam: exam.title }} components={{ keep }} />
+      : <Trans t={t} i18nKey="opening.exam" count={exam.days} values={{ exam: exam.title, count: exam.days }} components={{ keep }} />
+  ) : t('emptyTitle')
+  return (
+    <div data-chat-opening className="mx-auto grid w-full max-w-[700px] grid-cols-[100px_minmax(0,1fr)] gap-x-6 pt-[9vh] text-left">
+      {/* el flexo encendido sobre la mesa, pequeño, en el margen de lo que dice Aula (mientras piensa, su marca) */}
+      <div className="pt-1">
+        {busy ? <div className="grid h-[84px] w-[100px] place-items-center text-text"><AulaMark size={48} state={mark} hover /></div> : <InkSpot name="lamp" className="h-[84px] w-[100px]" />}
+      </div>
+      <motion.div className="min-w-0" initial={false} animate={{ opacity: ready ? 1 : 0 }} transition={{ duration: 0.25 }} aria-busy={!ready || undefined}>
+        <h1 className="font-serif text-[2rem] leading-[calc(38rem/15)] tracking-[-0.3px] text-text text-balance">{ready ? title : '\u00a0'}</h1>
+        <p className="mt-2 font-serif text-[calc(18rem/15)] leading-[calc(27rem/15)] text-text2 text-pretty">
+          {ready ? (pending.length ? t('opening.pending', { list: pending.join(t('opening.and')) }) : opening ? t('opening.ready') : t('emptyBody')) : '\u00a0'}
+        </p>
+        {/* tres ideas sacadas de sus cursos, como una lista con filetes (no chips) */}
+        {ready && <IdeaList ideas={ideas} onPick={onAsk} label={opening ? t('opening.ideas') : undefined} className="mt-7" />}
+      </motion.div>
+    </div>
+  )
+}
+
+function suggestionText(s: OpeningSuggestion, t: (k: string, o?: Record<string, unknown>) => string): string {
+  switch (s.kind) {
+    case 'topic': return t('opening.ideaTopic', { topic: s.topic })
+    case 'mistakes': return t('opening.ideaMistakes', { count: s.count })
+    case 'cards': return t('opening.ideaCards', { count: s.count })
+    case 'exam': return t('opening.ideaExam', { exam: s.title })
+  }
 }

@@ -1,6 +1,9 @@
 // Cambiar de pantalla (J1-6, J1-7): navegar muy rápido muchas veces nunca deja la vista en blanco ni colgada; al salir de un curso
 // no parpadea «Course not found»; y entre dos pantallas siempre hay algo a la vista (la anterior se queda hasta tener la nueva).
+// Y la barra lateral: tres grupos, Ajustes siempre a mano y el modo concentración al estudiar.
 import { test, expect, type Page } from 'playwright/test'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { go, homeWithDemoCourse, launch } from './helpers'
 
 const COURSE = 'exam-2-math112'
@@ -132,7 +135,7 @@ test('bienvenida en una ventana baja (1000×680): «Continuar» siempre a la vis
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.setViewportSize({ width: 1000, height: 680 })
-  await page.getByRole('button', { name: 'Get started' }).click()
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
   const next = page.getByRole('button', { name: 'Continue', exact: true })
   await expect(next).toBeVisible()
   const box = await next.boundingBox()
@@ -141,6 +144,65 @@ test('bienvenida en una ventana baja (1000×680): «Continuar» siempre a la vis
   // y se pulsa sin desplazar: pasa al paso de la plataforma
   await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2)
   await expect(page.getByRole('button', { name: 'I don’t use one' })).toBeVisible()
+  expect(errors).toEqual([])
+  await app.close()
+})
+
+test('barra lateral en tres grupos, Ajustes también plegada y modo concentración al estudiar (sin la gota de Aula)', async () => {
+  test.setTimeout(90_000)
+  const home = homeWithDemoCourse()
+  writeFileSync(join(home, 'settings.json'), JSON.stringify({ version: 2, onboarded: true, general: { language: 'en' } }))
+  const { app, page } = await launch({ home })
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  const nav = page.locator('nav[aria-label="Aula"]')
+  await expect(nav.getByText('Exam #2 · MATH 101')).toBeVisible()
+  // el orden: lo de cada día, los cursos con «New course» al final, lo de consulta y Ajustes
+  const names = await page.evaluate<string[]>(`[...document.querySelectorAll('nav[aria-label="Aula"] button')].map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim())`)
+  // (la fila de Herramientas empieza con su glifo «ƒ»)
+  const at = (name: string) => names.findIndex((n) => n.replace(/^ƒ/, '').startsWith(name))
+  const order = ['Today', 'Aula', 'Inbox', 'Calendar', 'Exam #2 · MATH 101', 'New course', 'Documents', 'Tools', 'Statistics', 'Settings'].map(at)
+  expect(order.every((i) => i >= 0), JSON.stringify(names)).toBe(true)
+  expect([...order].sort((a, b) => a - b)).toEqual(order)
+  // lo de consulta, atenuado
+  const color = (name: string) => page.evaluate<string>(`getComputedStyle([...document.querySelectorAll('nav[aria-label="Aula"] button')].find((b) => b.textContent.trim().startsWith(${JSON.stringify(name)}))).color`)
+  expect(await color('Documents')).not.toBe(await color('Today'))
+  // sin la gota flotante
+  expect(await page.locator('.aula-orb').count()).toBe(0)
+
+  // Ajustes, desplegada y plegada
+  await nav.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.locator('[data-screen="settings"][data-active="true"]')).toBeVisible()
+  await nav.getByRole('button', { name: 'Collapse sidebar' }).click()
+  await page.waitForTimeout(450)
+  await go(page, { name: 'home' })
+  await nav.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.locator('[data-screen="settings"][data-active="true"]')).toBeVisible()
+  await page.getByRole('button', { name: 'Expand sidebar' }).click()
+  await page.waitForTimeout(450)
+  const width = async () => (await nav.boundingBox())?.width ?? 0
+  expect(await width()).toBeGreaterThan(200)
+
+  // al estudiar se pliega sola y no hay buscador a la vista (⌘K sigue funcionando)
+  await go(page, { name: 'study', id: COURSE, mode: 'learn', skill: 'reference-angles' })
+  await page.waitForTimeout(450)
+  expect(await width()).toBeLessThan(100)
+  await expect(page.getByRole('button', { name: /^Search Aula/ })).toHaveCount(0)
+  await page.keyboard.press('Control+k')
+  await expect(page.locator('[cmdk-input]')).toBeVisible()
+  await page.keyboard.press('Escape')
+  // al volver, como estaba (y lo guardado no cambia)
+  await go(page, { name: 'home' })
+  await page.waitForTimeout(450)
+  expect(await width()).toBeGreaterThan(200)
+  await expect(page.getByRole('button', { name: /^Search Aula/ })).toBeVisible()
+  expect(await page.evaluate<string | null>(`localStorage.getItem('aula.sidebar.collapsed')`)).toBe('0')
+  // desplegada a mano en pleno estudio, se queda abierta
+  await go(page, { name: 'study', id: COURSE, mode: 'cards' })
+  await page.waitForTimeout(450)
+  await page.getByRole('button', { name: 'Expand sidebar' }).click()
+  await page.waitForTimeout(450)
+  expect(await width()).toBeGreaterThan(200)
   expect(errors).toEqual([])
   await app.close()
 })

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { Card, LiveDot, Select, cx } from '@renderer/design'
+import { Card, LiveDot, Select, cx, focusRing } from '@renderer/design'
 import { solveStoichiometry, type StoichiometryReport } from '@engine/chem/stoichiometry'
 import { Tex } from '../shared/Tex'
 import { formatNumber, percentSign } from '../shared/lib/num'
@@ -69,7 +69,7 @@ export default function Stoich() {
                   value={s.given[x.plain] ?? ''}
                   onChange={(e) => setS((p) => ({ ...p, given: { ...p.given, [x.plain]: e.target.value } }))}
                   placeholder={comma ? '10 g · 0,5 mol' : '10 g · 0.5 mol'}
-                  className="w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 px-3 text-[14px] outline-none focus:border-accent-line focus:shadow-[0_0_0_3px_var(--accent-wash)] tabular"
+                  className={`w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 px-3 text-[14px] outline-none ${focusRing} tabular`}
                 />
               </label>
             ))}
@@ -79,7 +79,7 @@ export default function Stoich() {
             </div>
             <label className="block">
               <span className="block t-ui font-medium text-text2 mb-1.5">{t('chemistry.actualYield')}</span>
-              <input value={actual} onChange={(e) => setActual(e.target.value)} placeholder={t('chemistry.optional')} className="w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 px-3 text-[14px] outline-none focus:border-accent-line tabular" />
+              <input value={actual} onChange={(e) => setActual(e.target.value)} placeholder={t('chemistry.optional')} className={`w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 px-3 text-[14px] outline-none ${focusRing} tabular`} />
             </label>
           </div>
         )}

@@ -31,7 +31,8 @@ se enseña **un único fotograma** (el `still` de la pista `hover`).
   hay nada que animar), un único `IntersectionObserver` (fuera de pantalla no anima; lo que se ve se pinta antes) y un
   único temporizador para el reposo. `<html data-pixel-idle="off">` apaga el reposo (capturas).
 - `brush/` — el dibujo a mano (ver abajo).
-- Componentes: `PixelIcon`, `CourseIcon` (`Pixel.tsx`) y `Companion` (`Companion.tsx`). El ratón se escucha en el ancestro
+- Componentes: `PixelIcon`, `CourseIcon` (`Pixel.tsx`). Los compañeros ya no salen en la app (solo en los vídeos de
+  `scripts/video`). El ratón se escucha en el ancestro
   más cercano con `[data-pixel-hover]`, `button`, `a[href]` o `role=button|option|menuitem|link|tab`; si no hay, en el
   padre del icono. Pon `data-pixel-hover` en una tarjeta clicable para que despierte a su icono.
 

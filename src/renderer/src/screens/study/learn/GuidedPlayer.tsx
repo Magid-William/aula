@@ -22,6 +22,7 @@ import { updateProgress, useStudyStore, type CourseData, type SyncOp } from '../
 import { gradeOpenWithAI } from '../ai'
 import { askTutor, attemptOp, exerciseContext, recordTime, whyOf } from '../kit'
 import { blocksSpeech, canSpeak, useSpeech } from '../speech'
+import { usePublishTutorContext } from '../tutorStore'
 import { PrepareMore } from './PrepareMore'
 import { RemediationView } from './Remediation'
 
@@ -257,6 +258,9 @@ export function GuidedPlayer({ data, skill, ctx, ink, modeMenu, onExit, onFinish
   const checkpoints = (concept?.checkpointBlocks ?? []).filter((b) => b.type === 'predict' || b.type === 'spot')
   const snapshot = assessment && concept && sp?.learning[concept.id]?.activeExercise?.id === assessment.id ? sp.learning[concept.id].activeInput : undefined
 
+  // el paso que se lee, para la puerta fija del tutor de la cápsula (con una pregunta a la vista, la publica ella)
+  usePublishTutorContext(presented === 'check' && assessment ? null : { courseID: packId, skillID: skill.id, screen: 'lesson', lessonBlock: index })
+
   const states: DotState[] = views.map((v, i) => (v.unchecked ? 'warn' : v.canAdvance ? 'done' : i > reachable ? 'locked' : 'todo'))
   const lead = assisted ? t('learn.assistedLead') : (view?.required ?? 2) <= 1 ? t('learn.openLead') : t('learn.checkLead', { n: view?.successes ?? 0, m: view?.required ?? 2 })
 
@@ -289,6 +293,7 @@ export function GuidedPlayer({ data, skill, ctx, ink, modeMenu, onExit, onFinish
       icon="learn"
       label={<RichText text={skill.title} inline />}
       onExit={onExit}
+      tutor
       trailing={
         <>
           {canSpeak() && (
@@ -342,7 +347,7 @@ export function GuidedPlayer({ data, skill, ctx, ink, modeMenu, onExit, onFinish
     )
 
   return (
-    <StudyFrame capsule={capsule} bottom={bottom} onExit={onExit} scrollKey={`${index}-${presented}-${assessment?.id ?? ''}`}>
+    <StudyFrame capsule={capsule} bottom={bottom} onExit={onExit} scrollKey={`${index}-${presented}-${assessment?.id ?? ''}`} reading>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={`${index}-${presented === 'check' ? `check-${assessment?.id ?? ''}` : presented}`} {...(reducedMotion ? {} : page)} className="flex flex-col gap-7">
           {presented === 'check' && (
@@ -452,6 +457,7 @@ function GuidedCheck({ exercise, ctx, snapshot, onDraft, onFirstResult, onAssist
 }) {
   const { t } = useTranslation('study')
   const c = useExercise(exercise, { mode: 'guided', snapshot, onDraft, onFirstResult, onAssist, exactText: ctx.exactText, gradeOpen: (e, text) => gradeOpenWithAI(packId, e, text) })
+  usePublishTutorContext(exerciseContext(packId, exercise, c.run, 'lesson'))
   return (
     <ExerciseView
       controller={c}

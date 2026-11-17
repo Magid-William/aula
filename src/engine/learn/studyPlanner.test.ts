@@ -159,6 +159,14 @@ describe('Plan · orden de las reglas', () => {
     expect(r[0].reason).toContain('500 tarjetas vencidas'); expect(r[0].reason).toContain('unas 20')
     expect(r[1].reason).toContain('100 errores'); expect(r[1].reason).toContain('unos 4')
     expect(total(r)).toBeLessThanOrEqual(20); expect(total(r)).toBeGreaterThan(14)
+    // cuántas cubre cada paso: lo mismo que dice su razón («unas 20», «unos 4»)
+    expect(r[0].count).toBe(20); expect(r[1].count).toBe(4)
+  })
+
+  it('si caben todas, el paso las cubre todas (y nunca más de las que tocan)', () => {
+    const r = plan(inputs(60, trig(), { cards: 4, mistakes: 3, diag: true }))
+    expect(r[0].count).toBe(4); expect(r[1].count).toBe(3)
+    expect(r.slice(2).every((x) => x.count === undefined)).toBe(true)
   })
 
   it('singular y plural', () => {

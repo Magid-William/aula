@@ -271,14 +271,16 @@ export function fakeMistake(ex: { wrongs?: unknown; hints?: unknown }, input?: s
   const norm = (v: string): string => v.replace(/\s+|\$/g, '').toLowerCase()
   const wrongs = Array.isArray(ex.wrongs) ? ex.wrongs : []
   const typical = input ? wrongs.find((w) => typeof w?.input === 'string' && typeof w?.why === 'string' && norm(w.input) === norm(input))?.why : undefined
-  const reason = (why?.trim() || typical)?.trim()
+  // «No es correcto.» no es un porqué: es lo que el corrector ya dijo (citarlo como razón sonaba a respuesta enlatada)
+  const generic = !why || /^(no es correcto|that'?s not correct|that’s not correct)\.?$/iu.test(why.trim())
+  const reason = ((generic ? undefined : why?.trim()) || typical)?.trim()
   const hint = Array.isArray(ex.hints) ? ex.hints.find((h): h is string => typeof h === 'string' && h.trim() !== '') : undefined
   const yours = input ? (/[\\^_{}]/.test(input) && !input.includes('$') ? `$${input}$` : `**${input}**`) : undefined
   const nudge = hint ? tr(`\n\n**Una pista para el siguiente intento:** ${hint}`, `\n\n**A nudge for your next try:** ${hint}`) : ''
   if (reason) {
     return tr(
-      `${yours ? `Respondiste ${yours}. ` : ''}Es un error muy típico, y tiene arreglo:\n\n> ${reason}${nudge}\n\nCorrige ese detalle y vuelve a intentarlo: todavía no te doy la solución completa.`,
-      `${yours ? `You answered ${yours}. ` : ''}That's a really common slip, and an easy one to fix:\n\n> ${reason}${nudge}\n\nFix that one detail and try again. I won't spoil the full solution yet.`
+      `${yours ? `Respondiste ${yours}. ` : ''}Esto es lo que falla:\n\n> ${reason}${nudge}\n\nCorrige eso y vuelve a intentarlo: todavía no te doy la solución completa.`,
+      `${yours ? `You answered ${yours}. ` : ''}Here's what's off:\n\n> ${reason}${nudge}\n\nFix that and try again. I won't give you the full solution yet.`
     )
   }
   return tr(

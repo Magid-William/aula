@@ -1,6 +1,6 @@
 // Superficies: el papel es sólido. «Group» es la lista agrupada (el contenedor por defecto); «Card» es un objeto
 // (un examen, un permiso, un documento) que puede levantarse al pasar el ratón o flotar suavemente.
-import { forwardRef, useCallback, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { forwardRef, useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { motion, type HTMLMotionProps } from 'motion/react'
 import { cx } from './cx'
 import { enter, spring } from './tokens'
@@ -23,10 +23,13 @@ export interface CardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
   elevation?: 1 | 2 | 3
   /** Velo plano muy suave con un color de identidad (el tono de un curso). Nunca degradados de varios colores. */
   wash?: string
+  /** `bubble`: la burbuja de siempre (un objeto: un examen, una flashcard, un ejercicio). `sheet`: sobre el papel, sin fondo ni
+   *  sombra, con un filete arriba (una sección de la página, no un objeto). */
+  variant?: 'bubble' | 'sheet'
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
-  { children, interactive, floating, padded = true, enterAnim, mark, markSize = 'md', elevation = 1, wash, className, style, onKeyDown, ...rest },
+  { children, interactive, floating, padded = true, enterAnim, mark, markSize = 'md', elevation = 1, wash, variant = 'bubble', className, style, onKeyDown, ...rest },
   ref
 ) {
   const { reducedMotion } = useTheme()
@@ -40,8 +43,10 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     },
     [ref]
   )
-  const pad = padded === false ? '' : padded === 'sm' ? 'p-4' : padded === 'lg' ? 'p-7' : 'p-5'
-  const shadow = elevation === 3 ? 'var(--e3)' : elevation === 2 ? 'var(--e2)' : 'var(--e1)'
+  const sheet = variant === 'sheet'
+  // la hoja no lleva relleno a los lados: su texto se alinea con el resto de la página
+  const pad = padded === false ? '' : sheet ? 'pt-5 pb-2' : padded === 'sm' ? 'p-4' : padded === 'lg' ? 'p-7' : 'p-5'
+  const shadow = sheet ? undefined : elevation === 3 ? 'var(--e3)' : elevation === 2 ? 'var(--e2)' : 'var(--e1)'
   // una tarjeta que se pulsa es un botón: se enfoca con Tab y se abre con Intro o Espacio, como `Row` (A4-P1-4). Solo
   // reacciona a las teclas sobre ella misma, no sobre un campo o un botón de dentro.
   const clickable = typeof rest.onClick === 'function'
@@ -63,23 +68,62 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     <motion.div
       ref={setRef}
       variants={enterAnim ? enter : undefined}
-      className={cx('relative rounded-[22px] bg-surface border-[0.5px] border-line', mark && 'isolate', pad, interactive && 'cursor-default', className)}
-      style={{ boxShadow: shadow, ...(wash ? { backgroundImage: `linear-gradient(color-mix(in oklab, ${wash} 9%, transparent), color-mix(in oklab, ${wash} 9%, transparent))` } : {}), ...style }}
-      whileHover={interactive && !reducedMotion ? { y: -2, boxShadow: 'var(--e2)', transition: spring.snappy } : undefined}
+      className={cx('relative', sheet ? 'border-t border-rule' : 'rounded-[22px] bg-surface border-[0.5px] border-line', mark && !sheet && 'isolate', pad, interactive && 'cursor-default', className)}
+      style={{ boxShadow: shadow, ...(wash && !sheet ? { backgroundImage: `linear-gradient(color-mix(in oklab, ${wash} 9%, transparent), color-mix(in oklab, ${wash} 9%, transparent))` } : {}), ...style }}
+      whileHover={interactive && !sheet && !reducedMotion ? { y: -2, boxShadow: 'var(--e2)', transition: spring.snappy } : undefined}
       whileTap={interactive && clickable ? { scale: 0.985, transition: spring.snappy } : undefined}
       {...rest}
       {...keys}
     >
-      {mark && <PigmentMark color={mark} size={markSize} />}
+      {/* sobre el papel no hay muestra de pigmento: caería debajo del texto */}
+      {mark && !sheet && <PigmentMark color={mark} size={markSize} />}
       {children}
     </motion.div>
   )
 })
 
-/** Lista agrupada con separadores que empiezan donde empieza el texto. */
-export function Group({ children, className, inset = 52 }: { children: ReactNode; className?: string; inset?: number }) {
+/** Filete: una línea fina de tinta sobre el papel que separa partes de una página (en vez de otra tarjeta). */
+export function Rule({ className }: { className?: string }) {
+  return <hr className={cx('m-0 h-px border-0 bg-rule', className)} />
+}
+
+/** Sección de una página: filete arriba, título serif, un detalle opcional y una acción a la derecha. `size="sm"` para las
+ *  notas de la columna del margen. Entra con la página (`enter`). El título le da nombre a la sección. */
+export function Section({ title, detail, action, size = 'md', children, className, rule = true, labelledBy }: {
+  title?: ReactNode
+  detail?: ReactNode
+  action?: ReactNode
+  size?: 'md' | 'sm'
+  children?: ReactNode
+  className?: string
+  /** Sin filete (la primera sección de una columna). */
+  rule?: boolean
+  /** Id del título (si no, uno propio). */
+  labelledBy?: string
+}) {
+  const auto = useId()
+  const headId = title ? (labelledBy ?? auto) : undefined
   return (
-    <div className={cx('list-group overflow-hidden', className)} style={{ ['--row-inset' as string]: `${inset}px` }}>
+    <motion.section variants={enter} aria-labelledby={headId ?? labelledBy} className={cx(rule && 'border-t border-rule', size === 'sm' ? 'pt-4 pb-5' : 'pt-6 pb-7', className)}>
+      {(title || action) && (
+        <div className={cx('flex items-baseline justify-between gap-4', size === 'sm' ? 'mb-2' : 'mb-3')}>
+          <div className="min-w-0">
+            {title && <h2 id={headId} className={size === 'sm' ? 'font-serif text-[calc(17rem/15)] leading-[calc(22rem/15)] font-medium tracking-[-0.1px] text-text' : 't-title2 text-text'}>{title}</h2>}
+            {detail && <div className="t-footnote mt-0.5">{detail}</div>}
+          </div>
+          {action && <div className="shrink-0 t-ui">{action}</div>}
+        </div>
+      )}
+      {children}
+    </motion.section>
+  )
+}
+
+/** Lista agrupada con separadores que empiezan donde empieza el texto. Con `plain`, sin caja: solo las filas con su filete
+ *  (dentro de una tarjeta, para no meter una caja dentro de otra). */
+export function Group({ children, className, inset = 52, plain }: { children: ReactNode; className?: string; inset?: number; plain?: boolean }) {
+  return (
+    <div className={cx(plain ? 'list-plain' : 'list-group overflow-hidden', className)} style={{ ['--row-inset' as string]: `${inset}px` }}>
       {children}
     </div>
   )
@@ -118,7 +162,7 @@ export function Row({ leading, title, subtitle, trailing, chevron, onClick, sele
         onClick && 'hover:bg-fill1 active:bg-fill2 focus-visible:bg-fill1',
         selected && 'bg-accent-wash',
         mark && 'isolate',
-        'before:absolute before:top-0 before:right-0 before:h-[0.5px] before:bg-line-soft before:left-[var(--row-inset)] first:before:hidden',
+        'before:absolute before:top-0 before:right-0 before:h-[0.5px] before:bg-[var(--row-line,var(--line-soft))] before:left-[var(--row-inset)] first:before:hidden',
         className
       )}
       {...rest}

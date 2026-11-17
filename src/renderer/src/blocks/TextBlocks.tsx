@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { Sigma } from 'lucide-react'
-import { cx, PigmentMark, PixelCheck, useTheme, type IconName } from '@renderer/design'
+import { cx, PixelCheck, useTheme, type IconName } from '@renderer/design'
 import type { BlockOf, CalloutKind } from '@shared/schema/blocks'
 import type { BlockProps } from './types'
 import { BlockTitle, Eyebrow, Inline, MathTex, Prose, SourceLink, useAnimate, useBlocksT, useSeen } from './shared'
@@ -41,22 +41,21 @@ export function MathBlockView({ block, ctx }: BlockProps<BlockOf<'math'>>) {
 interface CalloutLook {
   icon?: IconName
   glyph?: ReactNode
-  /** Color del icono, la palabra y la raya. */
+  /** Color del icono y la palabra. */
   tint: string
   /** Fondo: los de estado, su relleno suave; los de contenido, neutro. */
   soft: string
-  bar: string
 }
 
 function calloutLook(kind: CalloutKind): CalloutLook {
-  const neutral = { tint: 'var(--text2)', soft: 'var(--fill1)', bar: 'var(--line-strong)' }
+  const neutral = { tint: 'var(--text2)', soft: 'var(--fill1)' }
   switch (kind) {
-    case 'note': return { icon: 'info', tint: 'var(--info)', soft: 'var(--info-soft)', bar: 'var(--info)' }
-    case 'tip': return { icon: 'lightbulb', tint: 'var(--success)', soft: 'var(--success-soft)', bar: 'var(--success)' }
-    case 'warning': return { icon: 'alert', tint: 'var(--warning)', soft: 'var(--warning-soft)', bar: 'var(--warning)' }
-    case 'mistake': return { icon: 'mistakes', tint: 'var(--danger)', soft: 'var(--danger-soft)', bar: 'var(--danger)' }
-    case 'question': return { icon: 'help', tint: 'var(--info)', soft: 'var(--info-soft)', bar: 'var(--info)' }
-    case 'examTip': return { icon: 'exam', tint: 'var(--accent-text)', soft: 'var(--accent-wash)', bar: 'var(--accent)' }
+    case 'note': return { icon: 'info', tint: 'var(--info)', soft: 'var(--info-soft)' }
+    case 'tip': return { icon: 'lightbulb', tint: 'var(--success)', soft: 'var(--success-soft)' }
+    case 'warning': return { icon: 'alert', tint: 'var(--warning)', soft: 'var(--warning-soft)' }
+    case 'mistake': return { icon: 'mistakes', tint: 'var(--danger)', soft: 'var(--danger-soft)' }
+    case 'question': return { icon: 'help', tint: 'var(--info)', soft: 'var(--info-soft)' }
+    case 'examTip': return { icon: 'exam', tint: 'var(--accent-text)', soft: 'var(--accent-wash)' }
     case 'definition': return { icon: 'book', ...neutral }
     case 'theorem': return { glyph: <Sigma size={15} strokeWidth={2} />, ...neutral }
     case 'remember': return { icon: 'pin', ...neutral }
@@ -72,8 +71,7 @@ export function CalloutBlockView({ block, ctx }: BlockProps<BlockOf<'callout'>>)
   const chat = ctx.mode === 'chat'
   return (
     <aside className={cx('relative isolate overflow-hidden', chat ? 'rounded-[12px] py-2.5 pl-4 pr-3' : 'rounded-[16px] py-4 pl-5 pr-5')} style={{ background: look.soft }} aria-label={t(`callout.${block.kind}`)}>
-      {/* la muestra de pigmento del tipo de nota en la esquina (antes, una raya de color a la izquierda) */}
-      <PigmentMark color={look.bar} size={chat ? 'sm' : 'md'} seed={block.kind} />
+      {/* el tipo de nota lo dicen su fondo y su icono (el pigmento es solo del examen) */}
       <div style={{ color: look.tint }}>
         <Eyebrow icon={look.icon} glyph={look.glyph} label={t(`callout.${block.kind}`)} className="mb-1" />
       </div>
@@ -171,7 +169,6 @@ export function RecapBlockView({ block, ctx }: BlockProps<BlockOf<'recap'>>) {
   const chat = ctx.mode === 'chat'
   return (
     <section ref={ref} className={cx('relative isolate overflow-hidden bg-surface border-[0.5px] border-line', chat ? 'rounded-[14px] p-3 pl-4' : 'rounded-[22px] p-6 pl-7')} style={{ boxShadow: ctx.mode === 'lesson' ? 'var(--e1)' : undefined }}>
-      <PigmentMark color="var(--success)" size={chat ? 'sm' : 'md'} />
       <div className={cx('font-serif text-text', chat ? 'text-[16px] font-medium' : 't-title2')}>
         <Inline text={block.title?.trim() || t('recap.title')} />
       </div>

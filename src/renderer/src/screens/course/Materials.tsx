@@ -1,23 +1,25 @@
-// Materiales: las fuentes del curso (apuntes, libro, exámenes de repaso, web…) con su tipo, páginas y procedencia; abrir el
-// original, leer el texto que extrajo Aula (por páginas) y añadir más: se leen al instante y pasan al curso en cuanto están
-// leídos (aunque se salga de la pestaña); «Ampliar el curso con ellos» es un paso opcional (J2-7).
+// Materiales: las fuentes del curso (apuntes, libro, exámenes de repaso, web…) en una lista con su tipo, páginas y
+// procedencia; abrir el original o leer el texto que extrajo Aula (por páginas). La primera fila añade más (o se sueltan los
+// archivos encima de la ventana): se leen al instante y pasan al curso en cuanto están leídos (aunque se salga de la
+// pestaña); «Ampliar el curso con ellos» es un paso opcional (J2-7).
 import { timecode } from '@shared/ingest'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import type { Pack, SourceChunk, SourceMeta } from '@shared/schema'
 import { decodeSourceChunk } from '@shared/schema'
 import type { MaterialView } from '@shared/generation/types'
-import { Button, Card, cx, Drawer, EmptyState, Icon, SectionTitle, Spinner, Stagger, StaggerItem, TextField, toast, type IconName } from '@renderer/design'
+import { Button, Card, cx, Drawer, EmptyState, Icon, SectionTitle, Spinner, Stagger, TextField, toast, type IconName } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { api, packAssetUrl } from '@renderer/lib/api'
 import { isDemo } from '@renderer/lib/demo'
 import { fmtDate } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
 import { openCourseSource } from '@renderer/screens/documents/lib'
-import { useInk } from '@renderer/screens/study/kit'
+import { FileDropOverlay, filePaths, useFileDrop } from '@renderer/screens/documents/FileDrop'
 import { searchKey } from '@renderer/screens/study/tabs'
 import { ResearchNote } from './ResearchNote'
+import { RULED_ROW } from './sections'
 
 const invoke = api.invoke as unknown as (m: string, a?: unknown) => Promise<unknown>
 const demoChunks = import.meta.glob<unknown>('../../../../../resources/demo-course/Packs/*/sources/*/chunks.json', { import: 'default' })
@@ -51,13 +53,11 @@ export function chunksByPage(chunks: SourceChunk[]): { page?: number; chunks: So
 }
 
 export function MaterialsTab({ pack }: { pack: Pack }) {
-  const { t } = useTranslation('study')
-  const ink = useInk(pack)
+  const { t } = useTranslation(['course', 'study'])
   const [reading, setReading] = useState<SourceMeta | null>(null)
   const [added, setAdded] = useState<MaterialView[]>([])
   const [draftId, setDraftId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  const [drag, setDrag] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const sources = pack.sources
   const saved = useMemo(() => new Set(sources.map((x) => x.id)), [sources])
@@ -80,29 +80,22 @@ export function MaterialsTab({ pack }: { pack: Pack }) {
       // al curso en cuanto se lean (lo hace el proceso principal, también si nos vamos de aquí)
       await invoke('create.attachToCourse', { packId: pack.id, draftId: r.draftId }).catch(() => undefined)
     } catch {
-      toast.error(t('tab.materials.addFailed'))
+      toast.error(t('study:tab.materials.addFailed'))
     } finally {
       setAdding(false)
     }
   }
   const addFiles = (files: FileList | null): void => {
-    if (!files?.length) return
-    const paths = [...files].map((f) => {
-      try {
-        return api.pathForFile(f)
-      } catch {
-        return ''
-      }
-    }).filter(Boolean)
-    void addPaths(paths)
+    if (files?.length) void addPaths(filePaths(files))
   }
+  const dragging = useFileDrop(addFiles)
   const useForCourse = async (): Promise<void> => {
     const titles = added.filter((m) => m.status === 'ready').map((m) => `«${m.title}»`).join(', ')
     try {
-      const r = (await invoke('generation.extend', { packId: pack.id, instruction: t('tab.materials.extendInstruction', { titles, draft: draftId ?? '' }) })) as { runId: string }
+      const r = (await invoke('generation.extend', { packId: pack.id, instruction: t('study:tab.materials.extendInstruction', { titles, draft: draftId ?? '' }) })) as { runId: string }
       navigate({ name: 'run', id: r.runId })
     } catch {
-      navigate({ name: 'chat', prompt: t('tab.materials.extendInstruction', { titles, draft: draftId ?? '' }) })
+      navigate({ name: 'chat', prompt: t('study:tab.materials.extendInstruction', { titles, draft: draftId ?? '' }) })
     }
   }
   const openOriginal = async (s: SourceMeta): Promise<void> => {
@@ -111,105 +104,87 @@ export function MaterialsTab({ pack }: { pack: Pack }) {
       // el original se abre en el lector de Aula (PDF con marcas, Aula al lado)
       openCourseSource(pack.id, s.id)
     } catch {
-      toast.warning(t('tab.materials.openFailed'))
+      toast.warning(t('study:tab.materials.openFailed'))
     }
   }
 
   return (
-    <div
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('Files')) {
-          e.preventDefault()
-          setDrag(true)
-        }
-      }}
-      onDragLeave={() => setDrag(false)}
-      onDrop={(e) => {
-        e.preventDefault()
-        setDrag(false)
-        addFiles(e.dataTransfer.files)
-      }}
-      className="relative"
-    >
-      <Stagger className="grid grid-cols-12 gap-4" gap={0.05}>
-        <StaggerItem className="col-span-12 @5xl:col-span-8">
-          <Card padded="lg" className="h-full">
-            <SectionTitle title={t('tab.materials.title')} detail={t('tab.materials.count', { count: sources.length })} />
-            {sources.length === 0 ? (
-              <>
-                <p className="t-callout text-text2 mt-2">{t('tab.materials.none')}</p>
-                <ResearchNote packId={pack.id} />
-              </>
-            ) : (
-              <div className="mt-2 flex flex-col">
-                {sources.map((s, i) => (
-                  <motion.div key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 10) * 0.04 }} className="group flex items-center gap-3.5 border-t-[0.5px] border-line-soft py-3 first:border-t-0">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-tile text-text2">
-                      <Icon name={KIND_ICON[s.kind.toLowerCase()] ?? 'file'} size={20} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block t-callout font-medium truncate">{s.title}</span>
-                      <span className="mt-0.5 flex flex-wrap items-center gap-x-1 t-footnote">
-                        <span className="uppercase tracking-wide">{s.kind}</span>
-                        {/* una grabación dice cuánto dura, no cuántas páginas tiene */}
-                        {s.duration ? <span>· {timecode(s.duration)}</span> : s.pages > 0 && <span>· {t('tab.materials.pages', { count: s.pages })}</span>}
-                        <span>· <span style={{ color: TRUST_TONE[s.trust] }}>{t(`tab.materials.trust.${s.trust}`)}</span></span>
-                        <span>· {fmtDate(s.addedAt, { day: 'numeric', month: 'short' })}</span>
-                        {s.status === 'processing' && <span className="inline-flex items-center gap-1 text-text2">· <Spinner size={10} /> {t('tab.materials.reading')}</span>}
-                        {s.status === 'failed' && <span className="text-danger">· {t('tab.materials.failed')}</span>}
-                        {s.warnings.length > 0 && <span className="text-warning">· {s.warnings[0]}</span>}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      <Button size="sm" variant="secondary" icon={<Icon name="book" size={13} />} disabled={s.status !== 'ready'} onClick={() => setReading(s)}>{t('tab.materials.read')}</Button>
-                      {(s.filename || s.url) && (
-                        <Button size="sm" variant="ghost" icon={<Icon name={s.url ? 'external' : 'folder-open'} size={13} />} onClick={() => void openOriginal(s)}>{t('tab.materials.original')}</Button>
-                      )}
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </StaggerItem>
-
-        <StaggerItem className="col-span-12 @5xl:col-span-4">
-          <Card padded="lg" mark={ink} className="flex h-full flex-col">
-            <h2 className="t-title2">{t('tab.materials.addTitle')}</h2>
-            <p className="t-callout text-text2 mt-1">{t('tab.materials.addBody')}</p>
-            <button
-              type="button"
-              onClick={() => file.current?.click()}
-              className={cx('mt-4 flex flex-col items-center gap-2 rounded-[18px] border-[1.5px] border-dashed px-4 py-7 text-center transition-colors', drag ? 'border-accent bg-accent-wash' : 'border-line-strong/40 hover:bg-fill1')}
-            >
-              {adding ? <Spinner size={18} /> : <Icon name="upload" size={22} className="text-text2" />}
-              <span className="t-ui font-medium">{t('tab.materials.drop')}</span>
-              <span className="t-footnote">{t('tab.materials.kinds')}</span>
+    <>
+      <Stagger gap={0.05}>
+        <Card enterAnim padded="lg">
+          <SectionTitle title={t('study:tab.materials.title')} detail={sources.length ? t('study:tab.materials.count', { count: sources.length }) : undefined} />
+          <div className="-mx-3 flex flex-col">
+            {/* la primera fila añade: abre el selector de archivos (o se sueltan encima de la ventana) */}
+            <button type="button" onClick={() => file.current?.click()} className={cx(RULED_ROW, 'group flex items-center gap-3.5 rounded-[14px] px-3 py-3 text-left transition-colors hover:bg-fill1')}>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] border border-dashed border-line-strong/50 text-accent-text">
+                {adding ? <Spinner size={16} /> : <Icon name="plus" size={18} />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block t-callout font-medium text-accent-text">{t('materials.add')}</span>
+                <span className="block t-footnote mt-0.5">{t('study:tab.materials.kinds')}</span>
+              </span>
             </button>
-            <input ref={file} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
-            <AnimatePresence initial={false}>
-              {added.length > 0 && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-4 flex flex-col gap-1.5">
-                  {added.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 t-callout">
-                      {m.status === 'processing' ? <Spinner size={12} /> : <Icon name={m.status === 'ready' ? 'check-circle' : 'alert-circle'} size={14} className={m.status === 'ready' ? 'text-success' : 'text-danger'} />}
-                      <span className="min-w-0 flex-1 truncate">{m.title}</span>
-                      {saved.has(m.id) ? (
-                        <span className="t-footnote text-success">{t('tab.materials.saved')}</span>
-                      ) : (
-                        m.pages > 0 && <span className="t-footnote">{t('tab.materials.pages', { count: m.pages })}</span>
-                      )}
-                    </div>
-                  ))}
-                  <Button className="mt-2" variant="primary" disabled={!added.some((m) => m.status === 'ready')} onClick={() => void useForCourse()}>{t('tab.materials.use')}</Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Card>
-        </StaggerItem>
+            {added.map((m) => (
+              <div key={m.id} className={cx(RULED_ROW, 'flex items-center gap-3.5 px-3 py-2.5 t-callout')}>
+                <span className="grid h-11 w-11 shrink-0 place-items-center">
+                  {m.status === 'processing' ? <Spinner size={14} /> : <Icon name={m.status === 'ready' ? 'check-circle' : 'alert-circle'} size={16} className={m.status === 'ready' ? 'text-text2' : 'text-danger'} />}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{m.title}</span>
+                {saved.has(m.id) ? (
+                  <span className="t-footnote text-text2">{t('study:tab.materials.saved')}</span>
+                ) : m.status === 'processing' ? (
+                  <span className="t-footnote">{t('study:tab.materials.reading')}</span>
+                ) : (
+                  m.pages > 0 && <span className="t-footnote">{t('study:tab.materials.pages', { count: m.pages })}</span>
+                )}
+              </div>
+            ))}
+            {sources.map((s, i) => (
+              <motion.div key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 10) * 0.04 }} className={cx(RULED_ROW, 'group flex items-center gap-3.5 px-3 py-3')}>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-tile text-text2">
+                  <Icon name={KIND_ICON[s.kind.toLowerCase()] ?? 'file'} size={20} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block t-callout font-medium truncate">{s.title}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-1 t-footnote">
+                    <span className="uppercase tracking-wide">{s.kind}</span>
+                    {/* una grabación dice cuánto dura, no cuántas páginas tiene */}
+                    {s.duration ? <span>· {timecode(s.duration)}</span> : s.pages > 0 && <span>· {t('study:tab.materials.pages', { count: s.pages })}</span>}
+                    <span>· <span style={{ color: TRUST_TONE[s.trust] }}>{t(`study:tab.materials.trust.${s.trust}`)}</span></span>
+                    <span>· {fmtDate(s.addedAt, { day: 'numeric', month: 'short' })}</span>
+                    {s.status === 'processing' && <span className="inline-flex items-center gap-1 text-text2">· <Spinner size={10} /> {t('study:tab.materials.reading')}</span>}
+                    {s.status === 'failed' && <span className="text-danger">· {t('study:tab.materials.failed')}</span>}
+                    {s.warnings.length > 0 && <span className="text-warning">· {s.warnings[0]}</span>}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <Button size="sm" variant="secondary" icon={<Icon name="book" size={13} />} disabled={s.status !== 'ready'} onClick={() => setReading(s)}>{t('study:tab.materials.read')}</Button>
+                  {(s.filename || s.url) && (
+                    <Button size="sm" variant="ghost" icon={<Icon name={s.url ? 'external' : 'folder-open'} size={13} />} onClick={() => void openOriginal(s)}>{t('study:tab.materials.original')}</Button>
+                  )}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+          {sources.length === 0 && !added.length && (
+            <>
+              <p className="t-callout text-text2 mt-3">{t('study:tab.materials.none')}</p>
+              <ResearchNote packId={pack.id} />
+            </>
+          )}
+          {/* lo añadido ya está en el curso; ampliarlo con ello es un paso aparte (J2-7) */}
+          {added.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-rule pt-4">
+              <p className="min-w-0 flex-1 t-callout text-text2">{t('study:tab.materials.addBody')}</p>
+              <Button variant="primary" disabled={!added.some((m) => m.status === 'ready')} onClick={() => void useForCourse()}>{t('study:tab.materials.use')}</Button>
+            </div>
+          )}
+          <input ref={file} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
+        </Card>
       </Stagger>
+      <FileDropOverlay show={dragging} title={t('materials.dropHere')} body={t('study:tab.materials.kinds')} />
       <ReaderDrawer pack={pack} source={reading} onClose={() => setReading(null)} />
-    </div>
+    </>
   )
 }
 

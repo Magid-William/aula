@@ -2,7 +2,7 @@
 // cada lección con sus bloques dibujados igual que en la app (en `mode: 'print'`: estáticos), hoja de fórmulas, glosario,
 // errores comunes y mis notas; la chuleta a dos columnas; el examen con su sitio para responder y la hoja de respuestas aparte;
 // las tarjetas para recortar (a doble cara, en espejo) y las diapositivas (una por página o en folleto con líneas).
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { Answer, Block, CardFigure } from '@shared/schema'
 import type { DocumentCard, DocumentItem, DocumentPlan, DocumentQuestion, DocumentSection, DocumentSlide } from '@shared/documents'
 import { blanks, choiceLetter, markCSS, printablePrompt, stableShuffle } from '@shared/documents'
@@ -10,6 +10,7 @@ import { CourseIcon, cx, toneForHue } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { SafeBlockView } from '@renderer/blocks/BlockView'
 import { makeBlockContext, type BlockContext } from '@renderer/blocks/types'
+import { removable, startFit, stepFit, trimCheat } from './cheatFit'
 import './print.css'
 
 /** Alto útil de la página (pulgadas) con los márgenes de print.ts. */
@@ -27,6 +28,8 @@ export function PrintDocument({ plan }: { plan: DocumentPlan }) {
     // los bloques de la app están pensados para leer a 17–18 px: se escalan a la letra del documento
     ['--pd-zoom' as string]: ((style.fontSize * 4) / 3 / 17).toFixed(3)
   }
+  // la chuleta se mide en pantalla: con el ancho del papel, sale igual que en el PDF
+  if (kind === 'cheatsheet') css.width = `${PAGE_WIDTH[style.paper]}in`
   return (
     <article className={cx('pd', !style.serif && 'pd-sans', !style.color && 'pd-gray', style.paper === 'letter' && 'pd-letter', kind === 'cheatsheet' && 'pd-cheat')} style={css} lang={plan.lang}>
       {kind === 'guide' || kind === 'summary' ? <Cover plan={plan} /> : kind === 'exam' || kind === 'cheatsheet' ? <Head plan={plan} /> : null}
@@ -35,6 +38,8 @@ export function PrintDocument({ plan }: { plan: DocumentPlan }) {
         <CardsSheets plan={plan} ctx={ctx} />
       ) : kind === 'slides' ? (
         <Slides plan={plan} ctx={ctx} />
+      ) : kind === 'cheatsheet' ? (
+        <CheatSections plan={plan} ctx={ctx} />
       ) : (
         <div className="pd-sections">
           {plan.sections.map((s, i) => <Section key={s.id + i} section={s} first={i === 0} plan={plan} ctx={ctx} />)}
@@ -103,6 +108,55 @@ function ExamHeader({ plan }: { plan: DocumentPlan }) {
 }
 
 const fmtPoints = (p: number): string => (Math.round(p) === p ? String(p) : p.toFixed(1))
+
+// MARK: - Chuleta en una página
+
+/** Ancho útil de la página (pulgadas) con los márgenes de print.ts: la chuleta se mide en pantalla con el ancho del papel. */
+const PAGE_WIDTH = { a4: 6.76, letter: 7 }
+/** Aire de seguridad bajo las columnas (px), para que el aviso final no salte a otra página por un redondeo. */
+const FIT_SLACK = 14
+
+/**
+ * Las secciones de la chuleta a dos columnas, en UNA página: se miden con la altura que queda en la hoja (columnas que se
+ * llenan una tras otra) y, si se salen, se quita lo menos importante (`cheatFit.ts`) hasta que cabe. Mientras mide va
+ * `aria-busy` (la ventana de impresión espera). Si ni así cabe, va entera en varias páginas.
+ */
+function CheatSections({ plan, ctx }: { plan: DocumentPlan; ctx: BlockContext }) {
+  const paper = plan.request.style.paper
+  const max = useMemo(() => removable(plan.sections), [plan.sections])
+  const [search, setSearch] = useState(startFit)
+  const [room, setRoom] = useState<number | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const sections = useMemo(() => trimCheat(plan.sections, search.cut), [plan.sections, search.cut])
+  useEffect(() => {
+    if (search.done) return
+    let alive = true
+    void (async () => {
+      // las fuentes (KaTeX, la serif) cambian la altura: se mide con todo cargado
+      await document.fonts.ready
+      await new Promise((r) => requestAnimationFrame(() => r(null)))
+      const el = box.current
+      const page = el?.closest('.pd')
+      if (!alive || !el || !page) return
+      if (room === null) {
+        // lo que queda de la hoja: la página menos la cabecera y el aviso del final
+        const other = page.getBoundingClientRect().height - el.getBoundingClientRect().height
+        setRoom(Math.max(120, PAGE_HEIGHT[paper].portrait * 96 - other - FIT_SLACK))
+        return
+      }
+      setSearch((s) => stepFit(s, el.scrollWidth <= el.clientWidth + 1, max))
+    })()
+    return () => {
+      alive = false
+    }
+  }, [search, room, max, paper])
+  const fixed = room !== null && !search.overflow
+  return (
+    <div ref={box} className={cx('pd-sections', fixed && 'pd-fit')} style={fixed ? { height: room } : undefined} aria-busy={!search.done}>
+      {sections.map((s, i) => <Section key={s.id + i} section={s} first={i === 0} plan={plan} ctx={ctx} />)}
+    </div>
+  )
+}
 
 // MARK: - Secciones e items
 
@@ -195,7 +249,7 @@ function Item({ item, plan, ctx }: { item: DocumentItem; plan: DocumentPlan; ctx
 /** Fórmulas de la chuleta: nombre, la fórmula y cuándo se usa, en una línea cada una. */
 function CompactFormulas({ group }: { group: { title: string; items: { name: string; tex: string; when?: string }[] } }) {
   return (
-    <div className="pd-item">
+    <div className="pd-item pd-formula-group">
       {group.title && <h3 className="pd-h4">{group.title}</h3>}
       {group.items.map((f, i) => (
         <div key={i} className="pd-formula">

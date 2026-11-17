@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { AulaMark, Button, Card, CourseIcon, Icon, ProgressBar, TextField, cx, pixelBurst, spring, toast } from '@renderer/design'
+import { AulaMark, Button, Card, CourseIcon, Icon, ProgressBar, TextField, cx, spring, toast } from '@renderer/design'
 import type { AssistantCard, AssistantCardAction } from '@shared/assistant/types'
 import { api } from '@renderer/lib/api'
 import { showLive, signInHere } from '@renderer/lib/live'
@@ -35,10 +35,9 @@ function CardView({ card, threadId, messageId }: { card: AssistantCard; threadId
   const [other, setOther] = useState('')
   const [local, setLocal] = useState<AssistantCard>(card)
   const c = local.state === card.state ? card : local
-  const answer = async (patch: { optionId?: string; answer?: string; approve?: boolean }, el?: HTMLElement) => {
+  const answer = async (patch: { optionId?: string; answer?: string; approve?: boolean }) => {
     const label = patch.optionId ? c.options.find((o) => o.id === patch.optionId)?.label : patch.answer
     setLocal({ ...c, state: patch.approve === undefined ? 'answered' : patch.approve ? 'approved' : 'denied', answer: label })
-    if (el && patch.approve !== false) pixelBurst(el, { count: 8 })
     try {
       await api.invoke('chat.answerCard', { threadId, messageId, cardId: c.id, ...patch })
     } catch {
@@ -62,7 +61,7 @@ function CardView({ card, threadId, messageId }: { card: AssistantCard; threadId
         ) : (
           <motion.div key="ask" className="mt-2.5 flex flex-wrap gap-2" exit={{ opacity: 0, y: -4, transition: { duration: 0.14 } }}>
             {c.options.map((o) => (
-              <Button key={o.id} size="md" variant="secondary" onClick={(e) => void answer({ optionId: o.id }, e.currentTarget)}>
+              <Button key={o.id} size="md" variant="secondary" onClick={() => void answer({ optionId: o.id })}>
                 {o.label}
               </Button>
             ))}
@@ -113,7 +112,7 @@ function CardView({ card, threadId, messageId }: { card: AssistantCard; threadId
             <Button size="md" variant="ghost" onClick={() => void answer({ approve: false })}>
               {t('deny')}
             </Button>
-            <Button size="md" variant="primary" onClick={(e) => void answer({ approve: true }, e.currentTarget)}>
+            <Button size="md" variant="primary" onClick={() => void answer({ approve: true })}>
               {c.actionLabel ?? t('allow')}
             </Button>
           </motion.div>

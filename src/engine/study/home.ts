@@ -4,11 +4,12 @@ import type { HomeCourse, HomeEvent, HomeExam, HomePlanItem, HomeSummary } from 
 import { localTimeZone, startOfDay } from '@engine/calendar/time'
 import { ownValue, emptyProgress, type ItemID, type Pack, type StudyProgress } from '@shared/schema'
 import { L } from '@engine/grading/messages'
+import type { PlanItem } from '@engine/learn'
 import type { SkillsInput, StudyLang } from './types'
 import { LearnBridge } from './bridge'
 import { Recorder } from './recorder'
 import { StudyStatsCalc } from './stats'
-import { hasAttempts, toHomePlanItem } from './overview'
+import { hasAttempts, planBudget, toHomePlanItem } from './overview'
 import { readyTopicCount, topicIsReady, writtenTopicCount } from './topics'
 import { dayKey, skillMap, toDate } from './util'
 
@@ -46,15 +47,31 @@ interface CourseDigest {
   /** ¿Hay algún intento? Sin él, la nota estimada no dice nada (se muestra «Sin empezar»). */
   started: boolean
   plan: HomePlanItem[]
+  /** Cuántas tarjetas y errores cubre el repaso del plan (lo que cabe en sus minutos). */
+  fit: Pick<DueFit, 'fitCards' | 'fitMistakes'>
   generating: boolean
 }
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
-/** «Repasa 4 tarjetas y 5 errores» (frases completas, con plural). */
-export function dueTitle(cards: number, mistakes: number, lang?: StudyLang): string {
-  const c = L(lang, plural(cards, 'tarjeta', 'tarjetas'), plural(cards, 'card', 'cards'))
-  const m = L(lang, plural(mistakes, 'error', 'errores'), plural(mistakes, 'mistake', 'mistakes'))
+/** Lo que cubre el repaso de hoy de un curso: cuántas tarjetas y errores tocan y cuántos caben en sus minutos (lo que dice el
+ *  plan). Sin paso en el plan, no cabe ninguno. */
+export interface DueFit {
+  cards: number
+  mistakes: number
+  /** Las que caben en el paso de tarjetas y en el de errores (como mucho, las que tocan). */
+  fitCards?: number
+  fitMistakes?: number
+}
+
+/** «Repasa 4 tarjetas y 8 de tus 33 errores»: lo que cubre la sesión, no todo lo pendiente (frases completas, con plural). */
+export function dueTitle(cards: number, mistakes: number, lang?: StudyLang, fit: Pick<DueFit, 'fitCards' | 'fitMistakes'> = {}): string {
+  const part = (n: number, k: number | undefined, es: [string, string], en: [string, string]): string => {
+    const all = L(lang, plural(n, ...es), plural(n, ...en))
+    return k !== undefined && k > 0 && k < n ? L(lang, `${k} de tus ${all}`, `${k} of your ${all}`) : all
+  }
+  const c = part(cards, fit.fitCards, ['tarjeta', 'tarjetas'], ['flashcard', 'flashcards'])
+  const m = part(mistakes, fit.fitMistakes, ['error', 'errores'], ['mistake', 'mistakes'])
   if (cards > 0 && mistakes > 0) return L(lang, `Repasa ${c} y ${m}`, `Review ${c} and ${m}`)
   if (cards > 0) return L(lang, `Repasa ${c}`, `Review ${c}`)
   if (mistakes > 0) return L(lang, `Repasa ${m}`, `Review ${m}`)
@@ -67,27 +84,30 @@ function upcoming(date: Date | null, now: Date): number {
   return date.getTime()
 }
 
-/** El plan de hoy de un curso. Mientras se crea, solo propone los temas ya listos (no los que se están escribiendo): estudiar
- * lo escrito no tiene que esperar a que termine la creación, aunque se haya parado por un límite. Los demás temas siguen
- * contando para los pesos: las razones («Vale 10 puntos…») son las mismas que con el curso terminado. */
-function coursePlan(pack: Pack, skills: SkillsInput, progress: StudyProgress, goal: number, now: Date, generating: boolean, lang?: StudyLang): HomePlanItem[] {
+/** El plan de hoy de un curso, con los minutos del curso (los mismos que «Estudiar ahora», Repasar y el Resumen: lo que sale
+ * aquí es lo que hace «Empezar el plan»). Mientras se crea, solo propone los temas ya listos (no los que se están escribiendo):
+ * estudiar lo escrito no tiene que esperar a que termine la creación, aunque se haya parado por un límite. Los demás temas
+ * siguen contando para los pesos: las razones («Vale 10 puntos…») son las mismas que con el curso terminado. */
+function coursePlan(pack: Pack, skills: SkillsInput, progress: StudyProgress, now: Date, generating: boolean, lang?: StudyLang): PlanItem[] {
   if (generating && readyTopicCount(pack.skills) === 0) return []
-  return LearnBridge.dailyPlan(pack, skills, progress, goal, now, lang, generating ? topicIsReady : undefined).filter((i) => i.kind !== 'rest').map((i) => toHomePlanItem(pack, i))
+  return LearnBridge.dailyPlan(pack, skills, progress, planBudget(progress), now, lang, generating ? topicIsReady : undefined).filter((i) => i.kind !== 'rest')
 }
 
-function digest(input: HomeCourseInput, progress: StudyProgress, goal: number, now: Date, lang?: StudyLang): CourseDigest {
+function digest(input: HomeCourseInput, progress: StudyProgress, now: Date, lang?: StudyLang): CourseDigest {
   const { pack } = input
   const skills = skillMap(input.skills)
   const generating = input.generating === true
   const r = LearnBridge.readiness(pack, progress, now, lang)
   const seen = hasAttempts(pack, progress)
+  const plan = coursePlan(pack, skills, progress, now, generating, lang)
   return {
     pack, progress, generating,
     dueCards: LearnBridge.dueCardCount(pack, skills, progress, now),
     // sin los errores sin habilidad ni los de ejercicios que ya no existen: no se pueden repasar
     dueMistakes: Recorder.dueMistakes(progress, now, skills).length,
     readiness: seen ? r.expectedScore : 0, low: seen ? r.low : 0, high: seen ? r.high : 0, coverage: r.coverage, started: seen,
-    plan: coursePlan(pack, skills, progress, goal, now, generating, lang)
+    plan: plan.map((i) => toHomePlanItem(pack, i)),
+    fit: { fitCards: plan.find((i) => i.kind === 'review' && i.id !== 'formulas')?.count, fitMistakes: plan.find((i) => i.kind === 'mistakes')?.count }
   }
 }
 
@@ -105,7 +125,7 @@ export function combinedPlan(courses: readonly CourseDigest[], goal: number, lim
     if (due.length) {
       items.push({
         id: `${c.pack.id}:due`, courseId: c.pack.id, courseTitle: c.pack.title, icon: c.pack.icon, hue: c.pack.hue, kind: c.dueCards > 0 ? 'cards' : 'mistakes',
-        title: dueTitle(c.dueCards, c.dueMistakes, lang), detail: L(lang, 'Toca hoy según la repetición espaciada', 'Due today by spaced repetition'),
+        title: dueTitle(c.dueCards, c.dueMistakes, lang, c.fit), detail: L(lang, 'Toca hoy según la repetición espaciada', 'Due today by spaced repetition'),
         minutes: due.reduce((s, i) => s + Math.max(0, i.minutes), 0)
       })
     }
@@ -147,7 +167,7 @@ export function buildHomeSummary(inputs: readonly HomeCourseInput[], progressByP
   const lang = settings.lang
   const goal = Math.max(5, Math.trunc(settings.dailyMinutes ?? 60) || 60)
   const tz = localTimeZone()
-  const courses = inputs.map((c) => digest(c, ownValue(progressByPack, c.pack.id) ?? emptyProgress(), goal, now, lang))
+  const courses = inputs.map((c) => digest(c, ownValue(progressByPack, c.pack.id) ?? emptyProgress(), now, lang))
   const plan = combinedPlan(courses, goal, Math.max(1, settings.planLimit ?? 4), now, lang)
   const progresses = courses.map((c) => c.progress)
   const stats = StudyStatsCalc.summary(progresses, now, 7, tz)

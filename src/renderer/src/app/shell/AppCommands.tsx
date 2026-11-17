@@ -35,12 +35,12 @@ function run(command: AppCommand): void {
     case 'askAula':
       return navigate({ name: 'chat' })
     case 'studyNow':
-      // el plan de hoy del primer curso que tenga algo pendiente (si no, Inicio)
+      // el plan de hoy del primer curso que tenga algo pendiente, ya en su primer paso (si no, Inicio)
       void api
         .invoke('home.summary')
         .then((h) => {
           const first = h.plan[0]
-          navigate(first ? { name: 'study', id: first.courseId, mode: 'plan' } : { name: 'home' })
+          navigate(first ? { name: 'study', id: first.courseId, mode: 'plan', start: true } : { name: 'home' })
         })
         .catch(() => navigate({ name: 'home' }))
       return

@@ -26,5 +26,7 @@ describe('la pantalla apuntada en la dirección', () => {
     // lo que no es un campo corto de la ruta se deja fuera (un mensaje ya escrito no se reenvía solo)
     expect(routeFromHash(hash({ name: 'chat', prompt: 'borra todo', conversation: 'c-1' }))).toEqual({ name: 'chat', conversation: 'c-1' })
     expect(routeFromHash('#' + 'a'.repeat(2000))).toBeNull()
+    // una sesión que arrancaba sola no vuelve a arrancar al recargar
+    expect(routeFromHash(routeToHash({ name: 'study', id: 'c1', mode: 'plan', start: true }))).toEqual({ name: 'study', id: 'c1', mode: 'plan' })
   })
 })

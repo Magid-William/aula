@@ -21,7 +21,9 @@
     "all": "All",
     "unread": "Unread",
     "label": "Filter by type",
-    "attention": "Needs you"
+    "attention": "Needs you",
+    "show": "Show: {{filter}}",
+    "selected": "selected"
   },
   "kinds": {
     "platform": "Platform",

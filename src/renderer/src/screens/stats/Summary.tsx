@@ -1,89 +1,56 @@
-// Las cifras en frases: minutos de estudio, días con estudio, acierto y racha (serif que cuenta), con la llamita pixel-art.
+// Las cifras en un párrafo en serif: cuánto has estudiado, en cuántos días, con qué acierto y tu racha. Cada cifra va dentro
+// de la frase (en tinta, contando hacia arriba) y nunca se enseña un cero: lo que no hay, no se dice.
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { motion } from 'motion/react'
-import { Card, AnimatedNumber, PixelFlame, cx } from '@renderer/design'
-import { STATS_WINDOW_DAYS, type StatsDay } from '@shared/ipc/stats'
+import { Card, AnimatedNumber } from '@renderer/design'
+import type { StatsDay } from '@shared/ipc/stats'
+import { percentSuffix } from '@renderer/lib/format'
 import { streak, totals } from './derive'
+import { slot, splitSlots } from './sentence'
+
+/** Una cifra dentro de la frase. */
+function Figure({ children }: { children: ReactNode }) {
+  return <span className="text-text tabular whitespace-nowrap">{children}</span>
+}
 
 export function SummaryCard({ days, today }: { days: StatsDay[]; today: string }) {
   const { t } = useTranslation('stats')
   const tot = totals(days)
   const s = streak(days, today)
-  const hours = Math.floor(Math.round(tot.minutes) / 60)
-  const mins = Math.round(tot.minutes) % 60
-  const details: string[] = []
-  if (s.current > 1) details.push(s.best > s.current ? t('summary.streakBest', { current: s.current, best: s.best }) : t('summary.streakIsBest', { current: s.current }))
-  else if (s.current === 1 && s.best <= 1) details.push(t('summary.streakOne'))
-  else if (s.best > 1) details.push(t('summary.bestOnly', { best: s.best }))
-  if (tot.attempts > 0) details.push(t('summary.exercises', { count: tot.attempts }))
-
-  const figures = [
-    {
-      key: 'time',
-      value: (
+  const total = Math.round(tot.minutes)
+  const hours = Math.floor(total / 60)
+  const mins = total % 60
+  const slots: Record<string, ReactNode> = {
+    time:
+      total === 0 ? (
+        t('summary.underMinute')
+      ) : (
         <>
-          {hours > 0 && (
-            <>
-              <AnimatedNumber value={hours} />
-              <span className="text-[0.55em] text-text2 ml-1 mr-2">h</span>
-            </>
-          )}
-          <AnimatedNumber value={mins} />
-          <span className="text-[0.55em] text-text2 ml-1">min</span>
+          {hours > 0 && <AnimatedNumber value={hours} />}
+          {hours > 0 && ' h'}
+          {hours > 0 && mins > 0 && ' '}
+          {mins > 0 && <AnimatedNumber value={mins} />}
+          {mins > 0 && ' min'}
         </>
       ),
-      label: t('summary.study')
-    },
-    {
-      key: 'days',
-      value: (
-        <>
-          <AnimatedNumber value={tot.activeDays} />
-          <span className="text-[0.55em] text-text2 ml-1.5">/ {STATS_WINDOW_DAYS}</span>
-        </>
-      ),
-      label: t('summary.activeDaysLabel')
-    },
-    ...(tot.accuracy != null
-      ? [
-          {
-            key: 'acc',
-            value: (
-              <>
-                <AnimatedNumber value={Math.round(tot.accuracy * 100)} />
-                <span className="text-[0.55em] text-text2 ml-0.5">%</span>
-              </>
-            ),
-            label: t('summary.accuracy')
-          }
-        ]
-      : []),
-    {
-      key: 'streak',
-      value: (
-        <span className="inline-flex items-center gap-2.5">
-          <AnimatedNumber value={s.current} />
-          <motion.span initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="inline-block -mt-1">
-            <PixelFlame size={26} lit={s.current > 0} />
-          </motion.span>
-        </span>
-      ),
-      label: t('summary.streak', { count: s.current })
-    }
-  ]
+    days: <AnimatedNumber value={tot.activeDays} />,
+    percent: tot.accuracy != null ? <AnimatedNumber value={Math.round(tot.accuracy * 100)} suffix={percentSuffix()} /> : null,
+    current: <AnimatedNumber value={s.current} />,
+    best: <AnimatedNumber value={s.best} />
+  }
+  const marks = { time: slot('time'), days: slot('days'), percent: slot('percent'), current: slot('current'), best: slot('best') }
+  const lead = tot.accuracy != null ? t('summary.leadAccuracy', { ...marks, count: tot.activeDays }) : t('summary.lead', { ...marks, count: tot.activeDays })
+  const streakText =
+    s.current > 1 ? (s.best > s.current ? t('summary.streakBest', marks) : t('summary.streakIsBest', marks)) : s.current === 1 && s.best <= 1 ? t('summary.streakOne') : s.best > 1 ? t('summary.bestOnly', marks) : null
+  const render = (text: string) =>
+    splitSlots(text).map((p, i) => (p.kind === 'text' ? <span key={i}>{p.text}</span> : <Figure key={i}>{slots[p.name]}</Figure>))
 
   return (
-    <Card enterAnim padded={false} className="h-full">
-      <div className={cx('grid', figures.length === 4 ? 'grid-cols-2 @3xl:grid-cols-4' : 'grid-cols-3')}>
-        {figures.map((f, i) => (
-          <div key={f.key} className="relative px-6 pt-6 pb-4">
-            {i > 0 && <span aria-hidden className="absolute left-0 top-6 bottom-4 w-[0.5px] bg-line hidden @3xl:block" />}
-            <div className="font-serif text-[40px] leading-[46px] tracking-[-0.02em] tabular text-text whitespace-nowrap">{f.value}</div>
-            <div className="t-callout text-text2 mt-0.5">{f.label}</div>
-          </div>
-        ))}
-      </div>
-      {details.length > 0 && <div className="px-6 pb-5 t-ui text-text2">{details.join(' · ')}</div>}
+    <Card enterAnim padded="lg">
+      <p className="max-w-[920px] font-serif text-[calc(24rem/15)] leading-[calc(35rem/15)] tracking-[-0.1px] text-text2 text-pretty">
+        {render(lead)}
+        {streakText && <> {render(streakText)}</>}
+      </p>
     </Card>
   )
 }

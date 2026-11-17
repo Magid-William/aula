@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { heatGrid, heatLevel, nothingToMeasure, rhythm, shiftKey, streak, sumDays, sumLevels, totals, weekdayMonday } from './derive'
+import { heatGrid, heatLevel, nothingToMeasure, rhythm, shiftKey, streak, sumDays, sumLevels, totals, washFor, weekdayMonday } from './derive'
 import type { StatsCourse, StatsDay } from '@shared/ipc/stats'
 
 const day = (date: string, minutes = 0, attempts = 0, correct = 0): StatsDay => ({ date, minutes, attempts, correct })
@@ -98,5 +98,11 @@ describe('niveles', () => {
   it('nada que medir', () => {
     expect(nothingToMeasure([course('a', [day('2026-10-01')])])).toBe(true)
     expect(nothingToMeasure([course('a', [day('2026-10-01', 4)])])).toBe(false)
+  })
+
+  it('la constancia va en aguada de grafito: el nivel 0 sin color (solo su contorno)', () => {
+    expect(washFor(0)).toBeNull()
+    expect([1, 2, 3, 4].map(washFor)).toEqual(['var(--wash-1)', 'var(--wash-2)', 'var(--wash-3)', 'var(--wash-4)'])
+    expect(washFor(5)).toBeNull()
   })
 })

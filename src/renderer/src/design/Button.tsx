@@ -43,6 +43,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type="button"
       disabled={disabled || loading}
+      // la variante, a la vista de las pruebas: como mucho un botón principal por vista
+      data-variant={variant}
       whileTap={{ scale: 0.97 }}
       transition={spring.snappy}
       className={cx(

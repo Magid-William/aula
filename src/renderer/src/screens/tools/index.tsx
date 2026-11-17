@@ -1,14 +1,15 @@
-// Herramientas: galería de baldosas animadas; al abrir una, ocupa toda la pantalla (y se puede fijar flotante).
-import { Suspense } from 'react'
+// Herramientas: la galería es un cajón a dos columnas (la loseta a tinta, el nombre en serif y una línea de qué hace, con
+// filetes entre filas). Las fijadas van aparte, en su grupo, arriba; la chincheta de las que se pueden fijar sale al pasar por
+// encima (fija, solo en las fijadas). Al abrir una, ocupa toda la pantalla (y se puede fijar flotante).
+import { Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { ArrowLeft } from 'lucide-react'
-import { Card, PageHeader, Spinner, Stagger } from '@renderer/design'
-import { useAmbient } from '@renderer/design/ambient'
+import { Spinner, cx, enter } from '@renderer/design'
 import { useRoute, navigate } from '@renderer/app/router'
 import { useScreenTitle } from '@renderer/app/title'
-import { TOOLS, toolById } from '@renderer/tools/registry'
-import { PinToolButton } from '@renderer/tools/floating'
+import { TOOLS, pinnedGroups, toolById, type ToolDef } from '@renderer/tools/registry'
+import { PinToolButton, usePinnedTools } from '@renderer/tools/floating'
 import { ToolTile } from '@renderer/tools/ToolTile'
 
 export default function ToolsScreen() {
@@ -16,8 +17,6 @@ export default function ToolsScreen() {
   const route = useRoute()
   const toolId = route.name === 'tools' ? route.tool : undefined
   const tool = toolById(toolId)
-  // los iconos flotan solo mientras alguien usa la app (design/ambient.ts)
-  const moving = useAmbient()
   useScreenTitle(tool ? t(`${tool.id}.name`) : t('title'), tool?.floating ? <PinToolButton id={tool.id} onPinned={() => navigate({ name: 'tools' })} /> : null, [tool?.id])
 
   // sus comandos de ⌘K los registra el armazón (app/shell/commands.tsx), no esta pantalla
@@ -36,34 +35,62 @@ export default function ToolsScreen() {
     )
   }
 
+  return <Gallery />
+}
+
+/** La galería: el título visible es el de la barra de arriba (aquí, solo para lectores de pantalla). */
+function Gallery() {
+  const { t } = useTranslation('tools')
+  // las fijadas, en su grupo y en el orden de al llegar (fijar una no la hace saltar bajo el ratón)
+  const [{ pinned, rest }] = useState(() => pinnedGroups(TOOLS, usePinnedTools.getState().pinned))
   return (
-    <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-2 pb-24">
-      <PageHeader title={t('title')} subtitle={t('subtitle')} className="mb-6" />
-      <Stagger className="grid gap-4 grid-cols-1 @2xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4">
-        {TOOLS.map((x, i) => {
-          return (
-            <Card key={x.id} enterAnim interactive padded={false} onClick={() => navigate({ name: 'tools', tool: x.id })} className="group min-h-[164px]">
-              <div className="relative p-6 flex flex-col h-full">
-                {/* cada herramienta, en su loseta dibujada a mano y con su pigmento (tools/ToolTile.tsx) */}
-                <motion.div
-                  className="w-12 h-12"
-                  animate={moving ? { y: [0, -2, 0] } : { y: 0 }}
-                  transition={moving ? { duration: 6 + (i % 3), repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 } : { duration: 0.6 }}
-                >
-                  <ToolTile tool={x} size={48} />
-                </motion.div>
-                {x.floating && (
-                  <div className="absolute right-4 top-4">
-                    <PinToolButton id={x.id} look="icon" />
-                  </div>
-                )}
-                <div className="t-title2 text-[19px] mt-4">{t(`${x.id}.name`)}</div>
-                <div className="t-callout text-text2 mt-0.5">{t(`${x.id}.desc`)}</div>
-              </div>
-            </Card>
-          )
-        })}
-      </Stagger>
+    <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-4 pb-24">
+      <div className="mx-auto max-w-[1080px]">
+        <h1 className="sr-only">{t('title')}</h1>
+        <p className="t-callout text-text2 max-w-[640px] text-pretty">{t('subtitle')}</p>
+        {pinned.length > 0 && <ToolGroup label={t('pinnedGroup')} tools={pinned} className="mt-7" />}
+        <ToolGroup label={pinned.length > 0 ? t('allGroup') : undefined} tools={rest} className={pinned.length > 0 ? 'mt-8' : 'mt-6'} />
+      </div>
     </div>
+  )
+}
+
+/** Un grupo del cajón: su nombre (si hay más de uno) y las filas a dos columnas, con filetes. */
+function ToolGroup({ label, tools, className }: { label?: string; tools: ToolDef[]; className?: string }) {
+  return (
+    <section className={className}>
+      {label && <h2 className="mb-2 t-footnote font-semibold text-text2">{label}</h2>}
+      <motion.ul
+        className="grid grid-cols-1 gap-x-10 border-t border-rule @3xl:grid-cols-2"
+        initial="hidden"
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.03 } } }}
+      >
+        {tools.map((x) => <ToolRow key={x.id} tool={x} />)}
+      </motion.ul>
+    </section>
+  )
+}
+
+/** Una herramienta del cajón: la fila entera la abre (Intro o Espacio) y, si puede flotar, su chincheta va al lado (a la vista
+ *  al pasar por encima o al enfocarla; siempre, si ya está fijada). */
+function ToolRow({ tool }: { tool: ToolDef }) {
+  const { t } = useTranslation('tools')
+  const pinned = usePinnedTools((s) => s.pinned.includes(tool.id))
+  return (
+    <motion.li variants={enter} className="group/tool flex items-center gap-1 border-b border-rule py-1.5">
+      <button type="button" onClick={() => navigate({ name: 'tools', tool: tool.id })} className="-ml-2.5 flex min-w-0 flex-1 items-center gap-4 rounded-[14px] px-2.5 py-2.5 text-left transition-colors hover:bg-fill1">
+        <ToolTile tool={tool} size={40} />
+        <span className="min-w-0 flex-1">
+          <span className="block font-serif text-[calc(18rem/15)] leading-[calc(23rem/15)] font-medium tracking-[-0.1px] text-text">{t(`${tool.id}.name`)}</span>
+          <span className="block t-callout text-text2">{t(`${tool.id}.desc`)}</span>
+        </span>
+      </button>
+      {tool.floating && (
+        <span className={cx('transition-opacity', !pinned && 'opacity-0 group-hover/tool:opacity-100 focus-within:opacity-100')}>
+          <PinToolButton id={tool.id} look="icon" />
+        </span>
+      )}
+    </motion.li>
   )
 }

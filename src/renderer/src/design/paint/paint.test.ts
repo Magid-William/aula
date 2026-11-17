@@ -4,7 +4,7 @@ import { createNoise, fbmField } from './noise'
 import { area, deform, ellipse, superellipse } from './shapes'
 import { brushOutline, dryBrush, handLoop, handRoundRect, pathLength, pressureProfile, resample, toPathData } from './brush'
 import { markPaths } from './markPaths'
-import { arrowInk, borderInk, burstInk, checkInk, coverLineInk, handPace, raysInk, ringInk, strikeInk, tileInk, underlineInk } from './drawings'
+import { BURST_ARC_LEFT, arrowInk, borderInk, burstInk, checkInk, coverLineInk, handPace, raysInk, ringInk, strikeInk, tileInk, underlineInk } from './drawings'
 
 describe('azar con semilla', () => {
   it('la misma semilla da siempre la misma serie (mismo dibujo en cada arranque)', () => {
@@ -149,6 +149,18 @@ describe('dibujos a mano (vectores que se dibujan)', () => {
     expect(burst.strokes.length).toBe(6)
     for (let i = 1; i < 6; i++) expect(burst.strokes[i].at).toBeGreaterThan(burst.strokes[i - 1].at)
     expect(raysInk(106, 106, 'vacío', 53, 70, 5).strokes.length).toBe(6)
+  })
+  it('junto a una marca con texto a la derecha, las rayitas salen solo por arriba y a la izquierda', () => {
+    const burst = burstInk(64, 64, 'acierto', 5, BURST_ARC_LEFT)
+    expect(burst.strokes.length).toBe(5)
+    // ningún trazo pasa a la derecha del centro más allá de un tercio del radio, ni por debajo de él
+    for (const s of burst.strokes) {
+      const nums = (s.spine.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        expect(nums[i]).toBeLessThan(32 + 12)
+        expect(nums[i + 1]).toBeLessThan(32)
+      }
+    }
   })
   it('la flecha: el cuerpo y luego las dos alas de la punta', () => {
     const a = arrowInk(96, 64, 'flecha', { x: 88, y: 6 }, { x: 10, y: 44 })

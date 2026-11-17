@@ -62,6 +62,8 @@ export interface PlanItem {
   minutes: number
   /** Por qué está, con cifras concretas («Vale 12 puntos y vas en 35 %.»). */
   reason: string
+  /** Repaso de tarjetas y de errores: cuántas caben en sus minutos (las que cubre el paso; nunca más de las que tocan). */
+  count?: number
 }
 
 export interface PlannerOptions extends TextOptions {
@@ -240,7 +242,7 @@ class Builder {
       reason = this.tr(`Tienes ${n} tarjetas vencidas: hoy te da tiempo de unas ${k}; empieza por las más atrasadas.`,
         `You have ${n} overdue cards: today you have time for about ${k}; start with the most overdue ones.`)
     }
-    this.items.push({ id: 'review', kind: 'review', skillID: null, title: this.tr('Repaso de tarjetas', 'Flashcard review'), minutes, reason })
+    this.items.push({ id: 'review', kind: 'review', skillID: null, title: this.tr('Repaso de tarjetas', 'Flashcard review'), minutes, reason, count: Math.min(n, Math.max(1, capacity)) })
   }
 
   private addMistakes(finalMode: boolean, daysLeft: number | null): void {
@@ -268,7 +270,7 @@ class Builder {
       reason = this.tr(`Tienes ${n} errores por repasar: hoy te da tiempo de unos ${k}; empieza por los más recientes.`,
         `You have ${n} mistakes to review: today you have time for about ${k}; start with the most recent ones.`)
     }
-    this.items.push({ id: 'mistakes', kind: 'mistakes', skillID: null, title: this.tr('Repaso de errores', 'Mistake review'), minutes, reason })
+    this.items.push({ id: 'mistakes', kind: 'mistakes', skillID: null, title: this.tr('Repaso de errores', 'Mistake review'), minutes, reason, count: Math.min(n, Math.max(1, capacity)) })
   }
 
   /** Los temas que se pueden estudiar ya (los demás solo cuentan para los pesos). */

@@ -1,5 +1,6 @@
 // Estudiar: los modos a pantalla completa (la barra lateral sigue) con una columna de lectura tranquila, la cápsula de
-// progreso que flota arriba y atajos de teclado: aprender, practicar, tarjetas, simulacro, errores y el plan de hoy.
+// progreso que flota arriba y atajos de teclado: aprender, practicar, tarjetas, simulacro, errores y el plan de hoy. El tutor,
+// en una ventana ancha, es una columna al lado que empuja el estudio a la izquierda (TutorPanel).
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, EmptyState, Spinner } from '@renderer/design'
@@ -43,12 +44,15 @@ export default function StudyScreen() {
 
   const key = `${r.mode}:${r.skill ?? ''}`
   return (
-    <>
-      {/* el texto del curso (RichText) va en su idioma; la interfaz, en el suyo */}
-      <StudyLanguage.Provider value={data.pack.language}>{modeView(r.mode, key, data, r.skill)}</StudyLanguage.Provider>
+    // el tutor, en una ventana ancha, va al lado y empuja el estudio a la izquierda (no lo tapa)
+    <div className="flex min-h-0 flex-1">
+      <div data-study-main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* el texto del curso (RichText) va en su idioma; la interfaz, en el suyo */}
+        <StudyLanguage.Provider value={data.pack.language}>{modeView(r.mode, key, data, r.skill)}</StudyLanguage.Provider>
+      </div>
       {/* en el simulacro no hay tutor: «sin pistas ni explicaciones hasta entregar» */}
       {r.mode !== 'exam' && <TutorPanel screenKey={routeKey(r)} />}
-    </>
+    </div>
   )
 }
 

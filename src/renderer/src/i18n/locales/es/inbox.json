@@ -21,7 +21,9 @@
     "all": "Todo",
     "unread": "Sin leer",
     "label": "Filtrar por tipo",
-    "attention": "Te necesita"
+    "attention": "Te necesita",
+    "show": "Mostrar: {{filter}}",
+    "selected": "seleccionado"
   },
   "kinds": {
     "platform": "Plataforma",

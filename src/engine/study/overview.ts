@@ -51,11 +51,17 @@ export function minutesOn(progress: StudyProgress, now: Date): number {
 /** ¿Hay algún intento en el curso? */
 export const hasAttempts = (pack: Pack, progress: StudyProgress): boolean => pack.skills.some((s) => (ownValue(progress.skills, s.id)?.attempts ?? 0) > 0)
 
+/** Los minutos del plan de hoy de un curso (su ajuste; 45 por defecto). Una sola fuente para Hoy, «Estudiar ahora», Repasar
+ *  y el Resumen: así dicen las mismas cifras (cuántas tarjetas y errores caben y en cuánto tiempo). */
+export function planBudget(progress: StudyProgress, minutes?: number): number {
+  return Math.max(5, Math.trunc(minutes ?? progress.settings.dailyMinutes) || 45)
+}
+
 export function buildCourseOverview(pack: Pack, skillsInput: SkillsInput, progress: StudyProgress, now: Date, lang?: StudyLang, minutesGoal?: number): CourseOverview {
   const skills = skillMap(skillsInput)
   const r = LearnBridge.readiness(pack, progress, now, lang)
   const seen = hasAttempts(pack, progress)
-  const goal = Math.max(5, Math.trunc(minutesGoal ?? progress.settings.dailyMinutes ?? 45) || 45)
+  const goal = planBudget(progress, minutesGoal)
   const plan = LearnBridge.dailyPlan(pack, skills, progress, goal, now, lang).filter((i) => i.kind !== 'rest').map((i) => toHomePlanItem(pack, i))
   const dueMistakes = Recorder.dueMistakes(progress, now, skills)
   const views: SkillProgressView[] = orderedSkills(pack).map((ref) => {

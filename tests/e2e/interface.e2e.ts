@@ -1,8 +1,8 @@
 // Interfaz (auditoría final A4/A5, FIX2-UI): el curso de ejemplo se marca, las fórmulas van en el idioma de la interfaz, el
 // menú «Explore» no se corta, las tarjetas se abren con el teclado, «Inbox» no se confunde con las actualizaciones, la píldora
-// de las pestañas va debajo de las etiquetas, el monitor no se solapa al terminar, el foco no sale de las capas modales, la
-// gota no tapa controles, el movimiento reducido no deja la pantalla vacía, el texto al 130 % no se monta y el lector PDF no
-// retiene memoria al entrar y salir. (Las páginas se leen con cadenas: este proyecto de pruebas no carga los tipos del DOM.)
+// de las pestañas va debajo de las etiquetas, el monitor no se solapa al terminar, el foco no sale de las capas modales, el
+// movimiento reducido no deja la pantalla vacía, el texto al 130 % no se monta y el lector PDF no retiene memoria al entrar y
+// salir. (Las páginas se leen con cadenas: este proyecto de pruebas no carga los tipos del DOM.)
 import { test, expect, type Page } from 'playwright/test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -27,6 +27,13 @@ test('A4-P1-1 · el curso de ejemplo se marca y su examen no cuenta en el resume
   await expect(nav.getByText('Example course').first()).toBeVisible()
   await expect(nav.getByText(/Exam in \d+ days/)).toHaveCount(0)
   await expect(page.locator('main').getByText('Example', { exact: true }).first()).toBeVisible()
+  // Hoy en el primer arranque: el saludo invita a crear tu curso (el único botón ladrillo) y el examen de ejemplo no sale
+  const main = page.locator('main')
+  await expect(main.getByText('This is an example course. When is your exam?')).toBeVisible()
+  await expect(main.getByRole('button', { name: 'Create my course' })).toBeVisible()
+  await expect(main.getByRole('button', { name: 'Or start with the example' })).toBeVisible()
+  expect(await js<number>(page, `[...document.querySelectorAll('main [data-variant="primary"]')].filter((b) => b.getClientRects().length > 0).length`)).toBe(1)
+  await expect(main.getByText(/^days? until$|Likely grade|Your grade appears/)).toHaveCount(0)
   await go(page, { name: 'calendar' })
   await expect(page.getByText(/No exams in the next two weeks/)).toBeVisible()
   await go(page, { name: 'course', id: C })
@@ -82,20 +89,30 @@ test('A4-P1-4 · una tarjeta que se pulsa es un botón y se abre con Intro', asy
   await app.close()
 })
 
-test('A4-P1-5 · en inglés la bandeja se llama «Inbox» (no «Updates», que son las actualizaciones)', async () => {
-  const { app, page } = await launch({ home: home() })
+test('A4-P1-5 · en inglés la bandeja se llama «Inbox» (no «Updates»), filtra con un menú y el resumen de la mañana se ve con sus datos', async () => {
+  const { app, page } = await launch({ home: home(), env: { AULA_SEED: 'demo' } })
   const nav = page.locator('nav[aria-label="Aula"]')
   await expect(nav.getByRole('button', { name: /^Inbox/ })).toBeVisible()
   await expect(nav.getByRole('button', { name: /^Updates/ })).toHaveCount(0)
   await go(page, { name: 'inbox' })
   await expect(page.getByRole('tab', { name: /^Inbox/ })).toBeVisible()
+  // la vista previa del resumen de la mañana es su primera línea: con las cifras, no un «Today:» suelto
+  await expect(page.getByText(/^Today: 1 class, 1 deadline soon,? and 15 min of study\.$/).first()).toBeVisible()
+  await expect(page.getByText('Today:', { exact: true })).toHaveCount(0)
+  // el filtro es un menú «Show: …» (no otra cinta) y el lector oye la opción elegida y la cifra aparte
+  await page.getByRole('button', { name: 'Show: All' }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu.getByRole('menuitem')).toHaveCount(3)
+  await expect(menu.getByRole('menuitem', { name: 'All, selected', exact: true })).toBeVisible()
+  await menu.getByRole('menuitem', { name: /^Unread, \d+$/ }).click()
+  await expect(page.getByRole('button', { name: 'Show: Unread' })).toBeVisible()
   await app.close()
 })
 
 test('A4-P1-6 · la píldora de las pestañas es una sola, va antes (debajo) de las etiquetas y acaba en la elegida', async () => {
   const { app, page } = await launch({ home: home() })
   await go(page, { name: 'course', id: C })
-  await page.getByRole('tab', { name: 'Practice', exact: true }).click()
+  await page.getByRole('tab', { name: 'Review', exact: true }).click()
   await page.waitForTimeout(600)
   const r = await js<{ pills: number; first: boolean; dx: number; dw: number }>(page, `(() => {
     const list = [...document.querySelectorAll('main [role="tablist"]')].find((l) => l.querySelector('[data-tab-pill]'))
@@ -161,7 +178,7 @@ test('A4-P2-11 · Tab no sale de un diálogo, de ⌘K ni de la bienvenida', asyn
   await app.close()
 
   const first = await launch({ home: home({}, { onboarded: false }), onboarding: true })
-  await expect(first.page.getByText('Hi, I’m Aula')).toBeVisible()
+  await expect(first.page.getByText('Your notes become a course.')).toBeVisible()
   for (let i = 0; i < 8; i++) {
     await first.page.keyboard.press('Tab')
     expect(await js<boolean>(first.page, '!!document.activeElement.closest("[aria-modal=true]")'), `bienvenida, Tab ${i + 1}`).toBe(true)
@@ -187,45 +204,17 @@ test('A4-P2-9/10/12 · la pista no se sale ni se queda pegada; el foco no cambia
   await page.keyboard.press('Escape')
   // puntos de progreso con nombre
   expect(await js<number>(page, 'document.querySelectorAll("[role=group] > button:not([aria-label])").length')).toBe(0)
-  // el anillo de foco respeta el radio de la tarjeta
+  // el anillo de foco respeta el radio de la fila (la galería de herramientas es una lista: filas de 14 px de radio)
   await go(page, { name: 'tools' })
   const card = page.getByRole('button', { name: /Calculator/ }).first()
   await card.focus()
   await page.keyboard.press('Shift+Tab')
   await page.keyboard.press('Tab')
-  expect(await js<string>(page, 'getComputedStyle(document.activeElement).borderTopLeftRadius')).toBe('22px')
+  expect(await js<string>(page, 'getComputedStyle(document.activeElement).borderTopLeftRadius')).toBe('14px')
   // la barra lateral plegada: todos sus botones con nombre
   await page.getByRole('button', { name: 'Collapse sidebar' }).click()
   await page.waitForTimeout(400)
   expect(await js<string[]>(page, `[...document.querySelectorAll('nav[aria-label="Aula"] button')].filter((b) => !(b.getAttribute('aria-label') || b.textContent.trim())).map((b) => b.outerHTML.slice(0, 80))`)).toEqual([])
-  await app.close()
-})
-
-test('A4-P2-13 · con la vista quieta, la gota nunca tapa un control (y escondida no se enfoca)', async () => {
-  const { app, page } = await launch({ home: home() })
-  await page.setViewportSize({ width: 1000, height: 680 })
-  for (const route of [{ name: 'settings' }, { name: 'home' }, { name: 'inbox' }]) {
-    await go(page, route)
-    await page.waitForTimeout(1600)
-    for (let step = 0; step < 12; step++) {
-      const res = await js<{ visible: boolean; covered: string[]; more: boolean }>(page, `(() => {
-        const orb = document.querySelector('.aula-orb'); if (!orb) return { visible: false, covered: [], more: false }
-        const drop = orb.firstElementChild
-        const visible = getComputedStyle(drop).visibility !== 'hidden'
-        const o = { left: orb.offsetLeft, top: orb.offsetTop, right: orb.offsetLeft + orb.offsetWidth, bottom: orb.offsetTop + orb.offsetHeight }
-        const covered = visible ? [...document.querySelectorAll('main button, main [role="switch"], main input, main a[href], main [role="button"], main [role="tab"]')].filter((el) => {
-          const r = el.getBoundingClientRect(); const w = Math.max(0, Math.min(o.right, r.right) - Math.max(o.left, r.left)); const h = Math.max(0, Math.min(o.bottom, r.bottom) - Math.max(o.top, r.top))
-          return r.width > 0 && w * h / Math.max(1, r.width * r.height) >= 0.2 && getComputedStyle(el).visibility !== 'hidden'
-        }).map((el) => (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 40)) : []
-        const sc = [...document.querySelectorAll('main *')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 20 && e.clientHeight > 200).sort((a, b) => b.clientHeight - a.clientHeight)[0]
-        const before = sc ? sc.scrollTop : 0; if (sc) sc.scrollTop += 140
-        return { visible, covered, more: !!sc && sc.scrollTop !== before }
-      })()`)
-      expect(res.covered, `${route.name}, paso ${step}`).toEqual([])
-      if (!res.more) break
-      await page.waitForTimeout(1300)
-    }
-  }
   await app.close()
 })
 
@@ -260,6 +249,31 @@ test('A4-P2-17 · con texto al 130 % la cápsula de la lección no se monta y la
   })()`)
   expect(pill.overlap).toBeLessThanOrEqual(0.5)
   await app.close()
+})
+
+test('A4-P2-17b · el tamaño del texto escala la tipografía de verdad (al 130 %, el texto mide 1,3 veces)', async () => {
+  const measure = async (textScale: number) => {
+    const { app, page } = await launch({ home: home({ textScale }) })
+    await go(page, { name: 'course', id: C })
+    await expect(page.locator('main [role="tablist"]').first()).toBeVisible()
+    const px = await js<{ body: number; caption: number; real: number }>(page, `(() => {
+      const probe = (cls) => { const el = document.createElement('p'); el.className = cls; document.body.append(el); const v = parseFloat(getComputedStyle(el).fontSize); el.remove(); return v }
+      const real = document.querySelector('main .t-ui, main .t-callout, main .t-body')
+      return { body: probe('t-body'), caption: probe('t-caption'), real: real ? parseFloat(getComputedStyle(real).fontSize) : 0 }
+    })()`)
+    await app.close()
+    return px
+  }
+  const normal = await measure(1)
+  const big = await measure(1.3)
+  expect(normal.body).toBeCloseTo(15, 1)
+  // la letra más pequeña se lee: 12 px
+  expect(normal.caption).toBeCloseTo(12, 1)
+  expect(big.body / normal.body).toBeCloseTo(1.3, 2)
+  expect(big.caption / normal.caption).toBeCloseTo(1.3, 2)
+  // y lo que se ve en pantalla crece con ella
+  expect(normal.real).toBeGreaterThan(0)
+  expect(big.real / normal.real).toBeCloseTo(1.3, 2)
 })
 
 test('A5-P1-2 · el temporizador avisa con la ventana fuera de la vista (lo decide el proceso principal)', async () => {

@@ -1,9 +1,9 @@
-// Estadísticas: las cifras en frases, la constancia en un mapa de 12 semanas que se enciende píxel a píxel, tu ritmo,
-// el dominio por semana, el acierto por tema y la nota estimada de cada curso con su intervalo. Nada se inventa: todo sale
-// del progreso guardado (ver src/shared/ipc/stats.ts).
+// Estadísticas: las cifras en un párrafo, la constancia en un mapa de 12 semanas en aguada de grafito, tu ritmo, el dominio
+// por semana, el acierto por tema y la nota estimada de cada curso con su intervalo. Nada se inventa: todo sale del progreso
+// guardado (ver src/shared/ipc/stats.ts). El título visible es el de la barra de arriba (aquí, solo para lectores de pantalla).
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Stagger, StaggerItem, Select, EmptyState, Button, CourseIcon, PageHeader } from '@renderer/design'
+import { Stagger, StaggerItem, Select, EmptyState, Button, CourseIcon } from '@renderer/design'
 import { useRpc } from '@renderer/lib/useRpc'
 import { isDemo } from '@renderer/lib/demo'
 import { useScreenTitle } from '@renderer/app/title'
@@ -83,17 +83,17 @@ export default function StatsScreen() {
         }
       />
     )
-  return <StatsBody key={filter} stats={stats} filterTitle={chosen?.title ?? null} courses={courses} />
+  return <StatsBody key={filter} stats={stats} filtered={!!chosen} courses={courses} />
 }
 
-function StatsBody({ stats, courses, filterTitle }: { stats: StatsData; courses: StatsData['courses']; filterTitle: string | null }) {
+function StatsBody({ stats, courses, filtered }: { stats: StatsData; courses: StatsData['courses']; filtered: boolean }) {
   const { t } = useTranslation('stats')
   const days = useMemo(() => sumDays(courses), [courses])
   const topics = useMemo(() => sortedTopics(courses), [courses])
   const levels = useMemo(() => sumLevels(courses), [courses])
   return (
-    <div className="@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pt-1 pb-24">
-      <PageHeader title={t('title')} subtitle={filterTitle ? t('subtitleOne', { course: filterTitle }) : t('subtitleAll')} className="mb-5" />
+    <div className="@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pt-1 pb-10">
+      <h1 className="sr-only">{t('title')}</h1>
       <Stagger className="grid grid-cols-12 gap-4" gap={0.05}>
         <StaggerItem className="col-span-12">
           <SummaryCard days={days} today={stats.today} />
@@ -117,7 +117,7 @@ function StatsBody({ stats, courses, filterTitle }: { stats: StatsData; courses:
           </StaggerItem>
         ))}
         {/* los logros son de todo tu estudio (no se filtran por curso) */}
-        {!filterTitle && (
+        {!filtered && (
           <StaggerItem className="col-span-12">
             <AchievementsCard />
           </StaggerItem>

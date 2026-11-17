@@ -16,7 +16,6 @@ import { routeFromHash, routeToHash } from './routeHash'
 import { TopBar } from './shell/TopBar'
 import { useTitleStore } from './title'
 import { CommandPalette } from './shell/CommandPalette'
-import { OrbLauncher } from './shell/OrbLauncher'
 import { navigate, useNav, routeKey, ScreenScopeContext, type Route } from './router'
 import { SCREENS, prepareScreen, preloadScreensWhenIdle } from './screens'
 import './screens.css'
@@ -90,7 +89,6 @@ export function App() {
       {/* la bienvenida se hace en el Mac (allí se elige la IA); un dispositivo entra directo */}
       <AnimatePresence>{settings && !settings.onboarded && !remote && <Onboarding key="onboarding" />}</AnimatePresence>
       {!compact && <FloatingTools />}
-      {!compact && <OrbLauncher />}
       <CommandPalette />
       <LivePanel />
       <Approvals />

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeftRight, ArrowUpDown, Clock, Database, Droplet, Gauge, Move, Ruler, RotateCw, Scale, Square, Thermometer, Weight, Zap, Plug } from 'lucide-react'
-import { Card, Select, cx, spring, useTheme } from '@renderer/design'
+import { Card, Select, cx, focusWithinRing, spring, useTheme } from '@renderer/design'
 import { formatNumber, parseNumber } from '../shared/lib/num'
 import { useComma, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
@@ -50,7 +50,7 @@ export default function UnitsTool({ compact }: ToolProps) {
   const fromPane = (
     <motion.div key={`from-${turns}`} initial={turns ? { rotateX: -80, opacity: 0 } : false} animate={{ rotateX: 0, opacity: 1 }} transition={spring.smooth} className="min-w-0 flex-1 [transform-origin:50%_50%]">
       <Select value={from.id} options={options} onChange={setFrom} label={t('units.from')} />
-      <div className="mt-3 flex items-baseline gap-2 rounded-[16px] bg-sunken border-[0.5px] border-line px-4 py-3 focus-within:border-accent-line focus-within:shadow-[0_0_0_3px_var(--accent-wash)] transition">
+      <div className={`mt-3 flex items-baseline gap-2 rounded-[16px] bg-sunken border-[0.5px] border-line px-4 py-3 ${focusWithinRing} transition`}>
         <input
           value={saved.value}
           inputMode="decimal"

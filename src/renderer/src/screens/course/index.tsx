@@ -1,26 +1,23 @@
 // Pantalla de un curso: al entrar, una cortina de píxeles con el tono del curso se abre y su icono se enciende píxel
-// a píxel. Pestañas en cápsula: Resumen, Aprender, Practicar, Tarjetas, Simulacro, Errores, Materiales, Referencia.
+// a píxel. Cinco pestañas en cápsula: Resumen, Aprender, Repasar, Simulacro y Materiales. Los ids de antes (Práctica,
+// Tarjetas, Errores y Referencia) siguen funcionando: abren su vista y llevan hasta su sección.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EmptyState, PixelCurtain, SegmentedTabs, Spinner, toneForHue, useTheme, Button } from '@renderer/design'
-import { useRoute, navigate, type CourseTab } from '@renderer/app/router'
-import { useScreenTitle } from '@renderer/app/title'
+import { EmptyState, Icon, PixelCurtain, SegmentedTabs, Spinner, toneForHue, useTheme, Button } from '@renderer/design'
+import { useRoute, navigate, canonicalTab, COURSE_VIEWS, type CourseTab, type CourseView } from '@renderer/app/router'
+import { useInView, useScreenTitle } from '@renderer/app/title'
 import { useCoursePack, useOverview } from './data'
 import { CourseHeader } from './Header'
 import { Overview } from './Overview'
 import { LearnTab } from './Learn'
-import { ReferenceTab } from './Reference'
-import { PracticeTab } from './Practice'
-import { CardsTab } from './Cards'
+import { ReviewTab } from './Review'
 import { ExamTab } from './Exam'
-import { MistakesTab } from './Mistakes'
 import { MaterialsTab } from './Materials'
 import { CourseBuildingBanner, CourseCreationFailed, CoursePartialBanner } from './Failed'
 import { courseBuilding, courseRunIssue, coursePartial, creationPhase, extendingTopic, studyableCount } from './failure'
 import { topicCounts } from '@engine/study/topics'
 import { useCourseRun } from './runs'
-
-const TABS: CourseTab[] = ['overview', 'learn', 'practice', 'cards', 'exam', 'mistakes', 'materials', 'reference']
+import { useScrollToSection } from './sections'
 
 const curtainSeen = new Set<string>()
 
@@ -28,7 +25,9 @@ export default function CourseScreen() {
   const { t } = useTranslation(['course', 'common'])
   const route = useRoute()
   const id = route.name === 'course' ? route.id : ''
-  const tab: CourseTab = route.name === 'course' && route.tab ? route.tab : 'overview'
+  const asked: CourseTab | undefined = route.name === 'course' ? route.tab : undefined
+  // un id viejo abre su vista y lleva hasta su sección («cards» → Repasar, en «Tarjetas»)
+  const { view, focus } = canonicalTab(asked)
   const { pack, loading, missing } = useCoursePack(id)
   const ov = useOverview(pack)
   const lastRun = useCourseRun(id)
@@ -38,7 +37,20 @@ export default function CourseScreen() {
   useEffect(() => {
     if (id) curtainSeen.add(id)
   }, [id])
-  useScreenTitle(pack?.title ?? '', null, [pack?.title])
+  // el título ya sale en la cabecera: la barra de arriba solo lo pone en el teléfono… y cuando la cabecera sale de la vista al
+  // desplazarse (o al llegar a una sección), con la pestaña en la que se está: la página no se queda sin contexto
+  const [header, setHeader] = useState<HTMLDivElement | null>(null)
+  const headerSeen = useInView(header)
+  const tabLabel = t(`tabs.${view}`)
+  const crumb = pack ? (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="min-w-0 truncate">{pack.title}</span>
+      <Icon name="chevron-right" size={13} className="shrink-0 text-text3" />
+      <span className="shrink-0 font-normal text-text2">{tabLabel}</span>
+    </span>
+  ) : ''
+  useScreenTitle(headerSeen ? pack?.title ?? '' : crumb, null, [pack?.title, headerSeen, tabLabel], { compactOnly: headerSeen })
+  useScrollToSection(focus, `${id}:${view}`)
 
   // casi nunca se ve: la navegación espera a tener el curso (con tope) y lo guarda para la próxima visita
   if (loading)
@@ -50,7 +62,7 @@ export default function CourseScreen() {
   if (missing || !pack) return <EmptyState title={t('notFound')} body={t('notFoundBody')} action={<Button onClick={() => navigate({ name: 'home' })}>{t('common:nav.home')}</Button>} />
 
   const tone = toneForHue(pack.hue)
-  const setTab = (next: CourseTab) => navigate({ name: 'course', id: pack.id, tab: next }, { replace: true })
+  const setTab = (next: CourseView) => navigate({ name: 'course', id: pack.id, tab: next }, { replace: true })
   // se cuentan los temas escritos, no los planificados (el plan llega antes que el contenido): mientras se escribe, los listos;
   // si la creación se paró, todo lo escrito (también los borradores que quedaron sin auditar)
   const counts = topicCounts(pack.skills)
@@ -76,8 +88,8 @@ export default function CourseScreen() {
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-2 pb-24">
         {/* la cortina de píxeles solo sobre la cabecera y breve (antes tapaba toda la pantalla ~1 s: J1-7) */}
-        <div className="relative">
-          <CourseHeader pack={pack} />
+        <div ref={setHeader} className="relative">
+          <CourseHeader pack={pack} view={view} />
           {curtain && (
             <div className="absolute -inset-x-2 -inset-y-1 z-30 pointer-events-none overflow-hidden rounded-[18px]" style={{ ['--curtain' as string]: `color-mix(in oklab, ${dark ? tone.fillDark : tone.fillLight} ${dark ? 40 : 26}%, var(--paper))` }}>
               <PixelCurtain color={tone.top} duration={240} onDone={() => setCurtain(false)} />
@@ -88,19 +100,16 @@ export default function CourseScreen() {
         {building && lastRun && <CourseBuildingBanner run={lastRun} ready={ready} total={total} />}
         {/* en ventanas estrechas las pestañas se desplazan en horizontal en vez de partirse; centradas solo si caben («safe»:
             si no, empiezan por la izquierda y «Overview» no queda cortado fuera de alcance: A4-P2-17) */}
-        <div className="mt-6 mb-5 flex [justify-content:safe_center] overflow-x-auto no-scrollbar -mx-6 px-6">
-          <SegmentedTabs className="shrink-0" value={tab} onChange={setTab} items={TABS.map((x) => ({ id: x, label: t(`tabs.${x}`) }))} />
+        <div className="mt-5 mb-5 flex [justify-content:safe_center] overflow-x-auto no-scrollbar -mx-6 px-6">
+          <SegmentedTabs className="shrink-0" value={view} onChange={setTab} items={COURSE_VIEWS.map((x) => ({ id: x, label: t(`tabs.${x}`) }))} />
         </div>
         {/* cambiar de pestaña: la nueva entra al momento (sin esperar a que se vaya la anterior ni pasar por el vacío) */}
-        <div key={tab} className="tab-enter">
-            {tab === 'overview' && <Overview pack={pack} ov={ov} phase={phase} writing={writing} />}
-            {tab === 'learn' && <LearnTab pack={pack} ov={ov} phase={phase} writing={writing} />}
-            {tab === 'reference' && <ReferenceTab pack={pack} />}
-            {tab === 'practice' && <PracticeTab pack={pack} />}
-            {tab === 'cards' && <CardsTab pack={pack} />}
-            {tab === 'exam' && <ExamTab pack={pack} />}
-            {tab === 'mistakes' && <MistakesTab pack={pack} />}
-            {tab === 'materials' && <MaterialsTab pack={pack} />}
+        <div key={view} className="tab-enter">
+          {view === 'overview' && <Overview pack={pack} ov={ov} phase={phase} writing={writing} />}
+          {view === 'learn' && <LearnTab pack={pack} ov={ov} phase={phase} writing={writing} />}
+          {view === 'review' && <ReviewTab pack={pack} />}
+          {view === 'exam' && <ExamTab pack={pack} />}
+          {view === 'materials' && <MaterialsTab pack={pack} />}
         </div>
       </div>
     </div>

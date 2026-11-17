@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Copy, CornerDownLeft, Delete, Trash2, X } from 'lucide-react'
-import { Button, Card, IconButton, SegmentedTabs, Sprite, cx, spring, toast, useTheme } from '@renderer/design'
+import { Button, Card, IconButton, SegmentedTabs, Sprite, cx, focusWithinRing, spring, toast, useTheme } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import { Tex } from '../shared/Tex'
 import { localizeTex } from '../shared/lib/num'
@@ -250,7 +250,7 @@ function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, lan
         />
         {!compact && <Variables />}
       </div>
-      <div className={cx('relative mt-4 rounded-[16px] bg-sunken border-[0.5px] border-line', compact ? 'px-3 pt-2.5 pb-2' : 'px-5 pt-4 pb-3')}>
+      <div className={cx('relative mt-4 rounded-[16px] bg-sunken border-[0.5px] border-line transition', focusWithinRing, compact ? 'px-3 pt-2.5 pb-2' : 'px-5 pt-4 pb-3')}>
         <input
           ref={inputRef}
           value={s.input}

@@ -42,6 +42,8 @@ interface Geometry {
   labels: OverlayLabel[]
   xTicks: Tick[]
   yTicks: Tick[]
+  /** Por dónde pasa la tinta de las curvas (para que ni las etiquetas ni los números de los ejes la pisen). */
+  ink: Array<{ x: number; y: number }>
 }
 
 const clampPx = (v: number): number => (Number.isNaN(v) ? -1e5 : Math.max(-1e5, Math.min(1e5, v)))
@@ -78,7 +80,7 @@ function buildGeometry(spec: PlotSpec, params: Params, fns: Array<RealFn | null>
   const X = (x: number) => clampPx(rect.x + ((x - r.xMin) / dx) * rect.w)
   const Y = (y: number) => clampPx(rect.y + rect.h - ((y - r.yMin) / dy) * rect.h)
   const num = (s?: string) => evalNumber(s, params)
-  const g: Geometry = { curves: [], extra: [], regions: [], lines: [], points: [], labels: [], xTicks: [], yTicks: [] }
+  const g: Geometry = { curves: [], extra: [], regions: [], lines: [], points: [], labels: [], xTicks: [], yTicks: [], ink: [] }
 
   g.xTicks = spec.xPi ? piTicks(r.xMin, r.xMax, Math.max(4, Math.floor(rect.w / 70))) : numberTicks(r.xMin, r.xMax, Math.max(4, Math.floor(rect.w / 80)), lang, spec.xTickStep)
   g.yTicks = numberTicks(r.yMin, r.yMax, Math.max(3, Math.floor(rect.h / 60)), lang, spec.yTickStep)
@@ -141,7 +143,11 @@ function buildGeometry(spec: PlotSpec, params: Params, fns: Array<RealFn | null>
     g.lines.push({ x1, y1, x2, y2, color: color(l.color), dashed: l.dashed, arrow, faint: (l.color ?? 'gray') === 'gray' })
   }
 
-  const ink: Array<{ x: number; y: number }> = []
+  const ink: Array<{ x: number; y: number }> = g.ink
+  // las paramétricas y polares también cuentan como tinta (antes solo las funciones: el «−1» pisaba la circunferencia)
+  const addInk = (segs: Array<Array<{ x: number; y: number }>>): void => {
+    for (const s of segs) for (let k = 0; k < s.length; k += 2) if (s[k].y >= rect.y && s[k].y <= rect.y + rect.h && s[k].x >= rect.x && s[k].x <= rect.x + rect.w) ink.push(s[k])
+  }
   const samples = Math.max(240, Math.round(rect.w * 1.3))
   spec.curves.slice(0, LIMITS.curves).forEach((c, i) => {
     const f = fns[i]
@@ -176,6 +182,7 @@ function buildGeometry(spec: PlotSpec, params: Params, fns: Array<RealFn | null>
       seg[seg.length - 1].push({ x: X(x), y: Y(y) })
     }
     g.extra.push({ d: pathOf(seg), color: color(p.color), dashed: p.dashed })
+    addInk(seg)
   }
   for (const p of spec.polar.slice(0, LIMITS.curves)) {
     const f = compileFn(p.r, 'theta', params)
@@ -191,6 +198,7 @@ function buildGeometry(spec: PlotSpec, params: Params, fns: Array<RealFn | null>
       seg[seg.length - 1].push({ x: X(rr * Math.cos(th)), y: Y(rr * Math.sin(th)) })
     }
     g.extra.push({ d: pathOf(seg), color: color(p.color), dashed: false })
+    addInk(seg)
   }
   const pts = spec.points.slice(0, LIMITS.points).map((p) => ({ p, x: num(p.x), y: num(p.y) }))
   for (const { p, x, y } of pts) if (x !== undefined && y !== undefined) g.points.push({ x: X(x), y: Y(y), style: p.style, color: color(p.color) })
@@ -438,12 +446,13 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
         </defs>
         {/* rejilla */}
         {spec.grid && (
-          <g stroke="var(--line)" strokeWidth={1}>
+          <g stroke="var(--chart-grid)" strokeWidth={1}>
             {g.xTicks.map((tk, i) => <line key={`gx${i}`} x1={X(tk.value)} x2={X(tk.value)} y1={rect.y} y2={rect.y + rect.h} />)}
             {g.yTicks.map((tk, i) => <line key={`gy${i}`} x1={rect.x} x2={rect.x + rect.w} y1={Y(tk.value)} y2={Y(tk.value)} />)}
           </g>
         )}
-        <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill="none" stroke="var(--line)" strokeWidth={1} rx={2} />
+        {/* el marco gris solo si no hay ni ejes ni rejilla que digan dónde está la gráfica */}
+        {!spec.axes && !spec.grid && <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill="none" stroke="var(--line)" strokeWidth={1} rx={2} />}
         {/* ejes con flecha */}
         {spec.axes && (
           <g stroke="var(--text2)" strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -466,16 +475,17 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
           </g>
         </g>
         {/* marcas y números junto a los ejes (encima de las curvas, con un halo de papel)*/}
-        <g fontSize={11} fill="var(--text2)" className="tabular" stroke="var(--surface)" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
+        <g fontSize={11} fill="var(--text2)" className="tabular" stroke="var(--fig-bg, var(--surface))" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
           {g.xTicks.map((tk, i) => {
             if (tk.label === '0' && zeroX && zeroY) return null
             const px = X(tk.value)
             if (xName && px > rect.x + rect.w - labelSize(xName, 12).w - 14) return null
             const py = Math.min(rect.y + rect.h, Math.max(rect.y, axisX))
+            const at = tickSpot('x', tk.label, px, py, g.ink, spec.xPi ? 12.5 : 11)
             return (
               <g key={`tx${i}`}>
                 <line x1={px} x2={px} y1={py - 3} y2={py + 3} stroke="var(--text2)" strokeWidth={1} />
-                <text x={px} y={py + 15} textAnchor="middle" fontFamily={spec.xPi ? 'var(--font-serif)' : undefined} fontSize={spec.xPi ? 12.5 : 11}>
+                <text x={at.x} y={at.y} textAnchor={at.anchor} fontFamily={spec.xPi ? 'var(--font-serif)' : undefined} fontSize={spec.xPi ? 12.5 : 11}>
                   {tk.label}
                 </text>
               </g>
@@ -486,10 +496,11 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
             const py = Y(tk.value)
             if (yName && py < rect.y + 16) return null
             const px = Math.min(rect.x + rect.w, Math.max(rect.x, axisY))
+            const at = tickSpot('y', tk.label, px, py, g.ink, 11)
             return (
               <g key={`ty${i}`}>
                 <line x1={px - 3} x2={px + 3} y1={py} y2={py} stroke="var(--text2)" strokeWidth={1} />
-                <text x={px - 6} y={py + 3.8} textAnchor="end">
+                <text x={at.x} y={at.y} textAnchor={at.anchor}>
                   {tk.label}
                 </text>
               </g>
@@ -503,7 +514,7 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
         </g>
         <g clipPath={`url(#f${ids})`}>
           <motion.g initial={animate ? { opacity: 0 } : false} animate={seen ? { opacity: 1 } : undefined} transition={{ duration: 0.4, delay: 0.95 }}>
-            {g.curves.flatMap((c, i) => c.ends.map((e, k) => <circle key={`d${i}-${k}`} cx={e.x} cy={e.y} r={4.2} fill={e.open ? 'var(--surface)' : c.color} stroke={c.color} strokeWidth={e.open ? 1.8 : 0} />))}
+            {g.curves.flatMap((c, i) => c.ends.map((e, k) => <circle key={`d${i}-${k}`} cx={e.x} cy={e.y} r={4.2} fill={e.open ? 'var(--fig-bg, var(--surface))' : c.color} stroke={c.color} strokeWidth={e.open ? 1.8 : 0} />))}
             {g.points.map((p, i) => <PointMark key={`p${i}`} {...p} />)}
           </motion.g>
         </g>
@@ -511,7 +522,7 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
         {reading && (
           <g pointerEvents="none">
             <line x1={hover!.x} x2={hover!.x} y1={rect.y} y2={rect.y + rect.h} stroke="var(--text3)" strokeOpacity={0.7} strokeDasharray="3 3" />
-            {reading.rows.map((rw, i) => rw.py >= rect.y && rw.py <= rect.y + rect.h && <circle key={i} cx={hover!.x} cy={rw.py} r={4.5} fill={rw.color} stroke="var(--surface)" strokeWidth={2} />)}
+            {reading.rows.map((rw, i) => rw.py >= rect.y && rw.py <= rect.y + rect.h && <circle key={i} cx={hover!.x} cy={rw.py} r={4.5} fill={rw.color} stroke="var(--fig-bg, var(--surface))" strokeWidth={2} />)}
           </g>
         )}
       </svg>
@@ -519,7 +530,7 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
       <motion.div className="pointer-events-none absolute inset-0" initial={animate ? { opacity: 0 } : false} animate={seen ? { opacity: 1 } : undefined} transition={{ duration: 0.45, delay: 1.05 }}>
         {g.labels.map((l, i) => (
           <div key={i} className="absolute" style={{ left: l.x, top: l.y, transform: `translate(${-l.ax * 100}%, ${-l.ay * 100}%)`, color: l.color, fontWeight: l.weight, fontSize: l.size }}>
-            <span className="rounded-[4px] px-0.5" style={{ background: 'color-mix(in oklab, var(--surface) 78%, transparent)' }}>
+            <span className="rounded-[4px] px-0.5" style={{ background: 'color-mix(in oklab, var(--fig-bg, var(--surface)) 78%, transparent)' }}>
               <FigLabel text={l.text} />
             </span>
           </div>
@@ -578,17 +589,52 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
   )
 }
 
+/** Dónde va el número de una marca del eje: en su sitio de siempre o, si ahí pasa una curva, al lado (así el «−1» no pisa
+ *  la circunferencia unidad). Se queda con el sitio por el que pase menos tinta. */
+function tickSpot(axis: 'x' | 'y', label: string, px: number, py: number, ink: Array<{ x: number; y: number }>, size: number): { x: number; y: number; anchor: 'start' | 'middle' | 'end' } {
+  const w = Array.from(label).length * size * 0.6 + 2
+  const h = size + 2
+  const spots: Array<{ x: number; y: number; anchor: 'start' | 'middle' | 'end'; box: Box }> =
+    axis === 'x'
+      ? [
+          { x: px, y: py + 15, anchor: 'middle', box: { x: px - w / 2, y: py + 15 - size, w, h } },
+          { x: px - 4, y: py + 15, anchor: 'end', box: { x: px - 4 - w, y: py + 15 - size, w, h } },
+          { x: px + 4, y: py + 15, anchor: 'start', box: { x: px + 4, y: py + 15 - size, w, h } }
+        ]
+      : [
+          { x: px - 6, y: py + 3.8, anchor: 'end', box: { x: px - 6 - w, y: py + 3.8 - size, w, h } },
+          { x: px - 6, y: py - 5, anchor: 'end', box: { x: px - 6 - w, y: py - 5 - size, w, h } },
+          { x: px + 6, y: py + 3.8, anchor: 'start', box: { x: px + 6, y: py + 3.8 - size, w, h } }
+        ]
+  const hits = (b: Box): number => {
+    let n = 0
+    for (const p of ink) if (p.x >= b.x - 1.5 && p.x <= b.x + b.w + 1.5 && p.y >= b.y - 1.5 && p.y <= b.y + b.h + 1.5) n++
+    return n
+  }
+  let best = spots[0]
+  let fewest = hits(best.box)
+  for (const s of spots.slice(1)) {
+    if (fewest === 0) break
+    const k = hits(s.box)
+    if (k < fewest) {
+      fewest = k
+      best = s
+    }
+  }
+  return best
+}
+
 function PointMark({ x, y, style, color }: { x: number; y: number; style: string; color: string }) {
   const r = 5
   switch (style) {
     case 'open':
-      return <circle cx={x} cy={y} r={r} fill="var(--surface)" stroke={color} strokeWidth={2} />
+      return <circle cx={x} cy={y} r={r} fill="var(--fig-bg, var(--surface))" stroke={color} strokeWidth={2} />
     case 'cross':
       return <path d={`M${x - r} ${y - r}L${x + r} ${y + r}M${x - r} ${y + r}L${x + r} ${y - r}`} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
     case 'square':
-      return <rect x={x - r} y={y - r} width={r * 2} height={r * 2} rx={1.5} fill={color} stroke="var(--surface)" strokeWidth={1.5} />
+      return <rect x={x - r} y={y - r} width={r * 2} height={r * 2} rx={1.5} fill={color} stroke="var(--fig-bg, var(--surface))" strokeWidth={1.5} />
     default:
-      return <circle cx={x} cy={y} r={r} fill={color} stroke="var(--surface)" strokeWidth={2} />
+      return <circle cx={x} cy={y} r={r} fill={color} stroke="var(--fig-bg, var(--surface))" strokeWidth={2} />
   }
 }
 

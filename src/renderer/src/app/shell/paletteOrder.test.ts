@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { ASK_VALUE, filterCommands, focusSnippet, paletteValues, splitGroups, type Filterable } from './paletteOrder'
 
 const COMMANDS: Filterable[] = [
-  { id: 'new-course', group: 'actions', label: 'Nuevo curso con Aula' },
+  { id: 'theme-dark', group: 'appearance', label: 'Modo oscuro' },
+  { id: 'study-continue', group: 'study', label: 'Seguir con el plan de hoy', keywords: ['plan', 'hoy', 'today', 'estudiar', 'study'] },
+  { id: 'study-exam', group: 'study', label: 'Simulacro: Exam #2 · MATH 101', keywords: ['simulacro', 'mock', 'exam', 'examen'] },
+  { id: 'new-course', group: 'actions', label: 'Nuevo curso' },
   { id: 'home', group: 'navigate', label: 'Hoy' },
   { id: 'calendar', group: 'navigate', label: 'Calendario' },
   { id: 'settings', group: 'navigate', label: 'Ajustes', keywords: ['preferencias'] },
@@ -31,8 +34,13 @@ describe('orden de la paleta', () => {
   it('sin nada que coincida, preguntar a Aula es lo único (y lo elegido)', () => {
     expect(order('zanahoria cuántica')).toEqual([ASK_VALUE])
   })
-  it('sin consulta: todos los comandos en su orden y sin preguntar', () => {
-    expect(order('')).toEqual(['cmd:new-course', 'cmd:home', 'cmd:calendar', 'cmd:settings', 'cmd:course:trig', 'cmd:grapher'])
+  it('sin consulta: estudiar primero, la apariencia al final y sin preguntar', () => {
+    expect(order('')).toEqual(['cmd:study-continue', 'cmd:study-exam', 'cmd:new-course', 'cmd:home', 'cmd:calendar', 'cmd:settings', 'cmd:course:trig', 'cmd:grapher', 'cmd:theme-dark'])
+  })
+  it('las acciones de estudio se encuentran escribiendo, sin tapar las pantallas', () => {
+    expect(order('simulacro')[0]).toBe('cmd:study-exam')
+    expect(order('plan de hoy')[0]).toBe('cmd:study-continue')
+    expect(order('calend')[0]).toBe('cmd:calendar')
   })
   it('el fragmento empieza cerca de la primera coincidencia', () => {
     const long = 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut **derivada** de la función'

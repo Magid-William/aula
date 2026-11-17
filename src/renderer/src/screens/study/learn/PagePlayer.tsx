@@ -16,6 +16,7 @@ import { StudyFrame, GlassCapsule, ProgressDots, TopCapsule, CapsuleDivider, typ
 import { updateProgress, useStudyStore, type CourseData } from '../data'
 import { recordTime } from '../kit'
 import { blocksSpeech, canSpeak, useSpeech } from '../speech'
+import { usePublishTutorContext } from '../tutorStore'
 import { lessonPages, readingBlocks, type TitleWords } from './steps'
 import { TryItPanel } from './TryItPanel'
 import type { LearnFinish } from './GuidedPlayer'
@@ -53,6 +54,8 @@ export function PagePlayer({ data, skill, ctx: baseCtx, ink, reading, modeMenu, 
   const speech = useSpeech()
   const pg = pages[index]
   const isLast = index >= pages.length - 1
+  // la página que se lee, para la puerta fija del tutor de la cápsula
+  usePublishTutorContext({ courseID: packId, skillID: skill.id, screen: 'lesson', lessonBlock: index })
 
   const ctx: BlockContext = useMemo(() => ({
     ...baseCtx,
@@ -142,6 +145,7 @@ export function PagePlayer({ data, skill, ctx: baseCtx, ink, reading, modeMenu, 
       icon={reading ? 'book' : 'learn'}
       label={<RichText text={skill.title} inline />}
       onExit={onExit}
+      tutor
       trailing={
         <>
           {canSpeak() && (
@@ -188,7 +192,7 @@ export function PagePlayer({ data, skill, ctx: baseCtx, ink, reading, modeMenu, 
     )
 
   return (
-    <StudyFrame capsule={capsule} bottom={bottom} onExit={onExit} scrollKey={index}>
+    <StudyFrame capsule={capsule} bottom={bottom} onExit={onExit} scrollKey={index} reading>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={index} {...(reducedMotion ? {} : page)}>
           <BlockList blocks={pg.blocks} ctx={ctx} />

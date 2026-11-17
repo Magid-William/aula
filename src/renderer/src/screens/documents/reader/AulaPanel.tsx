@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { DocumentAIAction, DocumentCardTarget } from '@shared/documents'
 import { citedPages } from '@shared/documents'
-import { AulaMark, Button, EmptyState, Icon, IconButton, Menu, Spinner, cx, toast, type MenuItem } from '@renderer/design'
+import { AulaMark, Button, EmptyState, Icon, IconButton, Menu, Spinner, cx, focusWithinRing, toast, type MenuItem } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { api } from '@renderer/lib/api'
 import { navigate } from '@renderer/app/router'
@@ -214,7 +214,7 @@ function AskField({ busy, onStop }: { busy: boolean; onStop: () => void }) {
   }
   return (
     <div className="p-3">
-      <div className={cx('flex items-end gap-2 rounded-[18px] border-[0.5px] border-line bg-field px-3 py-2 shadow-[var(--e1)] focus-within:border-accent-line transition-colors')}>
+      <div className={cx('flex items-end gap-2 rounded-[18px] border-[0.5px] border-line bg-field px-3 py-2 shadow-[var(--e1)] transition', focusWithinRing)}>
         <textarea
           value={q}
           onChange={(e) => setQ(e.target.value)}

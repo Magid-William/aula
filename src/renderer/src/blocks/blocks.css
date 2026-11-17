@@ -41,6 +41,18 @@
   --code-comment: #8a857f;
 }
 
+/* Figuras de la lección sobre el papel (sin tarjeta): los halos de los números y etiquetas son del color del papel, y el pie
+   va en serif cursiva, como en un libro */
+.blk-figure-sheet { --fig-bg: var(--paper); }
+.blk-figcaption > div {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--text2);
+}
+.blk-figcaption .katex { font-style: normal; }
+
 /* Lectura: serif 18/28 en la lección, cuerpo 15/22 en el chat */
 .blk-prose.aula-rich { color: var(--text); }
 .blk-prose.aula-rich p { margin: 0 0 0.75em; }
@@ -115,3 +127,11 @@
 
 /* Impresión: nada se mueve */
 .blk-static *, .blk-static *::before, .blk-static *::after { animation: none !important; transition: none !important; }
+
+/* Pie de una tabla de la lección: serif cursiva, como el de las figuras */
+.blk-table-caption {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 22px;
+}

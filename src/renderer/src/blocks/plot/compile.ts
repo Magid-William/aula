@@ -80,7 +80,44 @@ export function plotRange(spec: PlotSpec, params: Params = {}): Range {
     ya = c - half
     yb = c + half
   }
-  return sanitized({ xMin: xa, xMax: xb, yMin: ya, yMax: yb })
+  return sanitized(fitClosedCurves({ xMin: xa, xMax: xb, yMin: ya, yMax: yb }, spec, params))
+}
+
+/** Una figura cerrada (la circunferencia unidad, una elipse) no se corta: si el rango deja ver al menos la mitad en cada eje,
+ *  crece hasta contenerla con algo de aire. Si se ve menos, es un zoom a propósito y se respeta. */
+export function fitClosedCurves(r: Range, spec: PlotSpec, params: Params = {}): Range {
+  const out = { ...r }
+  for (const p of spec.parametric.slice(0, LIMITS.curves)) {
+    if (!(Math.abs(p.tMax - p.tMin) >= 2 * Math.PI - 0.01)) continue
+    const fx = compileFn(p.x, 't', params)
+    const fy = compileFn(p.y, 't', params)
+    if (!fx || !fy) continue
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+    for (let i = 0; i <= 240; i++) {
+      const t = p.tMin + ((p.tMax - p.tMin) * i) / 240
+      const x = fx(t)
+      const y = fy(t)
+      if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)) continue
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y)
+    }
+    const w = x1 - x0
+    const h = y1 - y0
+    if (!(w > 0 && h > 0)) continue
+    // ¿cerrada de verdad? el principio y el final coinciden
+    const a = [fx(p.tMin), fy(p.tMin)]
+    const b = [fx(p.tMax), fy(p.tMax)]
+    if (a.some((v) => v === null) || b.some((v) => v === null) || Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!) > Math.max(w, h) * 0.01) continue
+    // se ve al menos la mitad en cada eje: se completa; si no, es un zoom
+    const seenX = (Math.min(x1, out.xMax) - Math.max(x0, out.xMin)) / w
+    const seenY = (Math.min(y1, out.yMax) - Math.max(y0, out.yMin)) / h
+    if (seenX < 0.5 || seenY < 0.5) continue
+    const pad = 0.06
+    if (x0 < out.xMin) out.xMin = x0 - w * pad
+    if (x1 > out.xMax) out.xMax = x1 + w * pad
+    if (y0 < out.yMin) out.yMin = y0 - h * pad
+    if (y1 > out.yMax) out.yMax = y1 + h * pad
+  }
+  return out
 }
 
 /** Valores de y por los que pasa lo que se dibuja (para encuadrar el eje y). */

@@ -8,14 +8,18 @@ import { AnimatePresence, motion } from 'motion/react'
 import { cx, Icon, IconButton, spring, Tooltip, useTheme, type IconName } from '@renderer/design'
 import { isTypingTarget } from '@renderer/exercises/normalize'
 import { dropSelection } from './reading'
+import { TutorButton } from './TutorButton'
+import { useTutor } from './tutorStore'
 
-export function StudyFrame({ capsule, bottom, children, onExit, wide, scrollKey, className }: {
+export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, scrollKey, className }: {
   capsule: ReactNode
   bottom?: ReactNode
   children: ReactNode
   onExit: () => void
   /** Columna ancha (simulacro, resúmenes). */
   wide?: boolean
+  /** Columna de lectura de libro (la lección): unos 70 caracteres por línea, directamente sobre el papel. */
+  reading?: boolean
   /** Al cambiar, vuelve arriba (cambio de página o de ejercicio). */
   scrollKey?: string | number
   className?: string
@@ -64,28 +68,30 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, scrollKey,
       {/* velo de papel (un solo color que se desvanece) tras las cápsulas: el texto no se lee a través de ellas */}
       {/* lo que se desplaza se pierde bajo las cápsulas: el mismo papel (con su grano) que se desvanece, no una franja lisa más clara */}
       <div aria-hidden className="paper-grain pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-paper [mask-image:linear-gradient(to_bottom,black_45%,transparent)]" />
-      {bottom && <div aria-hidden className="paper-grain pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-paper [mask-image:linear-gradient(to_top,black_40%,transparent)]" />}
       <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-6">{capsule}</div>
-      <div ref={scroller} onClickCapture={revealAnswer} className="@container min-h-0 flex-1 overflow-y-auto">
+      <div ref={scroller} onClickCapture={revealAnswer} className="@container flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* se selecciona el texto, no lo que se arrastra o gira (lienzos) */}
-        <div className={cx('selectable mx-auto w-full px-6 pt-[76px] pb-36 [&_canvas]:select-none', wide ? 'max-w-[1080px]' : 'max-w-[800px]', className)}>
+        <div className={cx('selectable mx-auto w-full shrink-0 px-6 pt-[76px] [&_canvas]:select-none', bottom ? 'pb-4' : 'pb-36', wide ? 'max-w-[1080px]' : reading ? 'max-w-[700px]' : 'max-w-[800px]', className)}>
           {children}
         </div>
+        {/* las acciones, pegadas justo debajo de lo que se estudia (no al fondo de la ventana); si lo de arriba es largo, se
+            quedan sujetas abajo con su velo de papel */}
+        <AnimatePresence>
+          {bottom && (
+            <motion.div
+              key="bottom"
+              className="pointer-events-none sticky bottom-0 z-20 flex shrink-0 justify-center px-6 pt-6 pb-5"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={spring.smooth}
+            >
+              <div aria-hidden className="paper-grain absolute inset-x-0 bottom-0 h-full bg-paper [mask-image:linear-gradient(to_top,black_55%,transparent)]" />
+              <div className="relative flex max-w-full justify-center">{bottom}</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      <AnimatePresence>
-        {bottom && (
-          <motion.div
-            key="bottom"
-            className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-6"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={spring.smooth}
-          >
-            {bottom}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
@@ -103,9 +109,18 @@ export function GlassCapsule({ children, className }: { children: ReactNode; cla
   )
 }
 
-/** La cápsula de arriba: salir · icono y nombre del modo · lo que va en medio (progreso) · extras. */
-export function TopCapsule({ icon, label, onExit, children, trailing }: { icon: IconName; label: ReactNode; onExit: () => void; children?: ReactNode; trailing?: ReactNode }) {
+/** La cápsula de arriba: salir · icono y nombre del modo · lo que va en medio (progreso) · extras y, con `tutor`, la puerta fija
+ *  al tutor (aprender, practicar, tarjetas y errores; nunca en el simulacro). */
+export function TopCapsule({ icon, label, onExit, children, trailing, tutor }: { icon: IconName; label: ReactNode; onExit: () => void; children?: ReactNode; trailing?: ReactNode; tutor?: boolean }) {
   const { t } = useTranslation('study')
+  // sin nada publicado (aún no hay ejercicio ni paso a la vista) no hay puerta: ni el separador
+  const canAsk = useTutor((s) => !!s.published)
+  const extras = tutor && canAsk ? (
+    <>
+      {trailing}
+      <TutorButton className="rounded-full!" />
+    </>
+  ) : trailing
   return (
     <GlassCapsule>
       <Tooltip label={t('chrome.exit')} side="bottom">
@@ -125,10 +140,10 @@ export function TopCapsule({ icon, label, onExit, children, trailing }: { icon: 
           <span className="flex shrink-0 items-center gap-2 px-2">{children}</span>
         </>
       )}
-      {trailing && (
+      {extras && (
         <>
           <span className="h-5 w-[0.5px] shrink-0 bg-line" aria-hidden />
-          <span className="flex shrink-0 items-center gap-1 pl-1">{trailing}</span>
+          <span className="flex shrink-0 items-center gap-1 pl-1">{extras}</span>
         </>
       )}
     </GlassCapsule>
@@ -137,8 +152,9 @@ export function TopCapsule({ icon, label, onExit, children, trailing }: { icon: 
 
 export type DotState = 'todo' | 'done' | 'warn' | 'wrong' | 'locked'
 
-/** Puntos de progreso: el actual se alarga y siempre va en ladrillo; los hechos, con la tinta del curso. Con muchos, «3 / 40». */
-export function ProgressDots({ states, current, ink = 'var(--accent)', onPick, max = 24 }: { states: DotState[]; current: number; ink?: string; onPick?: (i: number) => void; max?: number }) {
+/** Puntos de progreso: el actual se alarga y siempre va en ladrillo; los hechos, con la tinta del curso. Se ven de 7 px, pero cada
+ *  uno se pulsa en una zona de 24 px (§2.9). Con muchos, «3 / 16». */
+export function ProgressDots({ states, current, ink = 'var(--accent)', onPick, max = 16 }: { states: DotState[]; current: number; ink?: string; onPick?: (i: number) => void; max?: number }) {
   const { reducedMotion } = useTheme()
   const { t } = useTranslation('study')
   if (states.length > max)
@@ -149,7 +165,7 @@ export function ProgressDots({ states, current, ink = 'var(--accent)', onPick, m
     )
   return (
     // cada punto dice cuál es («3 of 8»): antes eran botones sin nombre con rol de elemento de lista (A4-P2-12)
-    <span className="flex shrink-0 items-center gap-[5px]" role="group" aria-label={t('common.nOfM', { n: current + 1, m: states.length })}>
+    <span className="-mx-1 flex shrink-0 items-center" role="group" aria-label={t('common.nOfM', { n: current + 1, m: states.length })}>
       {states.map((s, i) => {
         const on = i === current
         const color = s === 'done' ? ink : s === 'warn' ? 'var(--warning)' : s === 'wrong' ? 'var(--danger)' : on ? 'var(--accent)' : s === 'locked' ? 'var(--fill3)' : 'var(--fill4)'
@@ -164,9 +180,17 @@ export function ProgressDots({ states, current, ink = 'var(--accent)', onPick, m
             onClick={() => onPick?.(i)}
             layout={!reducedMotion}
             transition={spring.snappy}
-            className="h-[7px] rounded-full disabled:cursor-default"
-            style={{ width: on ? 20 : 7, background: on ? 'var(--accent)' : color, opacity: s === 'locked' ? 0.7 : 1 }}
-          />
+            className="grid h-6 place-items-center disabled:cursor-default"
+            style={{ width: on ? 32 : 24 }}
+          >
+            <motion.span
+              aria-hidden
+              layout={!reducedMotion}
+              transition={spring.snappy}
+              className="block h-[7px] rounded-full"
+              style={{ width: on ? 20 : 7, background: on ? 'var(--accent)' : color, opacity: s === 'locked' ? 0.7 : 1 }}
+            />
+          </motion.button>
         )
       })}
     </span>

@@ -1,23 +1,18 @@
 {
   "title": "Statistics",
-  "subtitleAll": "Last 12 weeks · all your courses",
-  "subtitleOne": "Last 12 weeks · {{course}}",
   "allCourses": "All courses",
   "pickCourse": "Choose a course",
   "loading": "Loading your stats",
   "summary": {
-    "study": "of study",
-    "activeDays": "{{active}} of {{total}}",
-    "activeDaysLabel": "days with study",
-    "accuracy": "correct",
-    "streak_one": "day streak",
-    "streak_other": "day streak",
-    "streakBest": "{{current}}-day streak (your best: {{best}})",
-    "streakIsBest": "{{current}}-day streak, your best so far",
-    "streakOne": "1 day in: come back tomorrow to start a streak",
-    "bestOnly": "Your best streak: {{best}} days",
-    "exercises_one": "{{count}} exercise solved",
-    "exercises_other": "{{count}} exercises solved"
+    "lead_one": "In the last 12 weeks you’ve studied for {{time}} on {{days}} day.",
+    "lead_other": "In the last 12 weeks you’ve studied for {{time}} on {{days}} days.",
+    "leadAccuracy_one": "In the last 12 weeks you’ve studied for {{time}} on {{days}} day, with {{percent}} correct.",
+    "leadAccuracy_other": "In the last 12 weeks you’ve studied for {{time}} on {{days}} days, with {{percent}} correct.",
+    "underMinute": "under a minute",
+    "streakBest": "You’re on a {{current}}-day streak (your best: {{best}}).",
+    "streakIsBest": "You’re on a {{current}}-day streak, your best so far.",
+    "streakOne": "1 day in: come back tomorrow to start a streak.",
+    "bestOnly": "Your best streak: {{best}} days."
   },
   "heat": {
     "title": "Consistency",
@@ -25,8 +20,11 @@
     "less": "Less",
     "more": "More",
     "cell": "{{date}}: {{minutes}}",
+    "cellNone": "{{date}}: no study",
     "cellExercises_one": "{{date}}: {{minutes}} · {{count}} exercise",
-    "cellExercises_other": "{{date}}: {{minutes}} · {{count}} exercises"
+    "cellExercises_other": "{{date}}: {{minutes}} · {{count}} exercises",
+    "cellOnlyExercises_one": "{{date}}: {{count}} exercise",
+    "cellOnlyExercises_other": "{{date}}: {{count}} exercises"
   },
   "rhythm": {
     "title": "Your rhythm",
@@ -73,14 +71,7 @@
     "pass": "Pass",
     "exam": "Exam",
     "footnote": "Rebuilt from your saved exercises; the last point is where you are today (flashcards included).",
-    "open": "Open “{{course}}”",
-    "labels": {
-      "notStarted": "Not started",
-      "early": "Getting started",
-      "gettingThere": "Getting there",
-      "almostReady": "Almost ready",
-      "ready": "Ready"
-    }
+    "open": "Open “{{course}}”"
   },
   "empty": {
     "noCourses": "Nothing to measure yet",

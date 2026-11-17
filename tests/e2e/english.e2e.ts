@@ -33,6 +33,8 @@ const SCREENS: Array<[string, Record<string, unknown>]> = [
   ['home', { name: 'home' }],
   ['course', { name: 'course', id: C }],
   ['course-learn', { name: 'course', id: C, tab: 'learn' }],
+  ['course-review', { name: 'course', id: C, tab: 'review' }],
+  ['course-exam', { name: 'course', id: C, tab: 'exam' }],
   ['course-practice', { name: 'course', id: C, tab: 'practice' }],
   ['course-reference', { name: 'course', id: C, tab: 'reference' }],
   ['course-materials', { name: 'course', id: C, tab: 'materials' }],

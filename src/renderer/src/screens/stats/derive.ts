@@ -98,6 +98,12 @@ export function heatLevel(minutes: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
+/** El color de un nivel de constancia: aguada de grafito (los datos de todo tu estudio no llevan ladrillo). El nivel 0 no
+ *  tiene color: se pinta solo su contorno. */
+export function washFor(level: number): string | null {
+  return level >= 1 && level <= 4 ? `var(--wash-${Math.round(level)})` : null
+}
+
 export interface HeatCell {
   week: number
   weekday: number

@@ -1,10 +1,10 @@
 // Un ejercicio completo (port de ExerciseView.swift): cabecera (nivel · puntos), enunciado con bloques, el control de
 // respuesta de su tipo, pistas que se abren una a una, comprobación con animación (acierto: la marca se dibuja píxel a
-// píxel, una ráfaga discreta y un velo verde; fallo: una sacudida suave y la explicación del error), solución paso a paso
-// y «Otra forma de verlo». En el simulacro no hay pistas ni corrección: solo se responde.
+// píxel, unas rayitas a tinta y un velo verde; fallo: una sacudida suave, lo escrito tachado y la nota al margen con el
+// porqué), solución paso a paso y «Otra forma de verlo». En el simulacro no hay pistas ni corrección: solo se responde.
 //
 // Teclado: ↩ comprueba / intenta de nuevo / sigue; en opciones, A–Z o 1–9 eligen; en verdadero o falso, 1/2.
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion, useAnimate } from 'motion/react'
 import type { Block } from '@shared/schema/blocks'
@@ -12,7 +12,7 @@ import type { Answer, AnswerPart } from '@shared/schema/exercises'
 import { StaticBlocks } from './Blocks'
 import type { BlockContext } from '@renderer/blocks/types'
 import { RichText } from '@renderer/lib/RichText'
-import { Button, cx, Icon, pixelBurst, Tooltip, useTheme } from '@renderer/design'
+import { Button, cx, Icon, Tooltip, useTheme } from '@renderer/design'
 import { correctAnswer } from './grading'
 import { partExercise } from './model'
 import { FeedbackPanel, HintList, InvalidNotice, PartFeedback, SolutionPanel } from './Feedback'
@@ -89,7 +89,6 @@ export function ExerciseView({ controller: c, ctx, skillTitle, continueLabel, ac
   const r = c.run.result
   const level: RevealLevel = exam ? 'none' : c.finished ? 'all' : c.checked ? 'mistakesOnly' : 'none'
   const [scope, animate] = useAnimate<HTMLDivElement>()
-  const checkEl = useRef<HTMLSpanElement | null>(null)
   const prompt = useMemo(() => promptBlocks(ex.prompt, ex.answer), [ex])
   const answerMd = useMemo(() => (c.finished && !exam ? correctAnswer(ex, i18n.language) : ''), [c.finished, exam, ex, i18n.language])
 
@@ -98,14 +97,6 @@ export function ExerciseView({ controller: c, ctx, skillTitle, continueLabel, ac
     if (!c.run.errorPulse || reducedMotion || !scope.current) return
     void animate(scope.current, { x: [0, -7, 7, -5, 5, -2, 0] }, { duration: 0.42, ease: 'easeOut' })
   }, [c.run.errorPulse, reducedMotion, animate, scope])
-  // acierto: ráfaga discreta desde la marca
-  useEffect(() => {
-    if (!c.run.successPulse) return
-    const id = requestAnimationFrame(() => {
-      if (checkEl.current) pixelBurst(checkEl.current, { count: 10, colors: ['var(--success)', 'var(--sun)', '#ffe2a8', 'var(--success)'] })
-    })
-    return () => cancelAnimationFrame(id)
-  }, [c.run.successPulse])
 
   // ↩ fuera de un campo: lo que diga el botón principal
   useKeys(active && !exam, (e) => {
@@ -185,7 +176,7 @@ export function ExerciseView({ controller: c, ctx, skillTitle, continueLabel, ac
                 hints={c.run.hintsShown}
                 attempts={c.run.attempts}
                 onAskTutor={onAskTutor}
-                checkRef={(el) => (checkEl.current = el)}
+                burst={c.run.successPulse}
               >
                 <StaticBlocks blocks={ex.solution} ctx={{ ...ctx, mode: 'chat' }} />
               </FeedbackPanel>
