@@ -137,6 +137,11 @@ async function tour(tag) {
   await snap(`${tag}-course`)
   await go(study('learn', { skill: 'reference-angles' }), 3000)
   await snap(`${tag}-learn`)
+  // el tutor de la lección (sin grabarlo, abrirlo en la demostración daba «esto no está en la demostración»)
+  await page.locator('[data-tutor-button]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(1500)
+  await page.locator('[data-tutor-button]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(500)
   await go(study('practice'), 2500)
   await go(study('cards'), 2500)
   await snap(`${tag}-cards`)
@@ -145,11 +150,14 @@ async function tour(tag) {
   await go(study('exam'), 2200)
   // el simulacro de verdad (sin grabarlo, «Empezar» fallaba en la demostración): empezar, contestar la primera pregunta y
   // entregar (el botón de la barra abre la confirmación; el último «Submit» es el suyo)
-  await tap(/^(Start the mock exam|Resume)$/, 3000)
-  await page.locator('[data-exercise] [role="radio"], [data-exercise] [role="option"]').first().click({ timeout: 4000 }).catch(() => undefined)
-  await page.waitForTimeout(800)
-  await tap(/^Submit$/, 1000)
-  await tap(/^Submit$/, 3500)
+  // una sola vez: en la vuelta estrecha (teléfono) «Entregar» está en el mapa de preguntas y quedaba un simulacro a medias
+  if (tag === 'wide') {
+    await tap(/^(Start the mock exam|Resume)$/, 3000)
+    await page.locator('[data-exercise] [role="radio"], [data-exercise] [role="option"]').first().click({ timeout: 4000 }).catch(() => undefined)
+    await page.waitForTimeout(800)
+    await tap(/^Submit$/, 1000)
+    await tap(/^Submit$/, 3500)
+  }
   for (const view of ['agenda', 'week', 'month']) await go({ name: 'calendar', view }, 1800)
   await snap(`${tag}-calendar`)
   await go({ name: 'stats' }, 2500)
@@ -161,13 +169,17 @@ async function tour(tag) {
   await page.waitForTimeout(3000)
   await go({ name: 'inbox' }, 2500)
   await snap(`${tag}-inbox`)
+  // abrir una novedad la marca como leída: también eso, para que en la demostración se abra sin aviso de error
+  await page.locator('[class*="group/entry"] > button[aria-expanded]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(1500)
   await go({ name: 'create' }, 2000)
   // los ajustes de un dispositivo (lo de uso diario): que la demostración también los enseñe
   await go({ name: 'settings' }, 2500)
   // el chat: un cuestionario rápido con la IA simulada (lo que Aula contesta en la demostración)
   await go({ name: 'chat' }, 2500)
   const box = page.locator('textarea').first()
-  if (await box.count()) {
+  // una sola vez (en la primera vuelta): si no, la conversación de ejemplo repetía la misma pregunta y su respuesta
+  if (tag === 'wide' && (await box.count())) {
     await box.fill('Give me a quick quiz')
     await box.press('Enter')
     await page.waitForSelector('[data-studyset="quiz"]', { timeout: 30000 }).catch(() => undefined)

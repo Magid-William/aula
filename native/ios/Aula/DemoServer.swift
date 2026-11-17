@@ -330,6 +330,8 @@ final class DemoServer: @unchecked Sendable {
               var payload = event["payload"] as? [String: Any], var message = payload["message"] as? [String: Any],
               message["role"] as? String == "assistant" else { return line }
         message["id"] = id
+        // la hora de ahora, no la de la grabación
+        message["date"] = ISO8601DateFormatter.string(from: Date(), timeZone: TimeZone(identifier: "UTC")!, formatOptions: [.withInternetDateTime, .withFractionalSeconds])
         if let was = message["text"] as? String, !was.isEmpty { message["text"] = text }
         payload["message"] = message
         event["payload"] = payload

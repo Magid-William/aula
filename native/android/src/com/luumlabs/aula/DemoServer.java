@@ -311,6 +311,8 @@ final class DemoServer {
             JSONObject message = payload == null ? null : payload.optJSONObject("message");
             if (message == null || !"assistant".equals(message.optString("role"))) return line;
             message.put("id", id);
+            // la hora de ahora, no la de la grabación
+            message.put("date", java.time.Instant.now().toString());
             if (!message.optString("text").isEmpty()) message.put("text", text);
             return event.toString();
         } catch (JSONException e) {
