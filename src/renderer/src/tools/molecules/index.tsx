@@ -4,7 +4,7 @@ import { Component, lazy, Suspense, useMemo, useState, type ReactNode } from 're
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Pause, RotateCw } from 'lucide-react'
-import { Card, IconButton, SegmentedTabs, Spinner, Switch, cx, useTheme } from '@renderer/design'
+import { Card, IconButton, SegmentedTabs, Spinner, Switch, cx, useTheme, useTouchOnly } from '@renderer/design'
 import { parseFormula } from '@engine/chem/parser'
 import { Tex } from '../shared/Tex'
 import { formatNumber } from '../shared/lib/num'
@@ -61,6 +61,8 @@ export default function MoleculesTool(_props: ToolProps) {
   const { t } = useTranslation('tools')
   const comma = useComma()
   const { dark, reducedMotion } = useTheme()
+  // con el dedo se acerca pellizcando, no con la rueda
+  const touch = useTouchOnly()
   const [s, setS] = useStored<Saved>('aula.tools.molecules', { formula: 'H2O', mode: 'ball', lone: true, rotate: true })
   const [draft, setDraft] = useState(s.formula)
   const res = useMemo(() => moleculeFor(s.formula), [s.formula])
@@ -91,7 +93,8 @@ export default function MoleculesTool(_props: ToolProps) {
         ) : (
           <div className="absolute inset-0 grid place-items-center t-callout text-text3">{t('molecules.none')}</div>
         )}
-        <div className="pointer-events-none absolute top-5 left-6 right-6 flex items-start justify-between gap-4">
+        {/* en una columna estrecha (un teléfono) la fórmula va encima del interruptor: al lado, este la tapaba */}
+        <div className="pointer-events-none absolute top-5 left-6 right-6 flex items-start justify-between gap-4 @max-xl:flex-col @max-xl:gap-2 @max-xl:top-4 @max-xl:left-4 @max-xl:right-4">
           <AnimatePresence mode="wait">
             {m && (
               <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="min-w-0">
@@ -118,8 +121,10 @@ export default function MoleculesTool(_props: ToolProps) {
             </IconButton>
           </div>
         </div>
+        {/* la leyenda y la pista, en una sola fila que se parte (antes eran dos cajas en la misma línea y se pisaban) */}
+        <div className="pointer-events-none absolute bottom-4 left-6 right-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-1.5 t-caption @max-xl:left-4 @max-xl:right-4">
         {m && (
-          <div className="pointer-events-none absolute bottom-4 left-6 flex flex-wrap gap-3 t-caption">
+          <div className="flex flex-wrap gap-3">
             {elements.map((el) => (
               <span key={el} className="inline-flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full border-[0.5px] border-line" style={{ background: atomSwatch(el, dark) }} />
@@ -134,7 +139,8 @@ export default function MoleculesTool(_props: ToolProps) {
             )}
           </div>
         )}
-        <div className="pointer-events-none absolute bottom-4 right-6 t-caption">{t('molecules.dragHint')}</div>
+        <div className="ml-auto">{t('molecules.dragHint', { context: touch ? 'touch' : undefined })}</div>
+        </div>
       </Card>
 
       <div className="flex flex-col gap-4 min-w-0">

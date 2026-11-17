@@ -1,7 +1,8 @@
 // Cabecera del curso, compacta: su icono pixel-art se enciende píxel a píxel sobre una losa dibujada a mano, el título en
 // serif en una línea y, debajo, una sola línea de datos (asignatura, código, el examen y lo que tiene el curso). A la
 // derecha, «Estudiar ahora» (solo en el Resumen: una sola acción en ladrillo por vista) y el menú «⋯», que también pide
-// cambios a Aula.
+// cambios a Aula. En una columna estrecha (un teléfono) se reparte en filas: icono, título (hasta dos líneas) y «⋯»; los
+// datos debajo, a todo el ancho; y «Estudiar ahora», un botón ancho al final.
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
@@ -29,20 +30,21 @@ export function CourseHeader({ pack, view }: { pack: Pack; view: CourseView }) {
   }, [])
   const facts = useCourseFacts(pack)
   return (
-    <div className="flex items-center gap-4">
+    // estrecha: una rejilla con sus zonas (el texto y las acciones se deshacen en ella con `contents`); ancha, una fila
+    <div className={cx('flex items-center gap-4', view === 'overview' ? NARROW_GRID_CTA : NARROW_GRID)}>
       {/* el icono, sobre una losa dibujada a mano: relleno plano del tono y su contorno de tinta, algo fuera de registro */}
-      <motion.div className="shrink-0" whileHover={{ y: -1.5 }} transition={{ type: 'spring', stiffness: 439, damping: 20 }}>
+      <motion.div className="shrink-0 @max-xl:[grid-area:icon]" whileHover={{ y: -1.5 }} transition={{ type: 'spring', stiffness: 439, damping: 20 }}>
         <DrawnTile seed={pack.id} size={56} radius={17} fill={`color-mix(in oklab, ${dark ? tone.fillDark : tone.fillLight} ${dark ? 24 : 16}%, var(--paper))`} ink={dark ? tone.inkDark : tone.inkLight} inkAlpha={dark ? 0.8 : 0.75}>
           <PixelIcon icon={pack.icon} hue={pack.hue} size={36} title={pack.title} animation="dissolve" celebrate />
         </DrawnTile>
       </motion.div>
-      <div className="min-w-0 flex-1">
-        <motion.h1 className="t-title1 truncate" title={pack.title} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.15 }}>
+      <div className="min-w-0 flex-1 @max-xl:contents">
+        <motion.h1 className="t-title1 truncate @max-xl:[grid-area:title] @max-xl:line-clamp-2 @max-xl:whitespace-normal @max-xl:[overflow-wrap:anywhere]" title={pack.title} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.15 }}>
           {pack.title}
         </motion.h1>
         {/* cada dato lleva su «·» delante, en su margen: la línea se corre ese margen a la izquierda y lo recorta, así que el
             punto del primero de cada línea no se ve. Al partirse, ninguna línea empieza ni acaba en «·» */}
-        <div className="t-callout text-text2 mt-0.5 -ml-4 flex flex-wrap items-center gap-y-0.5 [clip-path:inset(0_0_0_1rem)]">
+        <div className="t-callout text-text2 mt-0.5 -ml-4 flex flex-wrap items-center gap-y-0.5 [clip-path:inset(0_0_0_1rem)] @max-xl:mt-0 @max-xl:[grid-area:facts]">
           {/* un curso de ejemplo lo dice (A4-P1-1) */}
           {showsAsSample(pack.id) && <span className="inline-flex pl-4"><SampleTag /></span>}
           {facts.map((f, i) => (
@@ -52,12 +54,13 @@ export function CourseHeader({ pack, view }: { pack: Pack; view: CourseView }) {
           ))}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 @max-xl:contents">
         {view === 'overview' && (
-          <Button variant="primary" size="lg" onClick={() => navigate({ name: 'study', id: pack.id, mode: 'plan', start: true })}>
+          <Button variant="primary" size="lg" className="@max-xl:mt-1 @max-xl:w-full @max-xl:[grid-area:cta]" onClick={() => navigate({ name: 'study', id: pack.id, mode: 'plan', start: true })}>
             {t('studyNow')}
           </Button>
         )}
+        <span className="inline-flex @max-xl:self-start @max-xl:[grid-area:menu]">
         <Menu
           trigger={(open) => (
             <IconButton label={t('common:actions.more')} variant="filled" onClick={open}>
@@ -73,12 +76,18 @@ export function CourseHeader({ pack, view }: { pack: Pack; view: CourseView }) {
             ...(canFrom(api.role, 'courses.delete') ? [{ label: t('common:actions.delete'), icon: <Icon name="trash" size={15} />, danger: true, separatorBefore: true, onSelect: () => setAction('delete') }] : [])
           ]}
         />
+        </span>
         <CourseActions pack={pack} action={action} onClose={() => setAction(null)} />
         <RequestChangesDialog pack={pack} open={changes} onClose={() => setChanges(false)} />
       </div>
     </div>
   )
 }
+
+/** Las zonas de la cabecera en una columna estrecha: icono, título y «⋯»; los datos; y, en el Resumen, «Estudiar ahora». */
+const NARROW = '@max-xl:grid @max-xl:grid-cols-[auto_minmax(0,1fr)_auto] @max-xl:gap-x-3 @max-xl:gap-y-2.5'
+const NARROW_GRID = `${NARROW} @max-xl:[grid-template-areas:'icon_title_menu'_'facts_facts_facts']`
+const NARROW_GRID_CTA = `${NARROW} @max-xl:[grid-template-areas:'icon_title_menu'_'facts_facts_facts'_'cta_cta_cta']`
 
 /** La línea de datos: asignatura, código, el examen (en ladrillo si faltan tres días o menos) y lo que tiene el curso. */
 function useCourseFacts(pack: Pack): ReactNode[] {

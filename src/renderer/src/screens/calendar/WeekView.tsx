@@ -1,26 +1,32 @@
 // Vista de semana: rejilla de horas con los eventos como bloques del tono de su curso (con el título entero si el bloque es
-// alto) y la línea de «ahora» en ladrillo. Tocar un evento abre su hoja; tocar la cabecera de un día lo elige.
+// alto) y la línea de «ahora» en ladrillo. Tocar un evento abre su hoja; tocar la cabecera de un día lo elige. En el teléfono,
+// tres días desde el elegido (siete columnas de 40 px no se leían) y se pasa a los siguientes deslizando el dedo.
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { addDays, isSameDay, startOfWeek } from 'date-fns'
+import { addDays, isSameDay, startOfDay, startOfWeek } from 'date-fns'
 import { Card, InkRing, cx, useTheme } from '@renderer/design'
 import type { CalEvent } from './data'
 import { useEventColor } from './data'
-import { eventsOn, weekOpts } from './util'
-import { fmtDate, fmtTime } from '@renderer/lib/format'
+import { eventsOn, hourLabel, weekOpts } from './util'
+import { fmtDate, fmtTime, uiLocale } from '@renderer/lib/format'
 import { openEventSheet } from './sheet'
+import { useSwipe } from './swipe'
 
 const START_H = 7
 const END_H = 23
 const HOUR = 52
 
-export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date; events: CalEvent[]; selected: Date; onSelect: (d: Date) => void }) {
-  const { t } = useTranslation('calendar')
+/** Las columnas: el margen de las horas y los días (literales, para que Tailwind las vea). */
+const COLS = { 7: 'grid-cols-[56px_repeat(7,minmax(0,1fr))]', 3: 'grid-cols-[44px_repeat(3,minmax(0,1fr))]' } as const
+
+export function WeekView({ anchor, events, selected, onSelect, span = 7, onStep }: { anchor: Date; events: CalEvent[]; selected: Date; onSelect: (d: Date) => void; span?: 7 | 3; onStep?: (n: number) => void }) {
+  const { t, i18n } = useTranslation('calendar')
   const { dark } = useTheme()
   const color = useEventColor()
-  const start = startOfWeek(anchor, weekOpts)
-  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
+  const start = span === 7 ? startOfWeek(anchor, weekOpts) : startOfDay(anchor)
+  const days = Array.from({ length: span }, (_, i) => addDays(start, i))
+  const swipe = useSwipe((n) => onStep?.(n))
   const scroller = useRef<HTMLDivElement>(null)
   const [now, setNow] = useState(new Date())
   useEffect(() => {
@@ -30,7 +36,7 @@ export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date;
   // Al abrir: hacia la hora actual, pero nunca después del primer evento de la semana (ni de las 8:00 si no hay ninguno);
   // así, de noche, se ven las clases de la mañana y no unas horas vacías.
   const firstHour = (() => {
-    const end = addDays(start, 7)
+    const end = addDays(start, span)
     const hs = events.filter((e) => e.start >= start && e.start < end).map((e) => e.start.getHours())
     return hs.length ? Math.min(...hs) : 8
   })()
@@ -43,8 +49,8 @@ export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date;
   }, [firstHour])
   const hours = Array.from({ length: END_H - START_H + 1 }, (_, i) => START_H + i)
   return (
-    <Card floating elevation={2} padded={false} className="h-full flex flex-col overflow-hidden">
-      <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b-[0.5px] border-line px-2 py-2">
+    <Card floating elevation={2} padded={false} className="h-full flex flex-col overflow-hidden touch-pan-y" lang={i18n.language} {...(onStep ? swipe : {})}>
+      <div className={cx('grid border-b-[0.5px] border-line px-2 py-2', COLS[span])}>
         <span />
         {days.map((d) => {
           const today = isSameDay(d, now)
@@ -70,11 +76,11 @@ export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date;
         })}
       </div>
       <div ref={scroller} className="relative flex-1 overflow-y-auto px-2">
-        <div className="relative grid grid-cols-[56px_repeat(7,minmax(0,1fr))]" style={{ height: (END_H - START_H + 1) * HOUR }}>
+        <div className={cx('relative grid', COLS[span])} style={{ height: (END_H - START_H + 1) * HOUR }}>
           <div className="relative">
             {hours.map((h) => (
-              <div key={h} className="absolute right-2 t-caption tabular -translate-y-1/2" style={{ top: (h - START_H) * HOUR }}>
-                {String(h).padStart(2, '0')}:00
+              <div key={h} className="absolute right-2 whitespace-nowrap t-caption tabular -translate-y-1/2" style={{ top: (h - START_H) * HOUR }}>
+                {hourLabel(h, uiLocale())}
               </div>
             ))}
           </div>
@@ -110,7 +116,7 @@ export function WeekView({ anchor, events, selected, onSelect }: { anchor: Date;
                       style={{ top, height, background: eventFill(c, dark) }}
                     >
                       {/* el título entero (en dos líneas si el bloque es alto) y, si cabe, la hora */}
-                      <div className={cx('text-[calc(12rem/15)] leading-[calc(15rem/15)] font-semibold text-text', height > 44 ? 'line-clamp-2 break-words' : 'truncate', e.done && 'line-through opacity-60')}>{e.title}</div>
+                      <div className={cx('text-[calc(12rem/15)] leading-[calc(15rem/15)] font-semibold text-text', height > 44 ? 'line-clamp-2 break-words hyphens-auto' : 'truncate', e.done && 'line-through opacity-60')}>{e.title}</div>
                       {height > 60 && <div className="t-caption truncate">{fmtTime(e.start)}</div>}
                     </motion.button>
                   )

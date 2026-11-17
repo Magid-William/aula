@@ -80,7 +80,8 @@ export function Dialog({ open, onClose, title, description, children, footer, si
   return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[80] grid place-items-center p-6" style={SAFE_LAYER} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        // en el teléfono, menos margen alrededor y dentro: con 24 + 28 px por lado quedaban 290 px para lo que dice
+        <motion.div className="fixed inset-0 z-[80] grid place-items-center p-6 phone:px-3" style={SAFE_LAYER} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <motion.div className="absolute inset-0 bg-black/20 dark:bg-black/45" onClick={onClose} />
           <motion.div
             ref={ref}
@@ -88,7 +89,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
             aria-modal="true"
             tabIndex={-1}
             style={{ maxHeight: 'min(88vh, calc(100dvh - var(--kb, 0px) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 3rem))' }}
-            className={cx('relative w-full bg-raised border-[0.5px] border-line shadow-[var(--e4)] rounded-[24px] p-7 overflow-auto overscroll-contain outline-none', widths[size], className)}
+            className={cx('relative w-full bg-raised border-[0.5px] border-line shadow-[var(--e4)] rounded-[24px] p-7 overflow-auto overscroll-contain outline-none phone:p-5', widths[size], className)}
             initial={{ opacity: 0, y: 14, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -102,7 +103,8 @@ export function Dialog({ open, onClose, title, description, children, footer, si
             {title && <h2 className="t-title2 pr-10">{title}</h2>}
             {description && <p className="text-text2 mt-1.5">{description}</p>}
             {children && <div className={cx(title || description ? 'mt-5' : '')}>{children}</div>}
-            {footer && <div className="mt-6 flex items-center justify-end gap-2">{footer}</div>}
+            {/* el pie se parte si no cabe; en un teléfono cada botón crece hasta llenar su fila */}
+            {footer && <div className="mt-6 flex flex-wrap items-center justify-end gap-2 phone:[&>button]:grow">{footer}</div>}
           </motion.div>
         </motion.div>
       )}

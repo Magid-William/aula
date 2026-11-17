@@ -65,7 +65,7 @@ export function LearnTab({ pack, ov, phase = 'none', writing }: { pack: Pack; ov
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: Math.min(i, 8) * 0.03, ease: [0.2, 0.7, 0.2, 1] }}
                   data-topic-state={state}
-                  className={cx(RULED_ROW, 'group/topic flex items-center gap-5 rounded-[14px] px-3 py-3.5 outline-none transition-colors', opens ? 'cursor-default hover:bg-fill1 focus-visible:bg-fill1' : 'text-text3')}
+                  className={cx(RULED_ROW, 'group/topic flex items-center gap-5 rounded-[14px] px-3 py-3.5 outline-none transition-colors @max-2xl:gap-3', opens ? 'cursor-default hover:bg-fill1 focus-visible:bg-fill1' : 'text-text3')}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2.5">
@@ -84,8 +84,12 @@ export function LearnTab({ pack, ov, phase = 'none', writing }: { pack: Pack; ov
                     <TopicState state={state} />
                   ) : (
                     <>
-                      <MasteryBar value={shownMastery(mastery.get(sid))} ink={ink} className="hidden @2xl:inline-flex" />
-                      <span className="w-[52px] shrink-0 text-right t-footnote tabular text-text3">{t('minutes', { count: s.minutes })}</span>
+                      {/* la barra, solo si hay sitio: va envuelta porque MasteryBar ya trae su `inline-flex` (cx no resuelve
+                          clases que chocan y «hidden» perdía: la barra se veía siempre y estrujaba el tema en un teléfono) */}
+                      <span className="hidden @2xl:inline-flex">
+                        <MasteryBar value={shownMastery(mastery.get(sid))} ink={ink} />
+                      </span>
+                      <span className="w-[52px] shrink-0 text-right t-footnote tabular text-text3 @max-2xl:w-auto">{t('minutes', { count: s.minutes })}</span>
                     </>
                   )}
                   {opens && <Icon name="chevron-right" size={14} className="shrink-0 text-text3 transition-transform group-hover/topic:translate-x-0.5" />}

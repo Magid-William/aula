@@ -208,6 +208,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             value={text}
             // con el dedo no se enfoca sola: el teclado taparía la conversación al llegar
             autoFocus={autoFocus && canAutoFocus()}
+            // Intro envía (Mayús+Intro, salto de línea): la tecla del teclado de la pantalla dice «Enviar», que es lo que hace
+            enterKeyHint="send"
             onChange={(e) => {
               setText(e.target.value)
               setCaret(e.target.selectionStart)

@@ -39,3 +39,17 @@ export function fitChips(avail: number, count: number): { shown: number; wrap: n
   const spare = avail - (count * CHIP.line + (count - 1) * CHIP.gap)
   return { shown: count, wrap: Math.min(count, Math.max(0, Math.floor(spare / (CHIP.wrap - CHIP.line)))) }
 }
+
+/** La etiqueta de una hora en la rejilla de la semana, como la escribe el idioma: «13:00» o, con reloj de 12 horas, «1 PM»
+ *  (cabe en el margen estrecho; antes era siempre «13:00», también en inglés). */
+export function hourLabel(h: number, locale: string): string {
+  const d = new Date(2000, 0, 1, h)
+  const twelve = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12
+  return new Intl.DateTimeFormat(locale, twelve ? { hour: 'numeric' } : { hour: '2-digit', minute: '2-digit' }).format(d)
+}
+
+/** Un deslizamiento con el dedo sobre la rejilla: 1 (al siguiente), -1 (al anterior) o 0 si no fue claramente horizontal. */
+export function swipeStep(dx: number, dy: number, min = 48): -1 | 0 | 1 {
+  if (Math.abs(dx) < min || Math.abs(dx) < Math.abs(dy) * 1.5) return 0
+  return dx < 0 ? 1 : -1
+}
