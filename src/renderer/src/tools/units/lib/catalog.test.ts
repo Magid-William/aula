@@ -20,7 +20,7 @@ describe('conversor', () => {
   it('usa factores por definición', () => {
     expect(conv('mass', 1, 'kg', 'lb')).toBeCloseTo(2.20462262185, 10)
     expect(conv('pressure', 1, 'atm', 'mmHg')).toBeCloseTo(760, 9)
-    expect(conv('speed', 36, 'kmh', 'ms')).toBeCloseTo(10, 12)
+    expect(conv('speed', 36, 'kmh', 'mps')).toBeCloseTo(10, 12)
     expect(conv('data', 1, 'GiB', 'MiB')).toBe(1024)
     expect(conv('angle', 180, 'deg', 'rad')).toBeCloseTo(Math.PI, 12)
     expect(conv('energy', 1, 'kcal', 'kJ')).toBeCloseTo(4.184, 12)
@@ -37,5 +37,10 @@ describe('conversor', () => {
       expect(c.units.some((x) => x.id === c.to)).toBe(true)
       expect(new Set(c.units.map((x) => x.id)).size).toBe(c.units.length)
     }
+  })
+  it('no repite ids de unidad entre categorías (los nombres se traducen por id)', () => {
+    const ids = CATEGORIES.flatMap((c) => c.units.map((x) => x.id))
+    const repeated = ids.filter((id, i) => ids.indexOf(id) !== i)
+    expect(repeated).toEqual([])
   })
 })
