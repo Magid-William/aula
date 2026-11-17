@@ -339,13 +339,19 @@ html.remote [data-screen] :is(.overflow-y-auto, .overflow-auto, .overflow-y-scro
 html.compact body {
   background: var(--paper);
 }
-/* Lo que ocupa abajo lo fijo de la app: en el escritorio nada; en el teléfono las pestañas (y la barra de inicio), o el
-   teclado mientras se escribe. Los avisos flotantes se apoyan encima. */
+/* Las zonas de la hora, de la barra de inicio y de los bordes: las del sistema (env) o las que pasa la app de Android
+   cuando la página llega bajo sus barras (--aula-safe-*, docs/DEVICES.md). En el escritorio, 0.
+   Lo que ocupa abajo lo fijo de la app (`--dock`): en el escritorio nada; en el teléfono las pestañas (y la barra de
+   inicio), o el teclado mientras se escribe. Los avisos flotantes se apoyan encima. */
 :root {
-  --dock: env(safe-area-inset-bottom, 0px);
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--aula-safe-top, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--aula-safe-right, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--aula-safe-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--aula-safe-left, 0px));
+  --dock: var(--safe-bottom);
 }
 html.compact {
-  --dock: calc(56px + env(safe-area-inset-bottom, 0px));
+  --dock: calc(56px + var(--safe-bottom));
 }
 html.compact.kb-open {
   --dock: var(--kb, 0px);

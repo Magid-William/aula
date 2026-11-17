@@ -4,6 +4,7 @@
 // en el teléfono, una pestaña que no es «Hoy») deja UNA entrada de guarda en el historial: «atrás» la consume, Aula
 // retrocede y, si aún queda adónde volver, la pone otra vez. Sin nada que deshacer no hay guarda y «atrás» sale de la app.
 // La app nativa también puede preguntar antes con `window.__aulaBack()` (devuelve si lo atendió).
+import { hideLive, useLive } from '@renderer/lib/live'
 import { navigate, useNav } from '../router'
 import { routeToHash } from '../routeHash'
 import { usePalette } from './CommandPalette'
@@ -12,20 +13,28 @@ import { backAction, type BackAction } from './backAction'
 /** Capas que se cierran con Esc: diálogos y paneles, menús, listas desplegadas. */
 const OVERLAY = '[role="dialog"][aria-modal="true"], [role="menu"][data-aula-menu], [role="listbox"][data-aula-select]'
 
-function overlayOpen(): boolean {
-  return usePalette.getState().isOpen || document.querySelector(OVERLAY) !== null
+/** Cuántas capas hay abiertas encima (el buscador no es un portal, pero también cuenta). */
+function overlays(): number {
+  return (usePalette.getState().isOpen ? 1 : 0) + document.querySelectorAll(OVERLAY).length
 }
 
-function current(compact: () => boolean): BackAction {
+/** Una capa que no se cerró con «atrás» (no atiende Esc) no lo atrapa: pasado este rato, se mira lo que hay debajo. */
+const SETTLE_MS = 450
+let tried: { count: number; at: number } | null = null
+
+function current(compact: () => boolean, skipOverlay = false): BackAction {
   const { canBack, route } = useNav.getState()
-  return backAction({ overlay: overlayOpen(), canBack, compact: compact(), route: route.name })
+  return backAction({ overlay: !skipOverlay && overlays() > 0, canBack, compact: compact(), route: route.name })
 }
 
 /** Atiende «atrás» dentro de Aula; `false` si no hay nada que deshacer. */
 export function handleDeviceBack(compact: () => boolean): boolean {
   const action = current(compact)
   if (action === 'overlay') {
+    tried = { count: overlays(), at: Date.now() }
     if (usePalette.getState().isOpen) usePalette.getState().close()
+    // el navegador en vivo se queda con las teclas (Esc iría a su página): se cierra el panel
+    else if (useLive.getState().state) hideLive()
     else {
       // cada capa ya se cierra con Esc (y solo la de más arriba): se le manda uno
       const target = document.activeElement instanceof HTMLElement ? document.activeElement : document.body
@@ -44,7 +53,11 @@ export function installDeviceBack(compact: () => boolean): () => void {
   const here = (): string => routeToHash(useNav.getState().route) || window.location.pathname
   const sync = (): void => {
     timer = null
-    const want = current(compact) !== null
+    // ¿la capa que se intentó cerrar sigue ahí, ya asentada? entonces no cuenta (si no, «atrás» no saldría nunca)
+    const settled = tried !== null && Date.now() - tried.at >= SETTLE_MS
+    const stuck = settled && tried !== null && overlays() >= tried.count
+    if (settled) tried = null
+    const want = current(compact, stuck) !== null
     try {
       if (want && !guarded) {
         window.history.pushState(null, '', here())
@@ -73,10 +86,12 @@ export function installDeviceBack(compact: () => boolean): () => void {
       /* sin historial */
     }
     later()
+    setTimeout(later, SETTLE_MS)
   }
   window.addEventListener('popstate', onPop)
   const offNav = useNav.subscribe(later)
   const offPalette = usePalette.subscribe((s, prev) => s.isOpen !== prev.isOpen && later())
+  const offLive = useLive.subscribe((s, prev) => !s.state !== !prev.state && later())
   // los diálogos, paneles y menús se pintan en un portal, como hijos directos de <body>
   const portals = new MutationObserver(later)
   portals.observe(document.body, { childList: true })
@@ -87,6 +102,7 @@ export function installDeviceBack(compact: () => boolean): () => void {
     window.removeEventListener('popstate', onPop)
     offNav()
     offPalette()
+    offLive()
     portals.disconnect()
     if (timer) clearTimeout(timer)
     delete host.__aulaBack

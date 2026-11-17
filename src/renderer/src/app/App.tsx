@@ -98,7 +98,7 @@ export function App() {
       <AppCommands />
       <Backdrop compact={compact} />
       {/* en la tableta el hueco de la hora queda sobre el lienzo, como la barra lateral; en el teléfono lo pinta la hoja */}
-      <div className={cx('relative flex h-full', compact && 'flex-col')} style={remote && !compact ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}>
+      <div className={cx('relative flex h-full', compact && 'flex-col')} style={remote && !compact ? { paddingTop: 'var(--safe-top)' } : undefined}>
         {/* el hueco de arriba (sobre la hoja) también arrastra la ventana */}
         {!remote && <div aria-hidden className="drag absolute inset-x-0 top-0 h-2" />}
         {!compact && <Sidebar />}
@@ -153,7 +153,7 @@ function Sheet({ children, compact }: { children: ReactNode; compact?: boolean }
         // en el teléfono la hoja es toda la pantalla: sin marco, y empieza bajo la hora y la batería (con su papel detrás)
         compact ? 'min-h-0' : cx('border-[0.5px] border-line shadow-[var(--e1)]', mac ? 'my-2 mr-2 rounded-[16px]' : 'rounded-l-[16px] border-r-0 border-y-0')
       )}
-      style={compact ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}
+      style={compact ? { paddingTop: 'var(--safe-top)' } : undefined}
     >
       {children}
     </main>

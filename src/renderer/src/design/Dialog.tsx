@@ -72,7 +72,7 @@ export interface DialogProps {
 const widths = { sm: 'max-w-[420px]', md: 'max-w-[560px]', lg: 'max-w-[760px]', xl: 'max-w-[1040px]', full: 'max-w-[min(1320px,94vw)]' }
 
 /** La capa entera: no baja de lo que tapa el teclado, ni entra bajo la hora o la barra de inicio (en el escritorio, 0). */
-const SAFE_LAYER = { bottom: 'var(--kb, 0px)', paddingTop: 'max(1.5rem, env(safe-area-inset-top))', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }
+const SAFE_LAYER = { bottom: 'var(--kb, 0px)', paddingTop: 'max(1.5rem, var(--safe-top, 0px))', paddingBottom: 'max(1.5rem, var(--safe-bottom, 0px))' }
 
 export function Dialog({ open, onClose, title, description, children, footer, size = 'md', hideClose, className }: DialogProps) {
   useEscape(open, onClose)
@@ -88,7 +88,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
             role="dialog"
             aria-modal="true"
             tabIndex={-1}
-            style={{ maxHeight: 'min(88vh, calc(100dvh - var(--kb, 0px) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 3rem))' }}
+            style={{ maxHeight: 'min(88vh, calc(100dvh - var(--kb, 0px) - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 3rem))' }}
             className={cx('relative w-full bg-raised border-[0.5px] border-line shadow-[var(--e4)] rounded-[24px] p-7 overflow-auto overscroll-contain outline-none phone:p-5', widths[size], className)}
             initial={{ opacity: 0, y: 14, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -132,8 +132,8 @@ export function Drawer({ open, onClose, children, side = 'right', width = 440, t
               width,
               // en un teléfono el panel no cabe entero: ocupa la pantalla menos el margen
               maxWidth: 'calc(100vw - 24px)',
-              top: 'calc(var(--titlebar-h, 0px) + 12px + env(safe-area-inset-top))',
-              bottom: 'calc(12px + max(env(safe-area-inset-bottom), var(--kb, 0px)))'
+              top: 'calc(var(--titlebar-h, 0px) + 12px + var(--safe-top, 0px))',
+              bottom: 'calc(12px + max(var(--safe-bottom, 0px), var(--kb, 0px)))'
             }}
             initial={{ x: off, opacity: 0.6 }}
             animate={{ x: 0, opacity: 1 }}

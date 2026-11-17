@@ -61,7 +61,7 @@ export function registerCommands(id: string, provider: Provider): () => void {
 /** Espera tras la última tecla antes de buscar en los cursos, y cuántos resultados enseñar. */
 const SEARCH_DEBOUNCE_MS = 160
 /** Dónde empieza el buscador: un poco por debajo del borde de arriba, y nunca bajo la hora de un teléfono. */
-const PALETTE_TOP = 'max(12vh, calc(env(safe-area-inset-top) + 8px))'
+const PALETTE_TOP = 'max(12vh, calc(var(--safe-top, 0px) + 8px))'
 const MAX_HITS = 12
 
 /** Busca en todos los cursos (con espera entre teclas); si aún se están indexando cursos, vuelve a preguntar. */

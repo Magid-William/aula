@@ -36,7 +36,7 @@ export function CompactTabs() {
   const unread = useInboxCount()
   return (
     // mientras se escribe con el teclado de la pantalla las pestañas se apartan (styles.css: html.kb-open), para dejar sitio
-    <nav aria-label="Aula" data-compact-tabs className="shrink-0 border-t-[0.5px] border-line bg-surface" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav aria-label="Aula" data-compact-tabs className="shrink-0 border-t-[0.5px] border-line bg-surface" style={{ paddingBottom: 'var(--safe-bottom)' }}>
       <ul className="m-0 flex list-none items-stretch p-0">
         {TABS.map((tab) => {
           const on = current === tab.route.name
