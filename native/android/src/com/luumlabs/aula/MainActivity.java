@@ -94,8 +94,12 @@ public final class MainActivity extends Activity {
     private static final String GATE_HEADER = "X-Aula-Gate";
     private static final String DOWNLOAD = "https://github.com/luumlabs/aula/releases/latest";
     private static final int PICK_FILES = 7;
-    /** Volver atrás dentro de la interfaz: su propia navegación (cierra antes lo que haya abierto) o su historial. */
-    private static final String PAGE_BACK = "(window.aulaNav && window.aulaNav.back) ? window.aulaNav.back() : history.back(); void 0";
+    /**
+     * «Atrás» dentro de la interfaz: se le pregunta primero (window.__aulaBack cierra lo que haya abierto encima o vuelve
+     * a la pantalla anterior, y dice si lo hizo; deviceBack.ts). true: lo atendió.
+     */
+    private static final String ASK_BACK = "(() => { if (typeof window.__aulaBack === 'function') return !!window.__aulaBack();"
+        + " if (window.aulaNav && typeof window.aulaNav.back === 'function') { window.aulaNav.back(); return true } return false })()";
     /** Una pestaña del navegador dentro de la app (Custom Tabs, sin la librería): basta con estos extras. */
     private static final String TAB_SESSION = "android.support.customtabs.extra.SESSION";
     private static final String TAB_COLOR = "android.support.customtabs.extra.TOOLBAR_COLOR";
@@ -321,15 +325,13 @@ public final class MainActivity extends Activity {
             return true;
         }
         if (stage != Stage.READY || web == null) return false;
-        if (pageCanGoBack) {
-            web.evaluateJavascript(PAGE_BACK, null);
-            return true;
-        }
-        if (web.canGoBack()) {
-            web.goBack();
-            return true;
-        }
-        return false;
+        // primero la interfaz; si no tenía nada que deshacer, su historial; si tampoco, la app pasa a segundo plano
+        web.evaluateJavascript(ASK_BACK, handled -> {
+            if (isDestroyed() || "true".equals(handled)) return;
+            if (web.canGoBack()) web.goBack();
+            else moveTaskToBack(true);
+        });
+        return true;
     }
 
     /**
@@ -1158,14 +1160,19 @@ public final class MainActivity extends Activity {
         int left = edge ? Math.round(insL / d) : 0;
         int right = edge ? Math.round(insR / d) : 0;
         int bottom = edge && imeB == 0 ? Math.round(insB / d) : 0;
-        String vars = "--aula-safe-top:" + top + "px;--aula-safe-right:" + right + "px;--aula-safe-bottom:" + bottom + "px;--aula-safe-left:" + left
-            + "px;--aula-font-scale:" + fontScale();
+        float scale = fontScale();
+        boolean ime = imeB > 0;
+        String vars = top + "," + right + "," + bottom + "," + left + "," + scale + "," + ime;
         if (vars.equals(pushedVars)) return;
         pushedVars = vars;
-        String js = "(() => { const s = document.documentElement && document.documentElement.style; if (!s) return;"
+        // los márgenes (--aula-safe-*), el teclado (html.ime-open, lo lee keyboard.ts) y el tamaño del texto del sistema
+        // (window.__aulaFontScale de theme.tsx, o __aulaPendingFontScale si la interfaz aún no cargó)
+        String js = "(() => { const r = document.documentElement; if (!r) return; const s = r.style;"
             + " for (const [k, v] of [['top'," + top + "],['right'," + right + "],['bottom'," + bottom + "],['left'," + left + "]]) {"
             + " s.setProperty('--aula-safe-' + k, v + 'px'); s.setProperty('--aula-inset-' + k, v + 'px') }"
-            + " s.setProperty('--aula-font-scale', '" + fontScale() + "'); window.dispatchEvent(new Event('aula:insets')) })()";
+            + " s.setProperty('--aula-font-scale', '" + scale + "'); r.classList.toggle('ime-open', " + ime + ");"
+            + " if (typeof window.__aulaFontScale === 'function') window.__aulaFontScale(" + scale + "); else window.__aulaPendingFontScale = " + scale + ";"
+            + " window.dispatchEvent(new Event('aula:insets')) })()";
         web.evaluateJavascript(js, null);
     }
 
@@ -1597,9 +1604,9 @@ public final class MainActivity extends Activity {
 
     /**
      * Lo que la interfaz puede pedir a la app (`window.aulaApp`), lo mismo que en el iPhone (WebView.swift): page(json)
-     * cómo se ve (lo manda Shell.js), switchAula() y aulaCount(), setCanGoBack(bool) (con true, «atrás» llama a
-     * window.aulaNav.back(), o a history.back()), showLicenses(), exitDemo(), demoNotice(bool), edgeToEdge(bool) (la
-     * interfaz llega bajo las barras y deja sitio con --aula-safe-*) y fontScale().
+     * cómo se ve (lo manda Shell.js), switchAula() y aulaCount(), setCanGoBack(bool) («atrás» tiene algo que hacer
+     * aunque el historial no lo diga), showLicenses(), exitDemo(), demoNotice(bool), edgeToEdge(bool) (la interfaz llega
+     * bajo las barras y deja sitio con --aula-safe-*) y fontScale().
      */
     private final class AppBridge {
         @JavascriptInterface

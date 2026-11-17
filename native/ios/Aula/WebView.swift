@@ -43,8 +43,8 @@ struct WebView: PlatformViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(events: events) }
 
     /// Lo que la interfaz puede pedir a la app (`window.aulaApp`). Lo mismo que en Android (MainActivity.AppBridge):
-    /// page(json) cómo se ve (lo manda Shell.js), switchAula(), setCanGoBack(bool) (con true, deslizar desde el borde
-    /// izquierdo llama a window.aulaNav.back(), o a history.back()), showLicenses(), exitDemo() y demoNotice(bool).
+    /// page(json) cómo se ve (lo manda Shell.js), switchAula(), setCanGoBack(bool) (deslizar desde el borde izquierdo tiene
+    /// algo que hacer aunque el historial no lo diga), showLicenses(), exitDemo() y demoNotice(bool).
     private static let appBridge = """
     (() => {
       const post = (m) => window.webkit.messageHandlers.aulaApp.postMessage(m);
@@ -274,11 +274,16 @@ final class AulaWebView: WKWebView {
     private(set) var systemDark = false
     var onSystemStyle: (@MainActor (Bool) -> Void)?
     private var sceneWatch: (scene: UIWindowScene, token: any UITraitChangeRegistration)?
-    /// La interfaz tiene adónde volver: se puede deslizar desde el borde izquierdo, como en las apps del iPhone.
+    /// La interfaz tiene adónde volver: se puede deslizar desde el borde izquierdo, como en las apps del iPhone. Lo dice
+    /// ella (setCanGoBack) o su historial: mientras tiene algo que deshacer deja una entrada de guarda (deviceBack.ts).
     var pageCanGoBack = false {
-        didSet { edgeSwipe?.isEnabled = pageCanGoBack }
+        didSet { updateSwipe() }
     }
     private var edgeSwipe: UIScreenEdgePanGestureRecognizer?
+    private var historyWatch: NSKeyValueObservation?
+    /// «Atrás» dentro de la interfaz: se le pregunta primero (window.__aulaBack dice si lo atendió).
+    private static let askBack = "(() => { if (typeof window.__aulaBack === 'function') return !!window.__aulaBack();"
+        + " if (window.aulaNav && typeof window.aulaNav.back === 'function') { window.aulaNav.back(); return true } return false })()"
 
     override var safeAreaInsets: UIEdgeInsets {
         guard let window else { return super.safeAreaInsets }
@@ -302,10 +307,40 @@ final class AulaWebView: WKWebView {
         if edgeSwipe == nil, window != nil {
             let swipe = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(swipedBack(_:)))
             swipe.edges = .left
-            swipe.isEnabled = pageCanGoBack
             addGestureRecognizer(swipe)
             edgeSwipe = swipe
+            historyWatch = observe(\.canGoBack, options: [.initial, .new]) { view, _ in
+                MainActor.assumeIsolated { view.updateSwipe() }
+            }
+            // el teclado, también para la interfaz (html.ime-open: keyboard.ts aparta las pestañas mientras se escribe)
+            NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
         }
+        updateSwipe()
+    }
+
+    private func updateSwipe() {
+        edgeSwipe?.isEnabled = pageCanGoBack || sameAulaBehind
+    }
+
+    /// ¿Lo de atrás en el historial es esta misma interfaz? (no la de un túnel anterior, en otro puerto).
+    private var sameAulaBehind: Bool {
+        guard canGoBack, let back = backForwardList.backItem?.url, let now = url else { return false }
+        return back.host == now.host && back.port == now.port && back.scheme == now.scheme
+    }
+
+    private var imeOpen = false
+
+    @objc private func keyboardChanged(_ note: Notification) {
+        var open = false
+        if note.name != UIResponder.keyboardWillHideNotification, let window,
+           let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
+            // un teclado de verdad, no solo la barra de atajos de un teclado físico
+            open = window.bounds.intersection(window.convert(frame, from: nil)).height > 150
+        }
+        guard open != imeOpen else { return }
+        imeOpen = open
+        evaluateJavaScript("document.documentElement && document.documentElement.classList.toggle('ime-open', \(open)); void 0", completionHandler: nil)
     }
 
     override func layoutSubviews() {
@@ -346,8 +381,12 @@ final class AulaWebView: WKWebView {
     }
 
     @objc private func swipedBack(_ swipe: UIScreenEdgePanGestureRecognizer) {
-        guard swipe.state == .ended, pageCanGoBack, swipe.translation(in: self).x > 72 || swipe.velocity(in: self).x > 600 else { return }
-        evaluateJavaScript("(window.aulaNav && window.aulaNav.back) ? window.aulaNav.back() : history.back(); void 0", completionHandler: nil)
+        guard swipe.state == .ended, swipe.translation(in: self).x > 72 || swipe.velocity(in: self).x > 600 else { return }
+        // primero la interfaz; si no tenía nada que deshacer, su historial (solo el de esta misma Aula)
+        evaluateJavaScript(Self.askBack) { [weak self] handled, _ in
+            guard let self, (handled as? Bool) != true, self.sameAulaBehind else { return }
+            self.goBack()
+        }
     }
 
     /// Sin la barra de formulario de Safari (‹ › ✓) encima del teclado: la interfaz ya tiene sus botones, y la barra se
