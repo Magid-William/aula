@@ -325,6 +325,8 @@ final class AulaWebView: WKWebView {
             // el teclado, también para la interfaz (html.ime-open: keyboard.ts aparta las pestañas mientras se escribe)
             NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
             NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+            // un cambio de claro a oscuro con el tema de Aula impuesto no cambia la escena: se mira al volver a la app
+            NotificationCenter.default.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
         }
         updateSwipe()
     }
@@ -383,11 +385,19 @@ final class AulaWebView: WKWebView {
     }
 
     private func followSystem(_ scene: UIWindowScene) {
-        let dark = scene.traitCollection.userInterfaceStyle == .dark
+        // con el tema de Aula impuesto (preferredColorScheme pone un override en la escena) la escena ya no dice el del
+        // sistema: entonces vale el de la pantalla. Leer la escena ahí hacía un bucle (la app seguía a la página, la vista
+        // web a la app, la página a la vista web…) que dejaba la app en blanco y gastando CPU al cambiar a oscuro
+        let imposed = scene.traitOverrides.contains(UITraitUserInterfaceStyle.self)
+        let dark = (imposed ? scene.screen.traitCollection : scene.traitCollection).userInterfaceStyle == .dark
         overrideUserInterfaceStyle = dark ? .dark : .light
         guard dark != systemDark else { return }
         systemDark = dark
         onSystemStyle?(dark)
+    }
+
+    @objc private func becameActive() {
+        if let scene = window?.windowScene { followSystem(scene) }
     }
 
     @objc private func swipedBack(_ swipe: UIScreenEdgePanGestureRecognizer) {
