@@ -7,6 +7,7 @@ import {
   type Skill, type SourceRef
 } from '@shared/schema'
 import { compactJSON } from '@engine/base/json'
+import { findEmoji } from '@engine/base/emoji'
 import { MAX_TEMPLATE_BYTES, MathKitChecker, NoMathChecker, chemNumber, gradeChem, type MathChecking } from '@engine/grading'
 import { LearningController } from '@engine/study/learning'
 import { renderCloze } from '@engine/study/cloze'
@@ -31,6 +32,12 @@ export interface ValidatorOptions {
   assetInfo?: (id: string) => AssetMeta | undefined
   /** ¿Se puede dibujar la página de un material como figura (PDF con esa página o foto)? */
   sourcePageDrawable?: (ref: SourceRef) => boolean
+}
+
+/** Aula no usa emojis en lo que lee el estudiante (dibuja sus propios iconos): se avisa para que se quiten. */
+export function emojiIssues(s: string, path: string): ContentIssue[] {
+  const e = findEmoji(s)
+  return e ? [issue('warning', path, `Hay un emoji («${e}»): Aula no usa emojis; quítalo o escríbelo con palabras (para flechas, «→» o una raya).`)] : []
 }
 
 /** ¿Ruta de un contenido anidado a demasiada profundidad? (tryit → ejercicio → tryit…, partes dentro de partes) */
@@ -113,7 +120,7 @@ export class ContentValidator {
     if (required && !s.trim()) return [issue('error', path, 'El texto está vacío.')]
     const n = Array.from(s).length
     if (n > max) out.push(issue('warning', path, `Texto muy largo (${n} caracteres); divídelo en varios bloques.`))
-    out.push(...latexIssues(s, path))
+    out.push(...latexIssues(s, path), ...emojiIssues(s, path))
     return out
   }
 
@@ -456,6 +463,7 @@ export class ContentValidator {
     if (c.kind === 'cloze') { if (!c.front.includes('{{c1::')) out.push(issue('error', path + '.front', 'Una tarjeta cloze necesita «{{c1::respuesta}}».')) }
     else if (!c.back.trim()) out.push(issue('error', path + '.back', 'El reverso está vacío.'))
     out.push(...(c.kind === 'cloze' ? clozeTexIssues(c.front, path + '.front') : latexIssues(c.front, path + '.front')), ...latexIssues(c.back, path + '.back'))
+    out.push(...emojiIssues(c.front, path + '.front'), ...emojiIssues(c.back, path + '.back'))
     if (Array.from(c.front).length > 400 || Array.from(c.back).length > 800) out.push(issue('warning', path, 'Tarjeta demasiado larga: una idea por tarjeta.'))
     if (c.figure) out.push(...checkCardFigure(this, c.figure, path + '.figure'))
     return out

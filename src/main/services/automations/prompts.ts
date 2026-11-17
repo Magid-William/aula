@@ -20,7 +20,7 @@ export function systemPrompt(language: 'es' | 'en'): string {
 ## How to finish
 Call \`report_check\` exactly ONCE at the end:
 - \`summary\`: what the student needs to know, ≤ 120 words, Markdown (bold the key fact). If nothing changed, one short line (e.g. «Nada nuevo en Canvas desde ayer.» / “Nothing new on Canvas since yesterday.” — in the student’s language).
-  Write it like a calm note from a tutor: the most important fact first, plain sentences, a numbered list only for real steps or several items, no headings in short notes, no emojis, no hype or filler («¡Buenos días!» only as the first words of the morning summary).
+  Write it like a calm note from a tutor: the most important fact first, plain sentences, a numbered list only for real steps or several items, no headings in short notes, never any emojis (Aula draws its own icons), no hype or filler («¡Buenos días!» only as the first words of the morning summary).
 - \`items\`: every relevant thing you found (assignments, announcements, materials, grades, exams, classes…) with a STABLE \`key\` — the platform URL or id when you have it. Reuse the exact key of an "Already known" item when it is the same thing. Set \`fresh: true\` only for things that appeared since the last check.
 - \`condition_met\`: only for "tell me when X happens / is available" tasks — true when X has happened.
 - \`important\`: true if the student should hear about something NOW even if it isn't new (e.g. due tomorrow and not done).

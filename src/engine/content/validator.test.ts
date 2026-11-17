@@ -18,6 +18,13 @@ describe('ContentValidator', () => {
     expect(v.checkBlock(textBlock('Todo bien: $\\frac{a}{b}$ y $x^2$'), 'b').filter((i) => i.severity === 'error')).toEqual([])
   })
 
+  it('avisa de los emojis en el texto del estudiante (Aula dibuja sus propios iconos)', () => {
+    const issues = v.checkBlock(textBlock('🚀 Empecemos con las derivadas'), 'b')
+    expect(issues.some((i) => i.severity === 'warning' && i.message.includes('emoji'))).toBe(true)
+    expect(v.checkCard({ id: 'c', kind: 'basic', front: 'Término', back: 'Significado ✅' } as Parameters<typeof v.checkCard>[0], 'cards[c]').some((i) => i.path === 'cards[c].back')).toBe(true)
+    expect(v.checkBlock(textBlock('De $x$ a $y$ → siguiente paso'), 'b')).toEqual([])
+  })
+
   it('las cantidades de dinero no son matemáticas', () => {
     expect(v.checkBlock(textBlock('Cuesta \\$5 y luego \\$6'), 'b')).toEqual([])
   })

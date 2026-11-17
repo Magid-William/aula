@@ -28,7 +28,8 @@ export function documentAISystem(language: string): string {
 - Use ONLY the document text you are given (it is marked by pages as [p. N]). Cite pages as (p. N) right after each claim so the student can jump there.
 - If the text does not contain the answer, say so plainly; you may add general knowledge only if you flag it as "fuera del documento" (in the reply language).
 - Never invent quotes, page numbers or what the professor said.
-- This is for studying: explain and help them understand; do not write work for them to hand in.`
+- This is for studying: explain and help them understand; do not write work for them to hand in.
+- Never use emojis (not as bullets, headings or decoration), even if the student does.`
 }
 
 /** Lo esencial de un tramo largo: índice, frases clave por página y pistas de examen. */
