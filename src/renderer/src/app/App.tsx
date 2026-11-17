@@ -10,7 +10,9 @@ import { applyEngineLanguage } from '@engine/language'
 import { useSettings, wireSettings } from '@renderer/lib/settings'
 import { wireCourses } from '@renderer/lib/courses'
 import { Sidebar } from './shell/Sidebar'
-import { CompactTabs, COMPACT_QUERY, useCompact } from './shell/CompactTabs'
+import { CompactTabs } from './shell/CompactTabs'
+import { isCompact, useCompact } from './shell/compact'
+import { installScreenScroll } from './shell/screenScroll'
 import { installDeviceBack } from './shell/deviceBack'
 import { installKeyboardWatch } from './shell/keyboard'
 import { LivePanel } from './shell/LivePanel'
@@ -71,13 +73,16 @@ export function App() {
   // desde un dispositivo: «atrás» del sistema vuelve dentro de Aula, y el teclado de la pantalla se tiene en cuenta
   useEffect(() => {
     if (!api.remote) return
-    const offBack = installDeviceBack(() => window.matchMedia(COMPACT_QUERY).matches)
+    const offBack = installDeviceBack(isCompact)
     const offKeyboard = installKeyboardWatch()
     return () => {
       offBack()
       offKeyboard()
     }
   }, [])
+
+  // en el teléfono: subir arriba con la pestaña de ahora (o la hora del iPhone) y volver a «Hoy» por donde se iba
+  useEffect(() => installScreenScroll(), [])
 
   // en el teléfono la hoja de papel es toda la pantalla, también bajo la hora y la batería (styles.css: html.compact)
   useEffect(() => {

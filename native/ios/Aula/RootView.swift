@@ -430,6 +430,8 @@ private struct DemoBar: View {
         .padding(.leading, 18)
         .padding(.trailing, 6)
         .padding(.top, gap)
+        // crece con el texto del sistema como la página (que llega hasta 1,3): sin pasar de ahí, no queda más grande que ella
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .background(alignment: .top) { tint.ignoresSafeArea(edges: .top) }
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 0.5)

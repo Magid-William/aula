@@ -25,6 +25,7 @@
     "mixed": "mixto",
     "copyExact": "Copiar resultado",
     "copyDecimal": "Copiar decimal",
+    "scientific": "Funciones científicas",
     "history": "Historial",
     "historyEmpty": "Aquí aparecerán tus cálculos. Haz clic en uno para volver a usarlo.",
     "historyEmpty_touch": "Aquí aparecerán tus cálculos. Toca uno para volver a usarlo.",

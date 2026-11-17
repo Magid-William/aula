@@ -6,19 +6,23 @@ import { Atom, Calculator, FlaskConical, LineChart, Ruler, Timer, Sigma, Grid3x3
 export interface ToolProps {
   /** true cuando se muestra en la ventanita flotante (más compacta). */
   compact?: boolean
+  /** true a pantalla completa en el teléfono, para las que lo piden (`phoneFill`): ocupa el alto que hay, sin desplazarse. */
+  phone?: boolean
 }
 
 export interface ToolDef {
   id: string
   icon: typeof Calculator
   floating: boolean
+  /** En el teléfono ocupa la pantalla sin desplazarse (la calculadora: el visor y las teclas, a la vez a la vista). */
+  phoneFill?: boolean
   /** Palabras para la búsqueda (es y en). */
   keywords: string[]
   component: LazyExoticComponent<ComponentType<ToolProps>>
 }
 
 export const TOOLS: ToolDef[] = [
-  { id: 'calculator', icon: Calculator, floating: true, keywords: ['calculadora', 'calculator', 'fracciones', 'fractions', 'raíz', 'root', 'trigonometría', 'logaritmo', 'factorial', 'combinatoria'], component: lazy(() => import('./calculator')) },
+  { id: 'calculator', icon: Calculator, floating: true, phoneFill: true, keywords: ['calculadora', 'calculator', 'fracciones', 'fractions', 'raíz', 'root', 'trigonometría', 'logaritmo', 'factorial', 'combinatoria'], component: lazy(() => import('./calculator')) },
   { id: 'grapher', icon: LineChart, floating: false, keywords: ['graficadora', 'grapher', 'función', 'function', 'plot', 'gráfica', 'graph', 'paramétrica', 'parametric', 'polar', 'raíces', 'roots'], component: lazy(() => import('./grapher')) },
   { id: 'periodic', icon: Atom, floating: false, keywords: ['tabla periódica', 'periodic table', 'elementos', 'elements', 'configuración electrónica', 'electron configuration', 'electronegatividad', 'bohr'], component: lazy(() => import('./periodic')) },
   { id: 'chemistry', icon: FlaskConical, floating: false, keywords: ['química', 'chemistry', 'masa molar', 'molar mass', 'balancear', 'balance', 'estequiometría', 'stoichiometry', 'ph', 'molaridad', 'molarity', 'dilución', 'gases'], component: lazy(() => import('./chemistry')) },

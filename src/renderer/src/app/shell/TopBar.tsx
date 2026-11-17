@@ -30,7 +30,8 @@ export function TopBar({ title, right, compact }: { title?: ReactNode; right?: R
             <Icon name="chevron-left" size={20} />
           </IconButton>
         )}
-        <div className={cx('min-w-0 flex-1 truncate font-serif text-[19px] font-medium tracking-[-0.2px]', !showBack && 'pl-2.5')}>{title}</div>
+        {/* en rem: crece con el tamaño del texto (el de Aula y el del sistema), como el resto de la pantalla */}
+        <div className={cx('min-w-0 flex-1 truncate font-serif text-[calc(19rem/15)] font-medium tracking-[-0.2px]', !showBack && 'pl-2.5')}>{title}</div>
         {right && <div className="flex items-center gap-1.5">{right}</div>}
         {/* sin barra lateral, los ajustes se abren desde «Hoy» (las cuatro pestañas de abajo se quedan como están) */}
         {route.name === 'home' && (

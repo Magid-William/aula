@@ -67,6 +67,18 @@ struct WebView: PlatformViewRepresentable {
         return text
     }()
 
+    /// Lo que se pone en cada página: el puente, el tamaño del texto del sistema (antes de que se pinte) y Shell.js.
+    private static func install(on controller: WKUserContentController, textScale: Double) {
+        controller.removeAllUserScripts()
+        controller.addUserScript(WKUserScript(source: appBridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        #if canImport(UIKit)
+        controller.addUserScript(WKUserScript(source: TextScale.script(textScale), injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        if !shell.isEmpty {
+            controller.addUserScript(WKUserScript(source: shell, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        }
+        #endif
+    }
+
     private func makeView(_ context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
@@ -74,15 +86,19 @@ struct WebView: PlatformViewRepresentable {
         // las grabaciones de clase se ven dentro de la página, no a pantalla completa por la fuerza
         config.allowsInlineMediaPlayback = true
         #endif
-        config.userContentController.addUserScript(WKUserScript(source: Self.appBridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController.add(WeakMessageHandler(context.coordinator), name: "aulaApp")
         #if canImport(UIKit)
-        if !Self.shell.isEmpty {
-            config.userContentController.addUserScript(WKUserScript(source: Self.shell, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
-        }
+        let controller = config.userContentController
+        Self.install(on: controller, textScale: TextScale.current())
         let view = AulaWebView(frame: .zero, configuration: config)
         view.onSystemStyle = { [weak coordinator = context.coordinator] dark in coordinator?.systemChanged(dark) }
+        // el tamaño del texto del sistema cambió (Ajustes → Pantalla y brillo): a la página de ahora y a las que se carguen
+        view.onTextScale = { [weak view] scale in
+            Self.install(on: controller, textScale: scale)
+            view?.evaluateJavaScript(TextScale.script(scale), completionHandler: nil)
+        }
         #else
+        Self.install(on: config.userContentController, textScale: 1)
         let view = WKWebView(frame: .zero, configuration: config)
         #endif
         view.navigationDelegate = context.coordinator
@@ -156,6 +172,7 @@ struct WebView: PlatformViewRepresentable {
                 #if canImport(UIKit)
                 lockScroll = look.app
                 message.webView?.scrollView.isScrollEnabled = !look.app
+                (message.webView as? AulaWebView)?.paper = look.top.flatMap(UIColor.init(hex:))
                 // cada vez que la página cambia de aspecto se vuelve a mirar el del sistema (no solo al volver a la app)
                 (message.webView as? AulaWebView)?.recheckSystem()
                 #endif
@@ -293,9 +310,27 @@ final class AulaWebView: WKWebView {
     }
     private var edgeSwipe: UIScreenEdgePanGestureRecognizer?
     private var historyWatch: NSKeyValueObservation?
+    /// El tamaño del texto del sistema (Dynamic Type) que tiene la página, y a quién avisar si cambia.
+    private var textScale = TextScale.current()
+    var onTextScale: (@MainActor (Double) -> Void)?
+    /// El papel de la página (lo dice Shell.js): lo que queda debajo cuando la página se aparta al deslizar desde el borde.
+    var paper: UIColor?
+    /// Al deslizar desde el borde, la foto de la página que sigue al dedo y el papel que deja ver.
+    private var peel: (page: UIView, under: UIView)?
+    /// Tocar la hora sube la pantalla hasta arriba. La página entera no se desplaza (cada pantalla lo hace por dentro), así
+    /// que iOS no tenía qué subir: esta vista de desplazamiento mínima e invisible recibe el toque y se lo pasa a la interfaz
+    /// (window.__aulaScrollTop, screenScroll.ts). Tiene que ser la única con scrollsToTop.
+    private let topTap = UIScrollView()
+    private let topTapDelegate = TopTap()
     /// «Atrás» dentro de la interfaz: se le pregunta primero (window.__aulaBack dice si lo atendió).
     private static let askBack = "(() => { if (typeof window.__aulaBack === 'function') return !!window.__aulaBack();"
         + " if (window.aulaNav && typeof window.aulaNav.back === 'function') { window.aulaNav.back(); return true } return false })()"
+    /// Qué haría «atrás» (deviceBack.ts: 'overlay', 'back', 'home' o null), si la interfaz es la del teléfono (en la tableta
+    /// la barra lateral no se aparta con la pantalla) y dónde empiezan sus pestañas de abajo (se quedan quietas mientras la
+    /// pantalla se aparta, como en las apps del iPhone).
+    private static let askBackKind = "(() => { const kind = typeof window.__aulaBackKind === 'function' ? window.__aulaBackKind() : null;"
+        + " const tabs = document.querySelector('[data-compact-tabs]'); const r = tabs && tabs.getBoundingClientRect();"
+        + " return [kind, document.documentElement.classList.contains('compact'), r && r.height > 0 ? r.top : -1] })()"
 
     override var safeAreaInsets: UIEdgeInsets {
         guard let window else { return super.safeAreaInsets }
@@ -329,6 +364,19 @@ final class AulaWebView: WKWebView {
             NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
             // y por si acaso, también al volver a la app
             NotificationCenter.default.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(textSizeChanged), name: UIContentSizeCategory.didChangeNotification, object: nil)
+            scrollView.scrollsToTop = false
+            topTap.scrollsToTop = true
+            topTap.showsVerticalScrollIndicator = false
+            topTap.showsHorizontalScrollIndicator = false
+            topTap.backgroundColor = .clear
+            topTap.contentSize = CGSize(width: 1, height: 4)
+            topTap.contentOffset = CGPoint(x: 0, y: 1)
+            topTapDelegate.onTap = { [weak self] in
+                self?.evaluateJavaScript("typeof window.__aulaScrollTop === 'function' && window.__aulaScrollTop(); void 0", completionHandler: nil)
+            }
+            topTap.delegate = topTapDelegate
+            addSubview(topTap)
         }
         updateSwipe()
     }
@@ -359,7 +407,15 @@ final class AulaWebView: WKWebView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        topTap.frame = CGRect(x: 0, y: 0, width: bounds.width, height: 1)
         retell()
+    }
+
+    @objc private func textSizeChanged() {
+        let now = TextScale.current()
+        guard now != textScale else { return }
+        textScale = now
+        onTextScale?(now)
     }
 
     /// WebKit vuelve a leer los márgenes cuando se le avisa de que cambiaron.
@@ -407,12 +463,79 @@ final class AulaWebView: WKWebView {
         if let scene = window?.windowScene { followSystem(scene) }
     }
 
+    /// Deslizar desde el borde izquierdo, como en las apps del iPhone: la página sigue al dedo (una foto suya se aparta y deja
+    /// ver el papel) y, al soltar, vuelve atrás o se queda. Con una capa encima (un diálogo, un menú: se cierra, no se va la
+    /// pantalla), en la tableta o con movimiento reducido, solo al soltar.
     @objc private func swipedBack(_ swipe: UIScreenEdgePanGestureRecognizer) {
-        guard swipe.state == .ended, swipe.translation(in: self).x > 72 || swipe.velocity(in: self).x > 600 else { return }
-        // primero la interfaz; si no tenía nada que deshacer, su historial (solo el de esta misma Aula)
+        let dx = max(0, swipe.translation(in: self).x)
+        switch swipe.state {
+        case .began:
+            guard !UIAccessibility.isReduceMotionEnabled else { return }
+            evaluateJavaScript(Self.askBackKind) { [weak self, weak swipe] answer, _ in
+                guard let self, let swipe, swipe.state == .began || swipe.state == .changed, let answer = answer as? [Any],
+                      answer.count == 3, let kind = answer[0] as? String, kind == "back" || kind == "home",
+                      (answer[1] as? Bool) == true else { return }
+                let tabs = (answer[2] as? NSNumber).map { CGFloat($0.doubleValue) } ?? -1
+                self.startPeel(above: tabs > 0 ? tabs : nil)
+                self.peel?.page.transform = CGAffineTransform(translationX: max(0, swipe.translation(in: self).x), y: 0)
+            }
+        case .changed:
+            peel?.page.transform = CGAffineTransform(translationX: dx, y: 0)
+        case .ended, .cancelled, .failed:
+            let speed = swipe.velocity(in: self).x
+            let ended = swipe.state == .ended
+            if peel != nil {
+                endPeel(ended && (speed > 500 || (dx > bounds.width * 0.4 && speed > -200)))
+            } else if ended, dx > 72 || speed > 600 {
+                goBackInPage()
+            }
+        default:
+            break
+        }
+    }
+
+    /// Primero la interfaz; si no tenía nada que deshacer, su historial (solo el de esta misma Aula).
+    private func goBackInPage() {
         evaluateJavaScript(Self.askBack) { [weak self] handled, _ in
             guard let self, (handled as? Bool) != true, self.sameAulaBehind else { return }
             self.goBack()
+        }
+    }
+
+    /// `above`: hasta dónde se aparta (las pestañas de abajo, debajo, se quedan); nil, la vista entera.
+    private func startPeel(above: CGFloat?) {
+        let area = CGRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, above ?? bounds.height))
+        guard peel == nil, area.height > 0, let page = resizableSnapshotView(from: area, afterScreenUpdates: false, withCapInsets: .zero) else { return }
+        let under = UIView(frame: area)
+        under.backgroundColor = paper ?? UIColor(named: "Paper") ?? .systemBackground
+        page.frame = area
+        // la hoja que se aparta proyecta una sombra corta sobre el papel (sin degradados de color)
+        page.layer.shadowColor = UIColor.black.cgColor
+        page.layer.shadowOpacity = 0.14
+        page.layer.shadowRadius = 8
+        page.layer.shadowOffset = CGSize(width: -2, height: 0)
+        page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
+        addSubview(under)
+        addSubview(page)
+        peel = (page, under)
+    }
+
+    /// Suelta la página: se va del todo (y la interfaz vuelve atrás debajo) o regresa a su sitio.
+    private func endPeel(_ go: Bool) {
+        guard let page = peel?.page, let under = peel?.under else { return }
+        peel = nil
+        if go { goBackInPage() }
+        let width = bounds.width
+        UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+            page.transform = go ? CGAffineTransform(translationX: width, y: 0) : .identity
+        } completion: { _ in
+            page.removeFromSuperview()
+            // la pantalla de antes ya se pinta debajo: el papel se va con un fundido breve
+            UIView.animate(withDuration: go ? 0.18 : 0, delay: go ? 0.05 : 0) {
+                under.alpha = 0
+            } completion: { _ in
+                under.removeFromSuperview()
+            }
         }
     }
 
@@ -433,6 +556,40 @@ final class AulaWebView: WKWebView {
             quiet = made
         }
         if let quiet { object_setClass(content, quiet) }
+    }
+}
+
+/// Recibe el toque en la hora (scrollsToTop) sin desplazar nada: se lo cuenta a la interfaz.
+private final class TopTap: NSObject, UIScrollViewDelegate {
+    var onTap: (@MainActor () -> Void)?
+
+    func scrollViewShouldScrollToTop(_ scrollView: UIScrollView) -> Bool {
+        onTap?()
+        return false
+    }
+}
+
+/// El tamaño del texto del sistema (Dynamic Type) para la interfaz: la vista web no lo aplica al texto de la página (en px y
+/// rem). Como en Android: entre 1 y 1,3 (por debajo, Aula ya tiene su ajuste «Tamaño del texto»).
+@MainActor
+enum TextScale {
+    static func current() -> Double {
+        let traits = UITraitCollection(preferredContentSizeCategory: UIApplication.shared.preferredContentSizeCategory)
+        let scale = UIFontMetrics(forTextStyle: .body).scaledValue(for: 17, compatibleWith: traits) / 17
+        return (min(1.3, max(1, Double(scale))) * 100).rounded() / 100
+    }
+
+    /// Para la página: window.__aulaFontScale (theme.tsx) o, si aún no cargó, __aulaPendingFontScale.
+    nonisolated static func script(_ scale: Double) -> String {
+        "(() => { if (typeof window.__aulaFontScale === 'function') window.__aulaFontScale(\(scale)); else window.__aulaPendingFontScale = \(scale) })(); void 0"
+    }
+}
+
+extension UIColor {
+    /// «#rrggbb» (lo que dice Shell.js) → color; nil si no lo es.
+    convenience init?(hex: String) {
+        guard hex.count == 7, hex.hasPrefix("#"), let v = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        self.init(red: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
     }
 }
 

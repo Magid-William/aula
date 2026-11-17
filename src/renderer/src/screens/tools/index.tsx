@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { ArrowLeft } from 'lucide-react'
 import { Spinner, cx, enter } from '@renderer/design'
-import { useRoute, navigate } from '@renderer/app/router'
+import { useRoute, navigate, useNav } from '@renderer/app/router'
 import { useScreenTitle } from '@renderer/app/title'
 import { useCompact } from '@renderer/app/shell/CompactTabs'
 import { TOOLS, pinnedGroups, toolById, type ToolDef } from '@renderer/tools/registry'
@@ -20,19 +20,25 @@ export default function ToolsScreen() {
   const toolId = route.name === 'tools' ? route.tool : undefined
   const tool = toolById(toolId)
   const compact = useCompact()
+  const canBack = useNav((s) => s.canBack)
   useScreenTitle(tool ? t(`${tool.id}.name`) : t('title'), tool?.floating && !compact ? <PinToolButton id={tool.id} onPinned={() => navigate({ name: 'tools' })} /> : null, [tool?.id, compact])
 
   // sus comandos de ⌘K los registra el armazón (app/shell/commands.tsx), no esta pantalla
 
   if (tool) {
     const Comp = tool.component
+    // en el teléfono, la que lo pide ocupa la pantalla sin desplazarse (la calculadora: visor y teclas a la vez)
+    const fill = compact && !!tool.phoneFill
     return (
-      <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pb-24">
-        <button className="relative touch-target mb-3 inline-flex items-center gap-1.5 t-ui font-medium text-text2 hover:text-text" onClick={() => navigate({ name: 'tools' })}>
-          <ArrowLeft size={15} /> {t('back')}
-        </button>
+      <div className={cx('@container flex-1 min-h-0', fill ? 'flex flex-col px-4 pb-3' : 'overflow-y-auto px-6 pb-24')}>
+        {/* en el teléfono la barra de arriba ya trae «atrás» */}
+        {!(compact && canBack) && (
+          <button className="relative touch-target mb-3 inline-flex shrink-0 items-center gap-1.5 self-start t-ui font-medium text-text2 hover:text-text" onClick={() => navigate({ name: 'tools' })}>
+            <ArrowLeft size={15} /> {t('back')}
+          </button>
+        )}
         <Suspense fallback={<div className="grid place-items-center h-80"><Spinner size={22} /></div>}>
-          <Comp />
+          <Comp phone={fill} />
         </Suspense>
       </div>
     )

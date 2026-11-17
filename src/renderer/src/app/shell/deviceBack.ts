@@ -3,7 +3,8 @@
 // volver y Android cerraba la app. Mientras Aula tenga algo que deshacer (una capa abierta encima, una pantalla anterior o,
 // en el teléfono, una pestaña que no es «Hoy») deja UNA entrada de guarda en el historial: «atrás» la consume, Aula
 // retrocede y, si aún queda adónde volver, la pone otra vez. Sin nada que deshacer no hay guarda y «atrás» sale de la app.
-// La app nativa también puede preguntar antes con `window.__aulaBack()` (devuelve si lo atendió).
+// La app nativa también puede preguntar antes con `window.__aulaBack()` (devuelve si lo atendió) y, para que la página siga
+// al dedo al deslizar desde el borde (iPhone), qué haría con `window.__aulaBackKind()` ('overlay', 'back', 'home' o null).
 import { hideLive, useLive } from '@renderer/lib/live'
 import { navigate, useNav } from '../router'
 import { routeToHash } from '../routeHash'
@@ -96,8 +97,9 @@ export function installDeviceBack(compact: () => boolean): () => void {
   // los diálogos, paneles y menús se pintan en un portal, como hijos directos de <body>
   const portals = new MutationObserver(later)
   portals.observe(document.body, { childList: true })
-  const host = window as unknown as { __aulaBack?: () => boolean }
+  const host = window as unknown as { __aulaBack?: () => boolean; __aulaBackKind?: () => BackAction }
   host.__aulaBack = () => handleDeviceBack(compact)
+  host.__aulaBackKind = () => current(compact)
   later()
   return () => {
     window.removeEventListener('popstate', onPop)
@@ -107,5 +109,6 @@ export function installDeviceBack(compact: () => boolean): () => void {
     portals.disconnect()
     if (timer) clearTimeout(timer)
     delete host.__aulaBack
+    delete host.__aulaBackKind
   }
 }

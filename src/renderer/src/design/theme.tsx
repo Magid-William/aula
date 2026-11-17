@@ -14,15 +14,15 @@ interface ThemeState {
 const ThemeContext = createContext<ThemeState>({ dark: false, reducedMotion: false, mode: 'system' })
 
 /** Tamaño de la raíz en px para el ajuste «Tamaño del texto» (15 px al 100 %). Sin redondear: la escala `t-*` va en rem y
- *  tiene que crecer en la misma proporción que el ajuste. `osScale`: el tamaño de letra del sistema del teléfono (Android). */
+ *  tiene que crecer en la misma proporción que el ajuste. `osScale`: el tamaño de letra del sistema del teléfono o la tableta. */
 export function rootFontSize(textScale: number, osScale = 1): number {
   const k = Number.isFinite(textScale) ? Math.min(1.4, Math.max(0.85, textScale)) : 1
   const os = Number.isFinite(osScale) ? Math.min(1.6, Math.max(0.85, osScale)) : 1
   return Math.round(15 * k * os * 100) / 100
 }
 
-// El tamaño de letra del sistema: la app de Android lo pasa con `window.__aulaFontScale(1.3)` (o lo deja en
-// `window.__aulaPendingFontScale` si la página aún no había cargado), porque su WebView fija el zoom del texto al 100 %.
+// El tamaño de letra del sistema: las apps de Android y de iPhone/iPad lo pasan con `window.__aulaFontScale(1.3)` (o lo dejan
+// en `window.__aulaPendingFontScale` si la página aún no había cargado): sus vistas web no lo aplican al texto de la página.
 type FontScaleHost = { __aulaFontScale?: (scale: number) => void; __aulaPendingFontScale?: number }
 let osFontScale = 1
 const osFontListeners = new Set<() => void>()

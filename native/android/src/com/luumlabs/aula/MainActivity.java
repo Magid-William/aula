@@ -162,6 +162,10 @@ public final class MainActivity extends Activity {
     private WebView web;
     private LinearLayout demoBar;
     private View demoLine;
+    private TextView demoLabel, demoExit;
+    private GradientDrawable demoDot;
+    /** La tinta de la franja de la demostración ya es la de un papel oscuro (null: aún sin pintar). */
+    private Boolean demoInkDark;
     private ScrollView sheet;
     private ImageView art;
     private TextView title, body, foot, steps;
@@ -193,6 +197,7 @@ public final class MainActivity extends Activity {
         devPort = devPortOf(getIntent());
         if (devPort > 0) showLocal(devPort, "/");
         else render();
+        updateBack();
     }
 
     @Override
@@ -318,13 +323,6 @@ public final class MainActivity extends Activity {
 
     // MARK: Atrás
 
-    /** ¿«Atrás» tiene algo que hacer dentro de la app? */
-    private boolean wantsBack() {
-        if (customView != null || licenses != null) return true;
-        if (stage == Stage.CHOOSING && choosingFromReady) return true;
-        return stage == Stage.READY && web != null && (pageCanGoBack || web.canGoBack());
-    }
-
     /** Lo que hace «atrás»: salir de la pantalla completa o de las licencias, volver a la Aula abierta, o atrás en Aula. */
     private boolean handleBack() {
         if (customView != null) {
@@ -351,17 +349,20 @@ public final class MainActivity extends Activity {
 
     /**
      * «Atrás» en Android 13 o posterior: llega por el despachador del sistema (en Android 16, con la app hecha para
-     * Android 16, onBackPressed ya no se llama). Solo se registra mientras haya algo que hacer dentro; si no, el gesto es
-     * el del sistema (ir al inicio, con su animación, sin cerrar la app).
+     * Android 16, onBackPressed ya no se llama). Se queda registrado siempre: sin él, el «atrás» del sistema en «Hoy» (sin
+     * nada que deshacer) cerraba la actividad, y con ella la red privada y la demostración; al volver, la app empezaba de
+     * cero. Así, sin nada que hacer dentro, la app pasa a segundo plano sin cerrarse (se pierde la animación de ir al inicio
+     * en ese último «atrás»).
      */
     private void updateBack() {
         if (Build.VERSION.SDK_INT < 33 || web == null) return;
-        boolean want = !isDestroyed() && wantsBack();
-        if (pageBack == null) {
-            if (!want) return;
-            pageBack = new PageBack(this::handleBack);
-        }
-        pageBack.set(this, want);
+        if (pageBack == null) pageBack = new PageBack(this::backOrHide);
+        pageBack.set(this, !isDestroyed());
+    }
+
+    /** «Atrás» dentro de la app o, sin nada que hacer, a segundo plano (sin cerrarla). */
+    private void backOrHide() {
+        if (!handleBack()) moveTaskToBack(true);
     }
 
     /** OnBackInvokedCallback solo existe desde Android 13: esta clase solo se carga allí. */
@@ -978,8 +979,10 @@ public final class MainActivity extends Activity {
         d.setShape(GradientDrawable.OVAL);
         d.setColor(color(R.color.brick));
         dot.setBackground(d);
+        demoDot = d;
         row.addView(dot, new LinearLayout.LayoutParams(dp(7), dp(7)));
         TextView label = text(13, color(R.color.soft));
+        demoLabel = label;
         label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         label.setText(R.string.demo_bar);
         label.setSingleLine(true);
@@ -987,6 +990,7 @@ public final class MainActivity extends Activity {
         label.setPadding(dp(10), 0, dp(8), 0);
         row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView exit = text(15, color(R.color.brick));
+        demoExit = exit;
         exit.setTypeface(Typeface.DEFAULT_BOLD);
         exit.setText(R.string.demo_exit);
         exit.setGravity(Gravity.CENTER);
@@ -1000,6 +1004,26 @@ public final class MainActivity extends Activity {
         demoLine.setBackgroundColor(color(R.color.line));
         demoBar.addView(demoLine, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(0.5f))));
         root.addView(demoBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
+        demoInkDark = null;
+    }
+
+    // la tinta de la franja de la demostración en papel claro y en papel oscuro (los de values/ y values-night/themes.xml)
+    private static final int[] DEMO_INK_LIGHT = { 0xFF77716A, 0xFFB4502F, 0x1A2A2520 };
+    private static final int[] DEMO_INK_DARK = { 0xFFB3ACA3, 0xFFEE9F72, 0x24EFE6DC };
+
+    /**
+     * La tinta de la franja según su papel, que es el de la página: el tema de Aula puede no ser el del sistema (Aula en
+     * claro con el sistema en oscuro), y con los colores del sistema el texto se quedaba sin contraste.
+     */
+    private void tintDemoBar(boolean darkPaper) {
+        if (demoLabel == null || (demoInkDark != null && demoInkDark == darkPaper)) return;
+        demoInkDark = darkPaper;
+        int[] ink = darkPaper ? DEMO_INK_DARK : DEMO_INK_LIGHT;
+        demoLabel.setTextColor(ink[0]);
+        demoDot.setColor(ink[1]);
+        demoExit.setTextColor(ink[1]);
+        demoExit.setBackground(LicensesView.ripple(this, ink[1], dp(12)));
+        demoLine.setBackgroundColor(ink[2]);
     }
 
     private boolean demoBarShown() {
@@ -1211,8 +1235,9 @@ public final class MainActivity extends Activity {
             bands.setPage(t, b, l, r);
             topColor = t.main;
             bottomColor = b.main;
-            // la franja de la demostración, del mismo papel que lo de arriba de la página
+            // la franja de la demostración, del mismo papel que lo de arriba de la página (y su tinta, la de ese papel)
             demoBar.setBackgroundColor(t.main);
+            tintDemoBar(isDark(t.main));
         } else {
             bands.setPage(null, null, 0, 0);
             topColor = bottomColor = color(R.color.paper);
