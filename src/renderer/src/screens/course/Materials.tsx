@@ -5,7 +5,7 @@
 import { timecode } from '@shared/ingest'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import type { Pack, SourceChunk, SourceMeta } from '@shared/schema'
 import { decodeSourceChunk } from '@shared/schema'
 import type { MaterialView } from '@shared/generation/types'
@@ -14,8 +14,9 @@ import { RichText } from '@renderer/lib/RichText'
 import { api, packAssetUrl } from '@renderer/lib/api'
 import { isDemo } from '@renderer/lib/demo'
 import { fmtDate } from '@renderer/lib/format'
-import { navigate, useScreenActive } from '@renderer/app/router'
+import { navigate } from '@renderer/app/router'
 import { openCourseSource } from '@renderer/screens/documents/lib'
+import { FileDropOverlay, filePaths, useFileDrop } from '@renderer/screens/documents/FileDrop'
 import { searchKey } from '@renderer/screens/study/tabs'
 import { ResearchNote } from './ResearchNote'
 import { RULED_ROW } from './sections'
@@ -85,15 +86,7 @@ export function MaterialsTab({ pack }: { pack: Pack }) {
     }
   }
   const addFiles = (files: FileList | null): void => {
-    if (!files?.length) return
-    const paths = [...files].map((f) => {
-      try {
-        return api.pathForFile(f)
-      } catch {
-        return ''
-      }
-    }).filter(Boolean)
-    void addPaths(paths)
+    if (files?.length) void addPaths(filePaths(files))
   }
   const dragging = useFileDrop(addFiles)
   const useForCourse = async (): Promise<void> => {
@@ -189,67 +182,10 @@ export function MaterialsTab({ pack }: { pack: Pack }) {
           <input ref={file} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
         </Card>
       </Stagger>
-      <AnimatePresence>
-        {dragging && (
-          <motion.div
-            aria-hidden
-            className="pointer-events-none fixed inset-0 z-50 grid place-items-center p-4"
-            style={{ background: 'color-mix(in oklab, var(--paper) 86%, transparent)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <div className="grid h-full w-full place-items-center rounded-[28px] border-2 border-dashed border-accent-line">
-              <div className="flex flex-col items-center gap-3 text-center">
-                <Icon name="upload" size={28} className="text-accent-text" />
-                <span className="t-title2 text-text">{t('materials.dropHere')}</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FileDropOverlay show={dragging} title={t('materials.dropHere')} body={t('study:tab.materials.kinds')} />
       <ReaderDrawer pack={pack} source={reading} onClose={() => setReading(null)} />
     </>
   )
-}
-
-/** Archivos arrastrados sobre la ventana: mientras pasan por encima, `true` (se cubre la pantalla); al soltarlos, se añaden.
- *  Solo en la pantalla de delante. */
-function useFileDrop(onFiles: (files: FileList | null) => void): boolean {
-  const active = useScreenActive()
-  const [over, setOver] = useState(false)
-  const handler = useRef(onFiles)
-  handler.current = onFiles
-  useEffect(() => {
-    if (!active) return
-    let timer = 0
-    const hasFiles = (e: DragEvent): boolean => !!e.dataTransfer && [...e.dataTransfer.types].includes('Files')
-    // mientras se arrastra por encima llegan «dragover» seguidos: si dejan de llegar (salió de la ventana), se quita la capa
-    const onOver = (e: DragEvent): void => {
-      if (!hasFiles(e)) return
-      e.preventDefault()
-      setOver(true)
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => setOver(false), 250)
-    }
-    const onDrop = (e: DragEvent): void => {
-      if (!hasFiles(e)) return
-      e.preventDefault()
-      window.clearTimeout(timer)
-      setOver(false)
-      handler.current(e.dataTransfer?.files ?? null)
-    }
-    window.addEventListener('dragover', onOver)
-    window.addEventListener('drop', onDrop)
-    return () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('dragover', onOver)
-      window.removeEventListener('drop', onDrop)
-      setOver(false)
-    }
-  }, [active])
-  return over
 }
 
 /** El texto que leyó Aula de un material, por páginas, con búsqueda. */

@@ -236,7 +236,8 @@
   },
   "overview": {
     "gradeLine": "Between {{low}} and {{high}} · you’ve seen {{seen}} of the syllabus",
-    "gradeLineAll": "Between {{low}} and {{high}} · you’ve seen the whole syllabus"
+    "gradeLineAll": "Between {{low}} and {{high}} · you’ve seen the whole syllabus",
+    "rangeTip": "Likely range: {{low}} to {{high}}"
   },
   "review": {
     "today": "For today: {{list}} · about {{minutes}} min",
@@ -244,6 +245,10 @@
     "cards_other": "{{count}} flashcards",
     "mistakes_one": "{{count}} mistake",
     "mistakes_other": "{{count}} mistakes",
+    "cardsOf_one": "{{fit}} of your {{count}} flashcard",
+    "cardsOf_other": "{{fit}} of your {{count}} flashcards",
+    "mistakesOf_one": "{{fit}} of your {{count}} mistake",
+    "mistakesOf_other": "{{fit}} of your {{count}} mistakes",
     "practice_one": "{{count}} practice exercise",
     "practice_other": "{{count}} practice exercises",
     "start": "Start reviewing",
@@ -256,7 +261,10 @@
     "decksDetail": "The bar is how firmly you remember each deck",
     "reviewCards": "Review flashcards",
     "mixed": "Mixed practice",
-    "right": "{{n}} of {{m}} right"
+    "right": "{{n}} of {{m}} right",
+    "showAll_one": "Show all {{count}}",
+    "showAll_other": "Show all {{count}}",
+    "showFewer": "Show fewer"
   },
   "exam": {
     "take": "Take a mock exam",

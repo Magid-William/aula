@@ -25,6 +25,11 @@ export function topicOf(planTitle: string): string {
 
 const DAY = 86_400_000
 
+/** Un nombre corto («Exam #2 — Trigonometry») no se parte en el título: va entero a su línea. Uno largo sí puede partirse. */
+export function keepWhole(name: string, max = 32): boolean {
+  return name.length <= max
+}
+
 /** Días civiles hasta `date` (0 = hoy). */
 function daysUntil(date: string, now: Date): number {
   const a = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()

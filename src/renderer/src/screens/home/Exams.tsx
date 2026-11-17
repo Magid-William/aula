@@ -19,7 +19,8 @@ export function ExamCard({ exams }: { exams: HomeExam[] }) {
   return (
     <div className="flex h-full flex-col gap-2">
       <Floating amplitude={3} duration={7.5} className="flex-1">
-        <Card enterAnim interactive padded="lg" onClick={() => navigate({ name: 'course', id: e.courseId })} className="h-full flex flex-col justify-center">
+        {/* arriba, a la altura de la fecha del saludo (mismo margen); la nota probable, al pie, a la altura de su botón */}
+        <Card enterAnim interactive padded={false} onClick={() => navigate({ name: 'course', id: e.courseId })} className="h-full flex flex-col p-7 @3xl:p-8">
           <div>
             {n <= 1 ? (
               <span className="block font-serif text-[calc(30rem/15)] leading-[calc(36rem/15)] text-accent-text">{n <= 0 ? t('examToday') : t('examTomorrow')}</span>
@@ -36,7 +37,7 @@ export function ExamCard({ exams }: { exams: HomeExam[] }) {
               {capitalize(fmtDate(e.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · {fmtTime(e.date)}
             </div>
           </div>
-          <p className="t-marginal mt-3">{e.started ? t('examLikely', { low: fmtPercent(e.readinessLow), high: fmtPercent(e.readinessHigh) }) : t('examNotStarted')}</p>
+          <p className="t-marginal mt-auto pt-3">{e.started ? t('examLikely', { low: fmtPercent(e.readinessLow), high: fmtPercent(e.readinessHigh) }) : t('examNotStarted')}</p>
         </Card>
       </Floating>
       {more > 0 && (

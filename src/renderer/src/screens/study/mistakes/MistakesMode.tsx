@@ -10,6 +10,7 @@ import { StudyFrame, TopCapsule } from '../Chrome'
 import type { CourseData } from '../data'
 import { exitTo } from '../kit'
 import { PracticeMode } from '../practice/PracticeMode'
+import { currentStep } from '../plan/session'
 
 export function MistakesMode({ data, skillId }: { data: CourseData; skillId?: string }) {
   const { t } = useTranslation('study')
@@ -26,7 +27,10 @@ export function MistakesMode({ data, skillId }: { data: CourseData; skillId?: st
   const [queue] = useState<Exercise[]>(() => {
     try {
       const due = buildPractice(data.pack, data.skills, data.progress, { kind: 'mistakes' }, { count: 30, now: new Date() })
-      return skillId ? due.filter((e) => e.skill === skillId) : due
+      if (skillId) return due.filter((e) => e.skill === skillId)
+      // como paso del plan de hoy (o de «Empezar el repaso»), los que caben en su tiempo: los que dicen Hoy y Repasar
+      const step = currentStep(data.pack.id)
+      return step?.kind === 'mistakes' && step.count ? due.slice(0, step.count) : due
     } catch {
       return []
     }

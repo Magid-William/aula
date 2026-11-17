@@ -22,7 +22,8 @@ export function TutorButton({ className }: { className?: string }) {
   }
   return (
     <Tooltip label={t('tutorAsk')} side="bottom">
-      <IconButton label={t('tutorAsk')} size="sm" active={open} aria-pressed={open} data-tutor-button className={cx('rounded-full!', className)} onClick={toggle}>
+      {/* abierto, se ve pulsado: el relleno de lo seleccionado (ladrillo suave), no el gris de pasar por encima */}
+      <IconButton label={t('tutorAsk')} size="sm" active={open} aria-pressed={open} data-tutor-button className={cx('rounded-full!', open && 'bg-accent-wash! text-accent-text! hover:bg-accent-wash!', className)} onClick={toggle}>
         <AulaMark size={18} state={mark} />
       </IconButton>
     </Tooltip>

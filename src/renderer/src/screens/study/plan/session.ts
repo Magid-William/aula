@@ -55,6 +55,12 @@ export function endPlan(scope: PlanScope = 'plan'): void {
   usePlanStore.setState({ sessions: rest, running: running === scope ? null : running })
 }
 
+/** El paso en marcha de la sesión de un curso (si se está siguiendo una), para que el modo haga lo que dice el plan. */
+export function currentStep(packId: string): PlanItem | null {
+  const s = activePlan(packId)
+  return s && s.current >= 0 ? s.items[s.current] ?? null : null
+}
+
 /** La ruta de estudio de un paso del plan. */
 export function routeForStep(packId: string, item: PlanItem): Route {
   const skill = item.skillID ?? undefined

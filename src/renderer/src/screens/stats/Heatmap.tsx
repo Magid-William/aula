@@ -1,6 +1,6 @@
 // Constancia: 12 semanas × 7 días (lunes arriba) en casillas que se encienden semana a semana, con los meses encima, la
 // leyenda «Menos … Más» y una línea que lee el día señalado (hoy si no se señala ninguno). Es un dato de todo tu estudio:
-// va en aguada de grafito (los días sin estudio, solo con su contorno) y hoy lleva su anillo ladrillo.
+// va en aguada de grafito (los días sin estudio, solo con su contorno) y hoy lleva su anillo ladrillo, entero (no un velo).
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
@@ -56,7 +56,7 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1], delay: 0.1 + c.week * 0.03 + c.weekday * 0.01 }}
                   whileHover={{ scale: 1.18 }}
-                  className={cx('aspect-square rounded-[5px] cursor-default', isToday && 'ring-[1.5px] ring-offset-[1.5px] ring-offset-surface ring-accent-line', hover === c.day.date && 'ring-[1.5px] ring-text3')}
+                  className={cx('aspect-square rounded-[5px] cursor-default', isToday && 'ring-[1.5px] ring-offset-[1.5px] ring-offset-surface ring-accent', hover === c.day.date && 'ring-[1.5px] ring-text3')}
                   style={{ gridColumn: c.week + 2, gridRow: c.weekday + 1 }}
                 >
                   {/* el color va en una aguada de dentro: los anillos de hoy y del ratón no se recortan */}

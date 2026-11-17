@@ -3,9 +3,9 @@
 // Tarjetas, Errores y Referencia) siguen funcionando: abren su vista y llevan hasta su sección.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EmptyState, PixelCurtain, SegmentedTabs, Spinner, toneForHue, useTheme, Button } from '@renderer/design'
+import { EmptyState, Icon, PixelCurtain, SegmentedTabs, Spinner, toneForHue, useTheme, Button } from '@renderer/design'
 import { useRoute, navigate, canonicalTab, COURSE_VIEWS, type CourseTab, type CourseView } from '@renderer/app/router'
-import { useScreenTitle } from '@renderer/app/title'
+import { useInView, useScreenTitle } from '@renderer/app/title'
 import { useCoursePack, useOverview } from './data'
 import { CourseHeader } from './Header'
 import { Overview } from './Overview'
@@ -37,8 +37,19 @@ export default function CourseScreen() {
   useEffect(() => {
     if (id) curtainSeen.add(id)
   }, [id])
-  // el título ya sale en la cabecera: la barra de arriba solo lo pone en el teléfono
-  useScreenTitle(pack?.title ?? '', null, [pack?.title], { compactOnly: true })
+  // el título ya sale en la cabecera: la barra de arriba solo lo pone en el teléfono… y cuando la cabecera sale de la vista al
+  // desplazarse (o al llegar a una sección), con la pestaña en la que se está: la página no se queda sin contexto
+  const [header, setHeader] = useState<HTMLDivElement | null>(null)
+  const headerSeen = useInView(header)
+  const tabLabel = t(`tabs.${view}`)
+  const crumb = pack ? (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="min-w-0 truncate">{pack.title}</span>
+      <Icon name="chevron-right" size={13} className="shrink-0 text-text3" />
+      <span className="shrink-0 font-normal text-text2">{tabLabel}</span>
+    </span>
+  ) : ''
+  useScreenTitle(headerSeen ? pack?.title ?? '' : crumb, null, [pack?.title, headerSeen, tabLabel], { compactOnly: headerSeen })
   useScrollToSection(focus, `${id}:${view}`)
 
   // casi nunca se ve: la navegación espera a tener el curso (con tope) y lo guarda para la próxima visita
@@ -77,7 +88,7 @@ export default function CourseScreen() {
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-2 pb-24">
         {/* la cortina de píxeles solo sobre la cabecera y breve (antes tapaba toda la pantalla ~1 s: J1-7) */}
-        <div className="relative">
+        <div ref={setHeader} className="relative">
           <CourseHeader pack={pack} view={view} />
           {curtain && (
             <div className="absolute -inset-x-2 -inset-y-1 z-30 pointer-events-none overflow-hidden rounded-[18px]" style={{ ['--curtain' as string]: `color-mix(in oklab, ${dark ? tone.fillDark : tone.fillLight} ${dark ? 40 : 26}%, var(--paper))` }}>

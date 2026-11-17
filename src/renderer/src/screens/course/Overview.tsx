@@ -1,10 +1,11 @@
-// Resumen del curso, en burbujas: la nota estimada (una cifra serif que cuenta y una frase), el examen (la única tarjeta con
-// pigmento y la que flota), lo que toca ahora y el mapa del curso, con el dominio de cada tema en una barra fina con la tinta
-// del curso y «Sigue aquí» en el que toca. Lo que aún se escribe (o espera a «Reanudar») no se abre.
+// Resumen del curso, en burbujas: la nota estimada (una cifra serif que cuenta, una frase y la barra con su intervalo rotulado)
+// y lo que toca ahora a la izquierda; el examen (la única tarjeta con pigmento y la que flota) a la derecha, a la misma altura;
+// debajo, a todo lo ancho, el mapa del curso por unidades, con el dominio de cada tema en una barra fina con la tinta del curso
+// y «Sigue aquí» en el que toca. Lo que aún se escribe (o espera a «Reanudar») no se abre.
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { AnimatedNumber, Button, Card, Floating, Group, Icon, InkSpot, ProgressBar, Row, SectionTitle, Stagger, toneForHue, useTheme, type IconName, cx } from '@renderer/design'
+import { AnimatedNumber, Button, Card, Floating, Group, Icon, InkSpot, Row, SectionTitle, Stagger, toneForHue, useTheme, type IconName, cx } from '@renderer/design'
 import { COURSE_EDIT_EVENT } from './Actions'
 import type { Pack } from '@shared/schema/pack'
 import type { CourseOverview } from '@shared/ipc/course-view'
@@ -57,10 +58,10 @@ export function Overview({ pack, ov, phase, writing }: { pack: Pack; ov: CourseO
     return !ref || topicGate(ref, gate).opens
   })
   const planMinutes = plan.reduce((a, p) => a + p.minutes, 0)
-  // en ventana ancha, dos columnas (nota y «Ahora toca» | examen y mapa) sin huecos; estrecha, una sola en este orden: nota,
-  // examen, ahora toca y mapa
+  // en ventana ancha, dos columnas que acaban a la vez (nota y «Ahora toca» | el examen, que se estira) y el mapa debajo, a todo lo
+  // ancho; estrecha, una sola en este orden: nota, examen, ahora toca y mapa
   return (
-    <Stagger className="flex flex-col gap-4 @5xl:grid @5xl:grid-cols-12 @5xl:items-start" gap={0.05}>
+    <Stagger className="flex flex-col gap-4 @5xl:grid @5xl:grid-cols-12" gap={0.05}>
       <div className="contents @5xl:col-span-7 @5xl:flex @5xl:flex-col @5xl:gap-4">
         <div className="order-1">
           <GradeCard ov={ov} ink={ink} />
@@ -80,13 +81,11 @@ export function Overview({ pack, ov, phase, writing }: { pack: Pack; ov: CourseO
           </Card>
         </div>
       </div>
-      <div className="contents @5xl:col-span-5 @5xl:flex @5xl:flex-col @5xl:gap-4">
-        <div className="order-2">
-          <ExamCard pack={pack} ink={ink} />
-        </div>
-        <div className="order-4">
-          <CourseMap pack={pack} ov={ov} ink={ink} gate={gate} />
-        </div>
+      <div className="order-2 @5xl:col-span-5 @5xl:flex @5xl:flex-col">
+        <ExamCard pack={pack} ink={ink} />
+      </div>
+      <div className="order-4 @5xl:col-span-12">
+        <CourseMap pack={pack} ov={ov} ink={ink} gate={gate} />
       </div>
     </Stagger>
   )
@@ -119,16 +118,35 @@ function GradeCard({ ov, ink }: { ov: CourseOverview | null; ink: string }) {
                 : t('overview.gradeLine', { low: fmtPercent(ov.readinessLow), high: fmtPercent(ov.readinessHigh), seen: fmtPercent(ov.coverage) })}
             </span>
           </div>
-          {/* el intervalo, con la tinta del curso: lo probable, más claro; la estimación, entera */}
-          <div className="relative mt-4">
-            <ProgressBar value={ov.readinessHigh} color={`color-mix(in oklab, ${ink} 30%, transparent)`} height={5} />
-            <div className="absolute inset-x-0 top-0">
-              <ProgressBar value={ov.readiness} color={ink} height={5} className="bg-transparent!" />
-            </div>
-          </div>
+          <GradeBar value={ov.readiness} low={ov.readinessLow} high={ov.readinessHigh} ink={ink} />
         </>
       )}
     </Card>
+  )
+}
+
+/** La barra de la nota: hasta la estimación, la tinta del curso; el intervalo probable (de la nota baja a la alta), una banda más
+ *  clara alrededor, con su rótulo debajo («68–80 %»): las dos tintas se entienden sin leyenda. */
+function GradeBar({ value, low, high, ink }: { value: number; low: number; high: number; ink: string }) {
+  const { t } = useTranslation('course')
+  const clamp = (x: number): number => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0))
+  const [a, b] = [clamp(Math.min(low, high)), clamp(Math.max(low, high))]
+  const range = t('overview.rangeTip', { low: fmtPercent(a), high: fmtPercent(b) })
+  // el rótulo, centrado bajo la banda sin salirse de la tarjeta
+  const mid = Math.min(0.9, Math.max(0.1, (a + b) / 2))
+  return (
+    <div className="mt-4">
+      <div className="relative h-[11px]" role="img" aria-label={range}>
+        <div className="absolute inset-x-0 top-[3px] h-[5px] rounded-full bg-fill2" />
+        <motion.div className="absolute top-0 h-[11px] rounded-full" title={range} style={{ left: `${a * 100}%`, width: `${(b - a) * 100}%`, background: `color-mix(in oklab, ${ink} 24%, transparent)` }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: 0.6 }} />
+        <motion.div className="absolute left-0 top-[3px] h-[5px] rounded-full" style={{ background: ink }} initial={{ width: 0 }} animate={{ width: `${clamp(value) * 100}%` }} transition={{ duration: 1, ease: [0.2, 0.7, 0.2, 1] }} />
+      </div>
+      <div className="relative mt-1 h-4" aria-hidden>
+        <span className="absolute -translate-x-1/2 whitespace-nowrap t-caption tabular text-text2" style={{ left: `${mid * 100}%` }}>
+          {fmtPercent(a)}–{fmtPercent(b)}
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -159,7 +177,7 @@ function ExamCard({ pack, ink }: { pack: Pack; ink: string }) {
   return (
     <Wrap>
       {/* el pigmento (el examen) va en la esquina de abajo, que se deja libre: nunca debajo de texto */}
-      <Card enterAnim padded="lg" elevation={past ? 1 : 2} mark={past ? undefined : ink} markSize="sm">
+      <Card enterAnim padded="lg" elevation={past ? 1 : 2} mark={past ? undefined : ink} markSize="sm" className="h-full">
         <SectionTitle title={t('examCard')} />
         {status.phase === 'upcoming' ? (
           <div className="flex items-baseline gap-2">
@@ -231,12 +249,13 @@ function ExamFacts({ pack }: { pack: Pack }) {
   )
 }
 
+// en ventana ancha, la tarjeta del examen se estira hasta donde acaba la columna de al lado
 function FloatWrap({ children }: { children: ReactNode }) {
-  return <Floating amplitude={3} duration={9}>{children}</Floating>
+  return <Floating amplitude={3} duration={9} className="@5xl:flex-1">{children}</Floating>
 }
 
 function StillWrap({ children }: { children: ReactNode }) {
-  return <div>{children}</div>
+  return <div className="@5xl:flex-1">{children}</div>
 }
 
 /** El mapa del curso: las unidades con sus temas, el dominio de cada uno y «Sigue aquí» en el que toca. */
@@ -247,7 +266,8 @@ function CourseMap({ pack, ov, ink, gate }: { pack: Pack; ov: CourseOverview | n
   return (
     <Card enterAnim padded="lg">
       <SectionTitle title={t('map')} />
-      <div className="flex flex-col gap-4">
+      {/* a todo lo ancho, las unidades una al lado de otra (tantas columnas como quepan de unos 280 px) */}
+      <div className="grid gap-x-10 gap-y-5 [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]">
         {pack.units.map((u, ui) => (
           <div key={u.id}>
             <div className="t-ui font-semibold text-text2 mb-1">

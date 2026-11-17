@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { dailyPlan, studyStats } from '@engine/study'
+import { dailyPlan, planBudget, studyStats } from '@engine/study'
 import { topicCounts } from '@engine/study/topics'
 import type { PlanItem } from '@engine/learn'
 import { Button, Card, cx, EmptyState, Icon, InkCheck, InkStrike, Stagger, StaggerItem, type IconName } from '@renderer/design'
@@ -36,7 +36,7 @@ export function PlanMode({ data }: { data: CourseData }) {
   const isAvailable = planAvailability(useCourseRun(packId), topicCounts(data.pack.skills))
   const items = useMemo(() => {
     try {
-      return dailyPlan(data.pack, data.skills, data.progress, data.progress.settings.dailyMinutes || 45, new Date(), gradeLang(i18n.language), isAvailable)
+      return dailyPlan(data.pack, data.skills, data.progress, planBudget(data.progress), new Date(), gradeLang(i18n.language), isAvailable)
     } catch {
       return []
     }
@@ -78,7 +78,7 @@ export function PlanMode({ data }: { data: CourseData }) {
     <TopCapsule icon="today" label={t('plan.title')} onExit={onExit}>
       <CapsuleProgress value={doneCount} total={steps.length} label={doneCount ? t('plan.stepsDone', { n: doneCount, m: steps.length }) : t('plan.steps', { count: steps.length })} />
       {/* sin un «0 de 45 min»: antes de estudiar, la meta */}
-      {stats && <span className="t-ui tabular text-text2 whitespace-nowrap">{Math.round(stats.minutesToday) > 0 ? t('plan.minutesToday', { n: Math.round(stats.minutesToday), m: data.progress.settings.dailyMinutes || 45 }) : t('plan.goal', { m: data.progress.settings.dailyMinutes || 45 })}</span>}
+      {stats && <span className="t-ui tabular text-text2 whitespace-nowrap">{Math.round(stats.minutesToday) > 0 ? t('plan.minutesToday', { n: Math.round(stats.minutesToday), m: planBudget(data.progress) }) : t('plan.goal', { m: planBudget(data.progress) })}</span>}
     </TopCapsule>
   )
 

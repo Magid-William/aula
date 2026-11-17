@@ -1,5 +1,6 @@
 // Tu ritmo: promedio por día con estudio, el mejor día de la semana y la semana más larga (pares clave-valor), y abajo
-// los minutos por día de la semana en columnas de píxeles que caen en su sitio.
+// los minutos por día de la semana en columnas de píxeles que caen en su sitio. El mejor día va a tinta (el resto, en aguada
+// de grafito): el dato que importa se ve sin añadir color.
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { Card, SectionTitle, Icon, StaggerItem, Stagger, cx, type IconName } from '@renderer/design'
@@ -46,7 +47,8 @@ export function RhythmCard({ days }: { days: StatsDay[] }) {
   )
 }
 
-/** Minutos por día de la semana como columnas de píxeles (cada píxel con la aguada de grafito de su altura). */
+/** Minutos por día de la semana como columnas de píxeles (cada píxel con la aguada de grafito de su altura; los del mejor día,
+ *  a tinta). */
 function WeekdayPixels({ byWeekday, best, label }: { byWeekday: number[]; best: number | null; label: string }) {
   const letters = weekdayLetters()
   const max = Math.max(...byWeekday)
@@ -64,7 +66,7 @@ function WeekdayPixels({ byWeekday, best, label }: { byWeekday: number[]; best: 
                   <motion.span
                     key={k}
                     className="dab block h-[11px] w-[15px] rounded-[3px]"
-                    style={{ background: washFor(pixelLevel(k)) ?? undefined }}
+                    style={{ background: wd === best ? 'var(--text)' : washFor(pixelLevel(k)) ?? undefined }}
                     initial={{ opacity: 0, y: -14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ type: 'spring', stiffness: 600, damping: 24, delay: 0.35 + wd * 0.05 + k * 0.045 }}

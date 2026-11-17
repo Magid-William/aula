@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { PlanItem } from '@engine/learn'
 import { useNav } from '@renderer/app/router'
-import { activePlan, completeCurrentStep, endPlan, leaveStep, nextStep, runStep, startPlan, usePlanStore } from './session'
+import { activePlan, completeCurrentStep, currentStep, endPlan, leaveStep, nextStep, runStep, startPlan, usePlanStore } from './session'
 
 const PACK = 'p1'
 const item = (id: string, kind: PlanItem['kind'], minutes = 10): PlanItem => ({ id, kind, skillID: id.includes(':') ? id.split(':')[1] : null, title: id, minutes, reason: '' })
@@ -90,5 +90,15 @@ describe('el plan de hoy y la cola de repaso', () => {
     expect(activePlan(PACK, 'plan')).toBeNull()
     expect(activePlan(PACK, 'review')?.items).toHaveLength(2)
     expect(activePlan('otro', 'review')).toBeNull()
+  })
+
+  it('el paso en marcha (con cuántos errores caben) lo sabe el modo; sin sesión, ninguno', () => {
+    expect(currentStep(PACK)).toBeNull()
+    startPlan(PACK, [item('review', 'review'), { ...item('mistakes', 'mistakes'), count: 8 }], { scope: 'review' })
+    expect(currentStep(PACK)).toBeNull()
+    runStep(PACK, 1, { scope: 'review' })
+    expect(currentStep(PACK)).toMatchObject({ kind: 'mistakes', count: 8 })
+    endPlan('review')
+    expect(currentStep(PACK)).toBeNull()
   })
 })

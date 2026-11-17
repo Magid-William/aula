@@ -1,11 +1,12 @@
 // Documentos: la biblioteca del estudiante — los materiales de cada curso, los archivos que importa y los documentos que creó
-// Aula — con búsqueda en el texto de todo, filtro por curso, «Recientes» con su página en miniatura y una zona para soltar
-// archivos (el pixel-art del papel se enciende al pasar por encima). El título es el de la barra de arriba.
-import { useEffect, useMemo, useRef, useState } from 'react'
+// Aula —. Arriba, una sola barra: búsqueda en el texto de todo, filtro por curso, lo que hay y los dos botones (añadir y crear).
+// Debajo, «Recientes» con su página en miniatura y los documentos por curso. Los archivos se sueltan sobre la ventana (como en
+// los Materiales del curso): una capa con la hoja pixel encendida. El título es el de la barra de arriba.
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import type { DocumentEntry, DocumentLibrary, DocumentSearchHit } from '@shared/documents'
-import { Button, Card, Chip, cx, EmptyState, Icon, IconButton, Menu, PixelIcon, ProgressBar, SectionTitle, Spinner, Stagger, StaggerItem, TextField, toast, toneForHue, useTheme, type MenuItem } from '@renderer/design'
+import { Button, Card, Chip, EmptyState, Icon, IconButton, Menu, PixelIcon, ProgressBar, SectionTitle, Spinner, Stagger, StaggerItem, TextField, toast, toneForHue, useTheme, type MenuItem } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import i18n from '@renderer/i18n'
 import { useRpc, useRpcEvent } from '@renderer/lib/useRpc'
@@ -14,6 +15,7 @@ import { navigate } from '@renderer/app/router'
 import { boldParts, byOpened, foldKeep, kindIcon, kindLabel, openDocument } from './lib'
 import { PaperSprite } from './PaperSprite'
 import { Thumbnail } from './Thumbnail'
+import { FileDropOverlay, filePaths, useFileDrop } from './FileDrop'
 import { ExportDialog } from './export/ExportDialog'
 
 const ALL = '__all'
@@ -43,13 +45,8 @@ export function Library() {
   return (
     <div className="@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pt-1 pb-24">
       <Stagger className="grid grid-cols-12 gap-4" gap={0.05}>
-        {/* lado a lado solo con ancho de sobra (la tarjeta de soltar, de unos 350 px o más, con su texto en pocas líneas);
-            si no, una debajo de otra y a todo lo ancho */}
-        <StaggerItem className="col-span-12 @5xl:col-span-7 @6xl:col-span-8">
-          <SearchCard lib={lib} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} />
-        </StaggerItem>
-        <StaggerItem className="col-span-12 @5xl:col-span-5 @6xl:col-span-4">
-          <DropCard onCreate={() => setExportOpen(true)} hasCourses={lib.courses.length > 0} />
+        <StaggerItem className="col-span-12">
+          <Toolbar lib={lib} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} onCreate={() => setExportOpen(true)} />
         </StaggerItem>
 
         {query.trim().length >= 2 && (
@@ -103,9 +100,26 @@ function i18nT(key: string, opts?: Record<string, unknown>): string {
 
 // MARK: - Buscar y filtrar
 
-function SearchCard({ lib, query, setQuery, filter, setFilter }: { lib: DocumentLibrary; query: string; setQuery: (q: string) => void; filter: string; setFilter: (f: string) => void }) {
+/** La barra de arriba, en una fila: buscar, el filtro por curso, lo que hay (en text2, sin ceros) y los dos botones. Soltar
+ *  archivos en cualquier parte de la ventana los importa (la capa lo dice mientras se arrastran). */
+function Toolbar({ lib, query, setQuery, filter, setFilter, onCreate }: { lib: DocumentLibrary; query: string; setQuery: (q: string) => void; filter: string; setFilter: (f: string) => void; onCreate: () => void }) {
   const { t } = useTranslation('documents')
   const { dark } = useTheme()
+  const [busy, setBusy] = useState<{ name: string; fraction: number } | null>(null)
+  useRpcEvent('documents.importProgress', (p) => setBusy({ name: p.name, fraction: p.fraction }))
+  const importPaths = async (paths: string[]): Promise<void> => {
+    if (!paths.length) return
+    setBusy({ name: '', fraction: 0 })
+    try {
+      const r = await api.invoke('documents.import', { paths })
+      reportImport(r.imported, r.failed)
+    } catch (e) {
+      toast.error(t('library.importError'), e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+  const dragging = useFileDrop((files) => void importPaths(filePaths(files)))
   const imports = lib.items.filter((i) => i.origin === 'import').length
   const pages = lib.items.reduce((n, i) => n + i.pages, 0)
   const marks = lib.items.reduce((n, i) => n + i.marks, 0)
@@ -116,14 +130,12 @@ function SearchCard({ lib, query, setQuery, filter, setFilter }: { lib: Document
     marks > 0 ? t('library.summaryMarks', { count: marks }) : ''
   ].filter(Boolean)
   return (
-    <Card padded="lg" className="h-full flex flex-col">
+    <Card padded="sm" className="flex flex-wrap items-center gap-x-4 gap-y-3">
       {/* el título visible es el de la barra de arriba */}
       <h1 className="sr-only">{t('title')}</h1>
-      <div>
-        <TextField value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('library.search')} icon={<Icon name="search" size={15} />}
-          trailing={query ? <IconButton label={t('clear')} size="sm" onClick={() => setQuery('')}><Icon name="close" size={13} /></IconButton> : undefined} />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-1.5">
+      <TextField className="min-w-[240px] max-w-[420px] grow basis-[340px]" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('library.search')} icon={<Icon name="search" size={15} />}
+        trailing={query ? <IconButton label={t('clear')} size="sm" onClick={() => setQuery('')}><Icon name="close" size={13} /></IconButton> : undefined} />
+      <div className="flex flex-wrap items-center gap-1.5">
         <Chip active={filter === ALL} onClick={() => setFilter(ALL)}>{t('library.all')}</Chip>
         {lib.courses.map((c) => {
           const tone = toneForHue(c.hue)
@@ -137,8 +149,21 @@ function SearchCard({ lib, query, setQuery, filter, setFilter }: { lib: Document
         })}
         {imports > 0 && <Chip active={filter === IMPORTED} onClick={() => setFilter(IMPORTED)} icon={<Icon name="folder" size={12} />}>{t('library.imports')}</Chip>}
       </div>
-      {/* al pie de la tarjeta, a la altura de los botones de al lado */}
-      {facts.length > 0 && <p className="mt-auto pt-4 t-callout text-text2">{facts.join(' · ')}</p>}
+      {/* lo que hay o, mientras importa, lo que está leyendo */}
+      {busy ? (
+        <span className="flex min-w-0 items-center gap-2 t-callout text-text2" role="status">
+          <PaperSprite lit size={18} />
+          <span className="truncate">{busy.name ? t('library.reading', { name: busy.name }) : t('library.readingAny')}</span>
+          <ProgressBar value={busy.fraction} className="w-[72px] shrink-0" />
+        </span>
+      ) : (
+        facts.length > 0 && <span className="t-callout text-text2">{facts.join(' · ')}</span>
+      )}
+      <div className="ml-auto flex flex-wrap gap-2">
+        <Button variant="primary" icon={<Icon name="upload" size={14} />} onClick={() => void pick()} disabled={!!busy}>{t('library.pick')}</Button>
+        <Button variant="secondary" icon={<Icon name="file-text" size={14} />} onClick={onCreate} disabled={!lib.courses.length}>{t('library.create')}</Button>
+      </div>
+      <FileDropOverlay show={dragging} title={t('library.dropNow')} body={t('library.kinds')} />
     </Card>
   )
 }
@@ -192,67 +217,6 @@ function SearchResults({ lib, query, courseId }: { lib: DocumentLibrary; query: 
           ))}
         </div>
       )}
-    </Card>
-  )
-}
-
-// MARK: - Soltar archivos
-
-function DropCard({ onCreate, hasCourses }: { onCreate: () => void; hasCourses: boolean }) {
-  const { t } = useTranslation('documents')
-  const [drag, setDrag] = useState(false)
-  const [busy, setBusy] = useState<{ name: string; fraction: number } | null>(null)
-  const depth = useRef(0)
-  useRpcEvent('documents.importProgress', (p) => setBusy({ name: p.name, fraction: p.fraction }))
-
-  const importPaths = async (paths: string[]): Promise<void> => {
-    if (!paths.length) return
-    setBusy({ name: '', fraction: 0 })
-    try {
-      const r = await api.invoke('documents.import', { paths })
-      reportImport(r.imported, r.failed)
-    } catch (e) {
-      toast.error(t('library.importError'), e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(null)
-    }
-  }
-  const onDrop = (files: FileList): void => {
-    const paths = [...files].map((f) => { try { return api.pathForFile(f) } catch { return '' } }).filter(Boolean)
-    void importPaths(paths)
-  }
-  return (
-    <Card
-      padded="lg"
-      className="h-full flex flex-col"
-      onDragEnter={(e) => { if (e.dataTransfer.types.includes('Files')) { depth.current++; setDrag(true) } }}
-      onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault() }}
-      onDragLeave={() => { depth.current = Math.max(0, depth.current - 1); if (!depth.current) setDrag(false) }}
-      onDrop={(e) => { e.preventDefault(); depth.current = 0; setDrag(false); onDrop(e.dataTransfer.files) }}
-    >
-      {/* la zona para soltar, en una fila (la hoja pixel y lo que se puede soltar): así las dos tarjetas de arriba miden lo mismo */}
-      <button type="button" onClick={() => void pick()} disabled={!!busy}
-        className={cx('flex-1 min-h-[72px] flex items-center gap-3.5 rounded-[16px] border-[1.5px] border-dashed px-4 py-3 text-left transition-colors', drag ? 'border-accent bg-accent-wash' : 'border-line-strong/40 hover:bg-fill1')}>
-        <span className="shrink-0"><PaperSprite lit={drag || !!busy} size={32} /></span>
-        <span className="min-w-0 flex-1">
-          {busy ? (
-            <>
-              <span className="block t-ui font-medium truncate">{busy.name ? t('library.reading', { name: busy.name }) : t('library.readingAny')}</span>
-              <ProgressBar value={busy.fraction} className="mt-1.5 w-full max-w-[200px]" />
-            </>
-          ) : (
-            <>
-              <span className="block t-ui font-medium">{drag ? t('library.dropNow') : t('library.drop')}</span>
-              <span className="block t-footnote mt-0.5">{t('library.kinds')}</span>
-            </>
-          )}
-        </span>
-      </button>
-      {/* se reparten el ancho de la tarjeta y bajan de línea si no caben (nunca se salen) */}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="primary" className="grow basis-[150px]" icon={<Icon name="upload" size={14} />} onClick={() => void pick()} disabled={!!busy}>{t('library.pick')}</Button>
-        <Button variant="secondary" className="grow basis-[150px]" icon={<Icon name="file-text" size={14} />} onClick={onCreate} disabled={!hasCourses}>{t('library.create')}</Button>
-      </div>
     </Card>
   )
 }
@@ -379,8 +343,7 @@ function DocCard({ entry: e, index, progress }: { entry: DocumentEntry; index: n
 function LibrarySkeleton() {
   return (
     <div className="flex-1 grid grid-cols-12 gap-4 px-6 pt-1 content-start">
-      <div className="col-span-8 h-[220px] skeleton rounded-[22px]" />
-      <div className="col-span-4 h-[220px] skeleton rounded-[22px]" />
+      <div className="col-span-12 h-[68px] skeleton rounded-[22px]" />
       <div className="col-span-12 h-[210px] skeleton rounded-[22px]" />
       <div className="col-span-6 h-[300px] skeleton rounded-[22px]" />
       <div className="col-span-6 h-[300px] skeleton rounded-[22px]" />

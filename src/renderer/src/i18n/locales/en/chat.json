@@ -55,10 +55,10 @@
   "tutorEmpty": "Ask me anything about this topic: we’ll work through it together, step by step.",
   "tutorQuick": [
     "Explain it another way",
-    "Where did I go wrong?",
     "Give me a hint, not the answer",
     "Give me a similar example"
   ],
+  "tutorQuickWrong": "Where did I go wrong?",
   "openSource": "Open in the reader",
   "page": "p. {{n}}",
   "newShort": "New",
@@ -243,9 +243,9 @@
   "renameTitle": "Rename conversation",
   "expired": "Expired · ask again",
   "opening": {
-    "exam_one": "{{exam}} is tomorrow.",
-    "exam_other": "{{exam}} is in {{count}} days.",
-    "examToday": "{{exam}} is today.",
+    "exam_one": "<keep>{{exam}}</keep> is tomorrow.",
+    "exam_other": "<keep>{{exam}}</keep> is in {{count}} days.",
+    "examToday": "<keep>{{exam}}</keep> is today.",
     "pending": "Today: {{list}}.",
     "and": " and ",
     "mistakes_one": "{{count}} mistake to go over",

@@ -1,12 +1,12 @@
-// Repasar: una sola cola para lo que toca hoy. Arriba, una frase con lo que suma (tarjetas, errores y práctica, en minutos) y
-// un solo botón, «Empezar el repaso», que arranca esos pasos del plan de hoy uno tras otro. Debajo, las tres partes: los mazos
-// de tarjetas por tema (con lo firme que está cada uno y todas las tarjetas para hojear), el cuaderno de errores (con cuándo
-// vuelve cada uno) y la práctica por tema (su dominio y «9 de 10 bien»).
+// Repasar: una sola cola para lo que toca hoy. Arriba, una frase con lo que cubre la sesión (tarjetas, errores y práctica, en
+// minutos, con las cifras del plan: las mismas que Hoy y el Resumen) y un solo botón, «Empezar el repaso», que arranca esos
+// pasos del plan de hoy uno tras otro. Debajo, los mazos de tarjetas y la práctica por tema, uno al lado del otro (los dos son
+// una fila por tema), y al final, a todo lo ancho, el cuaderno de errores: unos pocos por tema y el resto a un clic.
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Flashcard, Pack } from '@shared/schema'
-import { clozeText, dailyPlan, dueCards, mistakesNotebook, skillMastery, type MistakeView } from '@engine/study'
+import { clozeText, dailyPlan, dueCards, dueMistakes, LearnBridge, mistakesNotebook, planBudget, skillMastery, type MistakeView } from '@engine/study'
 import { topicCounts } from '@engine/study/topics'
 import { Button, Card, cx, EmptyState, Icon, MarginNote, SectionTitle, SegmentedTabs, Spinner, Stagger, TextField, toast } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
@@ -21,7 +21,7 @@ import { planAvailability } from './failure'
 import { useCourseRun } from './runs'
 import { MasteryBar } from './MasteryBar'
 import { RULED_ROW, SECTION_ATTR } from './sections'
-import { deckStrength, glueLastWord, reviewCounts, reviewPlanItems, rightOfLast } from './reviewQueue'
+import { deckStrength, glueLastWord, previewGroups, reviewCounts, reviewPlanItems, rightOfLast } from './reviewQueue'
 
 const section = (id: string): Record<string, string> => ({ [SECTION_ATTR]: id })
 
@@ -32,15 +32,18 @@ export function ReviewTab({ pack }: { pack: Pack }) {
   const now = useMemo(() => new Date(), [])
   // mientras Aula escribe el curso, el plan solo propone los temas ya listos (como «Estudiar ahora»)
   const isAvailable = planAvailability(useCourseRun(pack.id), topicCounts(pack.skills))
+  // todas las tarjetas abiertas: la columna de los mazos crece y la de la práctica ya no se estira a su altura
+  const [allCards, setAllCards] = useState(false)
   const today = useMemo(() => {
     if (!data) return null
     try {
-      const items = reviewPlanItems(dailyPlan(data.pack, data.skills, data.progress, data.progress.settings.dailyMinutes || 45, now, gradeLang(i18n.language), isAvailable))
+      const items = reviewPlanItems(dailyPlan(data.pack, data.skills, data.progress, planBudget(data.progress), now, gradeLang(i18n.language), isAvailable))
       const notebook = mistakesNotebook(data.progress, data.skills, now)
-      const queue = dueCards(data.pack, data.skills, data.progress, { now })
       // las nuevas no «tocan» (no son repaso), pero «Repasar tarjetas» las ofrece: la frase lo dice cuando no hay nada más
-      const fresh = queue.filter((c) => c.isNew).length
-      return { items, notebook, fresh, counts: reviewCounts(items, { cards: queue.length, mistakes: notebook.filter((m) => m.due).length }) }
+      const fresh = dueCards(data.pack, data.skills, data.progress, { now }).filter((c) => c.isNew).length
+      // lo que toca, contado como el plan (y como Hoy y el Resumen): las tarjetas vencidas y los errores que se pueden repasar
+      const due = { cards: LearnBridge.dueCardCount(data.pack, data.skills, data.progress, now), mistakes: dueMistakes(data.progress, now, data.skills).length }
+      return { items, notebook, fresh, counts: reviewCounts(items, due) }
     } catch {
       return { items: [], notebook: [], fresh: 0, counts: { minutes: 0 } }
     }
@@ -50,9 +53,10 @@ export function ReviewTab({ pack }: { pack: Pack }) {
   if (!data || !today) return status === 'loading' ? <div className="grid place-items-center py-16 text-text3"><Spinner size={18} /></div> : <EmptyState title={t('study:common.loadError')} />
 
   const { counts } = today
+  // lo que cubre la sesión: «4 tarjetas y 8 de tus 33 errores» (si no da para todo, cuántos caben)
   const parts = [
-    counts.cards ? t('review.cards', { count: counts.cards }) : null,
-    counts.mistakes ? t('review.mistakes', { count: counts.mistakes }) : null,
+    counts.cards ? (counts.cardsFit ? t('review.cardsOf', { count: counts.cards, fit: counts.cardsFit }) : t('review.cards', { count: counts.cards })) : null,
+    counts.mistakes ? (counts.mistakesFit ? t('review.mistakesOf', { count: counts.mistakes, fit: counts.mistakesFit }) : t('review.mistakes', { count: counts.mistakes })) : null,
     counts.practice ? t('review.practice', { count: counts.practice }) : null
   ].filter((x): x is string => !!x)
   const due = parts.length > 0 && today.items.length > 0
@@ -76,20 +80,18 @@ export function ReviewTab({ pack }: { pack: Pack }) {
           </Button>
         )}
       </Card>
-      {/* en ventana ancha: los mazos y la práctica a la izquierda (filas por tema) y el cuaderno de errores a la derecha;
-          estrecha, una columna en el orden de la cola: tarjetas, errores y práctica */}
-      <div className="flex flex-col gap-4 @5xl:grid @5xl:grid-cols-12 @5xl:items-start">
-        <div className="contents @5xl:col-span-7 @5xl:flex @5xl:flex-col @5xl:gap-4">
-          <div className="order-1 scroll-mt-3" {...section('cards')}>
-            <CardsSection data={data} ink={ink} now={now} />
-          </div>
-          <div className="order-3 scroll-mt-3" {...section('practice')}>
-            <PracticeSection data={data} ink={ink} now={now} />
-          </div>
+      {/* en ventana ancha, los mazos y la práctica uno al lado del otro (los dos, una fila por tema; acaban a la vez, salvo con
+          todas las tarjetas abiertas) y el cuaderno de errores debajo, a todo lo ancho; estrecha, una columna en ese orden */}
+      <div className={cx('flex flex-col gap-4 @5xl:grid @5xl:grid-cols-2', allCards && '@5xl:items-start')}>
+        <div className="scroll-mt-3" {...section('cards')}>
+          <CardsSection data={data} ink={ink} now={now} open={allCards} setOpen={setAllCards} />
         </div>
-        <div className="order-2 scroll-mt-3 @5xl:col-span-5" {...section('mistakes')}>
-          <MistakesSection data={data} list={today.notebook} />
+        <div className="scroll-mt-3" {...section('practice')}>
+          <PracticeSection data={data} ink={ink} now={now} />
         </div>
+      </div>
+      <div className="scroll-mt-3" {...section('mistakes')}>
+        <MistakesSection data={data} list={today.notebook} />
       </div>
     </Stagger>
   )
@@ -117,9 +119,8 @@ function RowButton({ onOpen, children, className }: { onOpen?: () => void; child
 
 // MARK: Tarjetas
 
-function CardsSection({ data, ink, now }: { data: CourseData; ink: string; now: Date }) {
+function CardsSection({ data, ink, now, open, setOpen }: { data: CourseData; ink: string; now: Date; open: boolean; setOpen: (v: boolean) => void }) {
   const { t } = useTranslation(['course', 'study'])
-  const [open, setOpen] = useState(false)
   const all = data.skills.flatMap((s) => s.cards.map((c) => ({ card: c, skill: s })))
   const due = useMemo(() => {
     try {
@@ -130,7 +131,7 @@ function CardsSection({ data, ink, now }: { data: CourseData; ink: string; now: 
   }, [data, now])
   const study = (skill?: string): void => navigate({ name: 'study', id: data.pack.id, mode: 'cards', skill })
   return (
-    <Card enterAnim padded="lg">
+    <Card enterAnim padded="lg" className="h-full">
       <SectionTitle
         title={t('review.cardsTitle')}
         detail={all.length ? t('review.decksDetail') : undefined}
@@ -162,7 +163,7 @@ function CardsSection({ data, ink, now }: { data: CourseData; ink: string; now: 
               )
             })}
           </div>
-          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
+          <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
             <Icon name={open ? 'chevron-up' : 'chevron-down'} size={13} />
             {t('study:tab.cards.all')} <span className="tabular text-text3">{all.length}</span>
           </button>
@@ -230,11 +231,15 @@ function MiniCard({ card, skillTitle, state }: { card: Flashcard; skillTitle: st
 
 // MARK: Errores
 
+/** Errores que se ven antes de «Ver los 33»: el cuaderno entero no empuja el resto de la pantalla. */
+const MISTAKES_PREVIEW = 6
+
 function MistakesSection({ data, list }: { data: CourseData; list: MistakeView[] }) {
   const { t } = useTranslation(['course', 'study'])
   const due = list.filter((m) => m.due)
   // lo de hoy primero (si hay); el cuaderno entero, a un clic
   const [filter, setFilter] = useState<'due' | 'all'>(() => (due.length ? 'due' : 'all'))
+  const [expanded, setExpanded] = useState(false)
   const resolved = data.progress.mistakes.filter((m) => m.resolved).length
   const packId = data.pack.id
   const resolve = (m: MistakeView): void => {
@@ -242,7 +247,9 @@ function MistakesSection({ data, list }: { data: CourseData; list: MistakeView[]
     toast.success(t('study:tab.mistakes.resolved'), t('study:tab.mistakes.resolvedBody'))
   }
   const shown = filter === 'due' ? due : list
-  const groups = data.skills.map((s) => ({ skill: s, items: shown.filter((m) => m.entry.skill === s.id) })).filter((g) => g.items.length)
+  // por tema, en el orden del curso; plegado, solo los primeros (con su tema encima)
+  const groups = previewGroups(data.skills.map((s) => ({ skill: s, items: shown.filter((m) => m.entry.skill === s.id) })), expanded ? Infinity : MISTAKES_PREVIEW)
+  const hidden = shown.length - groups.reduce((n, g) => n + g.items.length, 0)
   return (
     <Card enterAnim padded="lg">
       <SectionTitle
@@ -262,18 +269,25 @@ function MistakesSection({ data, list }: { data: CourseData; list: MistakeView[]
                 <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'study', id: packId, mode: 'mistakes', skill: g.skill.id })}>{t('study:tab.mistakes.practiceThese')}</Button>
               </div>
               <div className="-mx-3 flex flex-col">
-                {g.items.map((m) => <MistakeRow key={m.entry.id} m={m} onResolve={() => resolve(m)} />)}
+                {/* con «Para hoy» todos tocan hoy: decirlo en cada fila sería ruido */}
+                {g.items.map((m) => <MistakeRow key={m.entry.id} m={m} showWhen={filter === 'all'} onResolve={() => resolve(m)} />)}
               </div>
             </section>
           ))}
         </div>
+      )}
+      {(hidden > 0 || expanded) && shown.length > MISTAKES_PREVIEW && (
+        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
+          <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={13} />
+          {expanded ? t('review.showFewer') : t('review.showAll', { count: shown.length })}
+        </button>
       )}
       {list.length > 0 && <p className="mt-4 t-footnote">{t('study:tab.mistakes.how')}</p>}
     </Card>
   )
 }
 
-function MistakeRow({ m, onResolve }: { m: MistakeView; onResolve: () => void }) {
+function MistakeRow({ m, showWhen, onResolve }: { m: MistakeView; showWhen: boolean; onResolve: () => void }) {
   const { t } = useTranslation('study')
   const [open, setOpen] = useState(false)
   const ex = m.exercise
@@ -281,12 +295,13 @@ function MistakeRow({ m, onResolve }: { m: MistakeView; onResolve: () => void })
     <div className={RULED_ROW}>
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-start gap-3 rounded-[14px] px-3 py-2.5 text-left transition-colors hover:bg-fill1">
         <span aria-hidden className={cx('mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full', m.due ? 'bg-text2' : 'bg-fill4')} />
-        <span className="min-w-0 flex-1">
-          <span className="block t-callout line-clamp-2">{ex ? <RichText text={promptText(ex)} inline /> : <span className="text-text3">{t('tab.mistakes.gone')}</span>}</span>
-          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 t-footnote text-text2">
+        {/* a todo lo ancho, el enunciado a la izquierda y sus datos a la derecha; estrecho, los datos debajo */}
+        <span className="min-w-0 flex-1 @3xl:flex @3xl:items-baseline @3xl:gap-6">
+          <span className="block t-callout line-clamp-2 @3xl:min-w-0 @3xl:flex-1">{ex ? <RichText text={promptText(ex)} inline /> : <span className="text-text3">{t('tab.mistakes.gone')}</span>}</span>
+          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 t-footnote text-text2 @3xl:mt-0 @3xl:shrink-0 @3xl:flex-nowrap">
             <span>{t('mistakes.failedTimes', { count: m.entry.count })}</span>
             <span>{t('mistakes.stage', { n: Math.min(m.entry.stage + 1, 5), m: 5 })}</span>
-            <span className={m.due ? 'font-medium text-text' : undefined}>{m.due ? t('tab.mistakes.dueNow') : t('tab.mistakes.inDays', { count: m.inDays })}</span>
+            {showWhen && <span className={m.due ? 'font-medium text-text' : undefined}>{m.due ? t('tab.mistakes.dueNow') : t('tab.mistakes.inDays', { count: m.inDays })}</span>}
           </span>
         </span>
         <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} className="mt-1 shrink-0 text-text3" />
@@ -330,7 +345,7 @@ function PracticeSection({ data, ink, now }: { data: CourseData; ink: string; no
   const start = (skill?: string): void => navigate({ name: 'study', id: data.pack.id, mode: 'practice', skill })
   const skills = data.skills.filter((s) => s.exercises.length + s.templates.length > 0)
   return (
-    <Card enterAnim padded="lg">
+    <Card enterAnim padded="lg" className="h-full">
       <SectionTitle
         title={t('review.practiceTitle')}
         action={skills.length > 0 && <Button size="sm" variant="ghost" iconRight={<Icon name="arrow-right" size={13} />} onClick={() => start()}>{t('review.mixed')}</Button>}

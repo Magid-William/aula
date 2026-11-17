@@ -99,6 +99,13 @@ export type TutorLooking =
   | { kind: 'topicExercise'; skill: string }
   | { kind: 'topic'; skill: string }
 
+/** Las preguntas rápidas del tutor vacío. «¿Dónde me equivoqué?» va la segunda y solo si lo que se mira se ha fallado (del todo
+ *  o en parte): antes de responder no hay nada en que equivocarse. */
+export function tutorQuickIdeas(base: readonly string[], wrong: string, lastResult?: string): string[] {
+  const failed = /^(incorrect|partial)\b/.test(lastResult ?? '')
+  return failed ? [...base.slice(0, 1), wrong, ...base.slice(1)] : [...base]
+}
+
 /** Lo que dice esa línea con lo que se sabe (el contexto, la posición en la sesión y el título del tema). Sin datos, nada. */
 export function tutorLooking(context: TutorContext | null, position: TutorPosition | null, skillTitle?: string): TutorLooking | null {
   if (!context) return null

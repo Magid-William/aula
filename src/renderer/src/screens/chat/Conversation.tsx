@@ -30,17 +30,18 @@ export function Conversation({ conv, language, onCancelQueued, empty, className,
   const { thread, busy, queued, liveId, pendingSince } = conv
   const scroller = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
-  const { stuck, toBottom } = useStickToBottom(scroller, content, thread?.id)
+  const { stuck, held, toBottom } = useStickToBottom(scroller, content, thread?.id)
   const messages = thread?.messages ?? []
   const isEmpty = messages.length === 0 && queued.length === 0 && !pendingSince
 
-  // al enviar (un mensaje tuyo nuevo, o a la cola), de vuelta al final
+  // al enviar (un mensaje tuyo nuevo, o a la cola), de vuelta al final; la respuesta crece debajo sin cortar tu pregunta
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.id
   const sentCount = useRef({ user: lastUser, queued: queued.length })
   useEffect(() => {
     const before = sentCount.current
     sentCount.current = { user: lastUser, queued: queued.length }
-    if ((lastUser && lastUser !== before.user && lastUser.startsWith('local-')) || queued.length > before.queued) toBottom()
+    const sent = !!lastUser && lastUser !== before.user && lastUser.startsWith('local-')
+    if (sent || queued.length > before.queued) toBottom(true, sent)
   }, [lastUser, queued.length, toBottom])
 
   return (
@@ -73,10 +74,11 @@ export function Conversation({ conv, language, onCancelQueued, empty, className,
           </AnimatePresence>
         </div>
       </div>
-      {/* subiste a leer: volver al final (con un punto de sol si Aula sigue escribiendo), pegado a la esquina de la caja */}
+      {/* subiste a leer (o la respuesta sigue debajo de tu pregunta): volver al final (con un punto de sol si Aula sigue
+          escribiendo), pegado a la esquina de la caja */}
       <div className={cx('pointer-events-none absolute inset-x-0 bottom-0 z-10 mx-auto flex w-full justify-end', jumpClassName)}>
         <AnimatePresence>
-          {!stuck && !isEmpty && (
+          {(!stuck || held) && !isEmpty && (
             <motion.button
               key="jump"
               type="button"

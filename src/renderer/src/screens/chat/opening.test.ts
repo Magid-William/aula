@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HomeSummary } from '@shared/ipc/home'
-import { openingFor, topicOf } from './opening'
+import { keepWhole, openingFor, topicOf } from './opening'
 
 const now = new Date(2026, 10, 16, 14, 0)
 const base: Pick<HomeSummary, 'exams' | 'plan' | 'courses'> = {
@@ -49,5 +49,12 @@ describe('lo primero que dice Aula en el chat', () => {
     expect(o.mistakes).toBe(2)
     expect(o.dueCards).toBe(0)
     expect(o.suggestions).toEqual([{ kind: 'mistakes', count: 2 }])
+  })
+})
+
+describe('keepWhole', () => {
+  it('un nombre corto va entero; uno largo puede partirse', () => {
+    expect(keepWhole('Exam #2 — Trigonometry')).toBe(true)
+    expect(keepWhole('Final exam of Introduction to Organic Chemistry II')).toBe(false)
   })
 })

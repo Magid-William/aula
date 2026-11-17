@@ -236,7 +236,8 @@
   },
   "overview": {
     "gradeLine": "Entre {{low}} y {{high}} · has visto el {{seen}} del temario",
-    "gradeLineAll": "Entre {{low}} y {{high}} · has visto todo el temario"
+    "gradeLineAll": "Entre {{low}} y {{high}} · has visto todo el temario",
+    "rangeTip": "Intervalo probable: de {{low}} a {{high}}"
   },
   "review": {
     "today": "Para hoy: {{list}} · unos {{minutes}} min",
@@ -244,6 +245,10 @@
     "cards_other": "{{count}} tarjetas",
     "mistakes_one": "{{count}} error",
     "mistakes_other": "{{count}} errores",
+    "cardsOf_one": "{{fit}} de tu {{count}} tarjeta",
+    "cardsOf_other": "{{fit}} de tus {{count}} tarjetas",
+    "mistakesOf_one": "{{fit}} de tu {{count}} error",
+    "mistakesOf_other": "{{fit}} de tus {{count}} errores",
     "practice_one": "{{count}} ejercicio de práctica",
     "practice_other": "{{count}} ejercicios de práctica",
     "start": "Empezar el repaso",
@@ -256,7 +261,10 @@
     "decksDetail": "La barra es lo firme que recuerdas cada mazo",
     "reviewCards": "Repasar tarjetas",
     "mixed": "Práctica mezclada",
-    "right": "{{n}} de {{m}} bien"
+    "right": "{{n}} de {{m}} bien",
+    "showAll_one": "Ver el {{count}}",
+    "showAll_other": "Ver los {{count}}",
+    "showFewer": "Ver menos"
   },
   "exam": {
     "take": "Hacer un simulacro",

@@ -34,8 +34,8 @@ export const TOOLS: ToolDef[] = [
 
 export const toolById = (id: string | undefined) => TOOLS.find((t) => t.id === id)
 
-/** Las herramientas con las fijadas (flotantes) arriba, en el orden en que se fijaron; el resto, en el del catálogo. */
-export function pinnedFirst<T extends { id: string }>(tools: readonly T[], pinned: readonly string[]): T[] {
+/** La galería en dos grupos: las fijadas (flotantes), en el orden en que se fijaron, y el resto, en el del catálogo. */
+export function pinnedGroups<T extends { id: string }>(tools: readonly T[], pinned: readonly string[]): { pinned: T[]; rest: T[] } {
   const on = pinned.map((id) => tools.find((t) => t.id === id)).filter((t): t is T => !!t)
-  return [...on, ...tools.filter((t) => !pinned.includes(t.id))]
+  return { pinned: on, rest: tools.filter((t) => !on.includes(t)) }
 }

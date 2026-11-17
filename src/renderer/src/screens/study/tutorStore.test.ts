@@ -1,7 +1,7 @@
 // A3-P1-1: el tutor no se reabre en otras pantallas ni repite su pregunta inicial.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { navigate, routeKey, useNav, type Route } from '@renderer/app/router'
-import { tutorLooking, tutorVisibleFor, useTutor } from './tutorStore'
+import { tutorLooking, tutorQuickIdeas, tutorVisibleFor, useTutor } from './tutorStore'
 
 const practice: Route = { name: 'study', id: 'c1', mode: 'practice', skill: 's1' }
 const ctx = { courseID: 'c1', skillID: 's1', screen: 'practice' }
@@ -130,5 +130,15 @@ describe('la línea «Mirando: …» del tutor', () => {
     useTutor.getState().publish(exercise, Symbol('modo'), { n: 2, m: 10 })
     expect(useTutor.getState().open).toBe(false)
     expect(useTutor.getState().context).toBeNull()
+  })
+})
+
+describe('las preguntas rápidas del tutor', () => {
+  const base = ['Explain it another way', 'Give me a hint, not the answer', 'Give me a similar example']
+  it('«¿Dónde me equivoqué?» solo después de fallar', () => {
+    expect(tutorQuickIdeas(base, 'Where did I go wrong?')).toEqual(base)
+    expect(tutorQuickIdeas(base, 'Where did I go wrong?', 'correct')).toEqual(base)
+    expect(tutorQuickIdeas(base, 'Where did I go wrong?', 'incorrect: the exact answer has π in it')).toEqual(['Explain it another way', 'Where did I go wrong?', 'Give me a hint, not the answer', 'Give me a similar example'])
+    expect(tutorQuickIdeas(base, 'Where did I go wrong?', 'partial')[1]).toBe('Where did I go wrong?')
   })
 })

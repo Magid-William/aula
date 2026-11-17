@@ -7,8 +7,9 @@ import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { create } from 'zustand'
 import { Icon, Tooltip, cx, spring, AulaMark, useTheme, type IconName, SelectionPaint } from '@renderer/design'
-import { useNav, navigate, type Route } from '../router'
+import { useNav, type Route } from '../router'
 import { SidebarCourses } from './SidebarCourses'
+import { goFromSidebar } from './sidebarNav'
 import { useInboxCount } from './inboxCount'
 import { KeychainNotice } from './KeychainNotice'
 import { UpdateNotice } from './UpdateNotice'
@@ -177,7 +178,7 @@ function FxGlyph({ size = 17 }: { size?: number }) {
 function NavRow({ item, active, collapsed, muted }: { item: NavItem; active: boolean; collapsed: boolean; muted?: boolean }) {
   const row = (
     <button
-      onClick={() => navigate(item.route)}
+      onClick={(e) => goFromSidebar(e, item.route)}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? (item.count ? `${item.label} (${item.count})` : item.label) : undefined}
       className={cx('no-drag relative flex w-full items-center gap-2.5 h-8 rounded-[10px] px-2.5 t-ui transition-colors', active ? 'text-text font-medium' : cx('hover:bg-fill1', muted ? 'text-text2 hover:text-text' : 'text-text'), collapsed && 'justify-center px-0')}

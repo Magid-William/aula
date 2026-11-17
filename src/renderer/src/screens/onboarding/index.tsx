@@ -41,7 +41,7 @@ export function Onboarding() {
               <div className="flex flex-col items-center text-center max-w-[560px]">
                 {/* el arco de Aula amaneciendo, a tinta y acuarela como el icono de la app: la tinta se dibuja y entra el color */}
                 <ArchLight scene="dawn" className="h-[170px] w-[204px]" />
-                <h1 className="t-display mt-6">{t('hello')}</h1>
+                <h1 className="t-display mt-6 text-balance">{t('hello')}</h1>
                 <p className="t-body text-text2 mt-3">{t('helloBody')}</p>
                 <div className="w-full max-w-[340px] mt-8 text-left">
                   <TextField label={t('name')} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('namePlaceholder')} onKeyDown={(e) => e.key === 'Enter' && setStep(1)} autoFocus />
@@ -58,7 +58,7 @@ export function Onboarding() {
             {step === 1 && (
               <div className="w-full">
                 <div className="text-center max-w-[620px] mx-auto">
-                  <h1 className="t-title1 text-[34px] leading-[40px]">{t('aiTitle')}</h1>
+                  <h1 className="t-title1 text-[34px] leading-[40px] text-balance">{t('aiTitle')}</h1>
                   <p className="t-body text-text2 mt-2">{t('aiBody')}</p>
                 </div>
                 <div className="mt-8">
@@ -70,7 +70,7 @@ export function Onboarding() {
             {step === 2 && (
               <div className="w-full max-w-[640px]">
                 <div className="text-center">
-                  <h1 className="t-title1 text-[34px] leading-[40px]">{t('platformTitle')}</h1>
+                  <h1 className="t-title1 text-[34px] leading-[40px] text-balance">{t('platformTitle')}</h1>
                   <p className="t-body text-text2 mt-2">{t('platformBody')}</p>
                 </div>
                 <div className="mt-7">
@@ -83,7 +83,7 @@ export function Onboarding() {
               <div className="flex flex-col items-center text-center max-w-[560px]">
                 {/* el mismo arco del principio, ya a pleno sol */}
                 <ArchLight scene="noon" className="h-[150px] w-[180px]" />
-                <h1 className="t-display mt-6">{t('doneTitle')}</h1>
+                <h1 className="t-display mt-6 text-balance">{t('doneTitle')}</h1>
                 <p className="t-body text-text2 mt-3">{t('doneBody')}</p>
                 <div className="flex flex-wrap justify-center gap-2 mt-8">
                   <Button variant="primary" size="xl" onClick={() => void finish('create')}>

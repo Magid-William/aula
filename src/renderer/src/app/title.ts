@@ -1,5 +1,5 @@
 // Título de la barra superior (cada pantalla pone el suyo) y acciones extra a la derecha.
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { create } from 'zustand'
 import { useScreenActive } from './router'
 
@@ -33,4 +33,20 @@ export function useScreenTitle(title: ReactNode, right: ReactNode = null, deps: 
     // si el título es texto, también se actualiza cuando cambia (p. ej. al cambiar el idioma)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, active, compactOnly, typeof title === 'string' ? title : null])
+}
+
+/** ¿Se ve aún el elemento (el h1 de la pantalla)? Cuando sale por arriba al desplazarse, la pantalla le pasa su título a la barra
+ *  de arriba: una página larga no se queda sin contexto. Sin elemento (aún cargando), se da por visto. */
+export function useInView(node: Element | null): boolean {
+  const [seen, setSeen] = useState(true)
+  useEffect(() => {
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setSeen(true)
+      return
+    }
+    const io = new IntersectionObserver(([e]) => setSeen(e.isIntersecting), { threshold: 0 })
+    io.observe(node)
+    return () => io.disconnect()
+  }, [node])
+  return seen
 }

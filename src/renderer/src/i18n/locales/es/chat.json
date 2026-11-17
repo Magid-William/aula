@@ -55,10 +55,10 @@
   "tutorEmpty": "Pregúntame lo que quieras de este tema: lo vemos juntos, paso a paso.",
   "tutorQuick": [
     "Explícamelo de otra forma",
-    "¿Dónde me equivoqué?",
     "Dame una pista, no la respuesta",
     "Otro ejemplo parecido"
   ],
+  "tutorQuickWrong": "¿Dónde me equivoqué?",
   "openSource": "Abrir en el lector",
   "page": "p. {{n}}",
   "newShort": "Nueva",
@@ -243,9 +243,9 @@
   "renameTitle": "Renombrar la conversación",
   "expired": "Caducada · pídelo otra vez",
   "opening": {
-    "exam_one": "{{exam}} es mañana.",
-    "exam_other": "Quedan {{count}} días para {{exam}}.",
-    "examToday": "{{exam}} es hoy.",
+    "exam_one": "<keep>{{exam}}</keep> es mañana.",
+    "exam_other": "Quedan {{count}} días <keep>para {{exam}}</keep>.",
+    "examToday": "<keep>{{exam}}</keep> es hoy.",
     "pending": "Hoy: {{list}}.",
     "and": " y ",
     "mistakes_one": "{{count}} error por repasar",

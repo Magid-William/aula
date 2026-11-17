@@ -16,7 +16,7 @@ export function TopBar({ title, right, compact }: { title?: ReactNode; right?: R
   const openPalette = usePalette((s) => s.open)
   const isMac = api.platform === 'darwin'
   const collapsed = useSidebarState((s) => s.collapsed)
-  // la pantalla ya enseña su título (el h1 del curso): en escritorio no se repite
+  // la pantalla ya enseña su título (el h1 del curso): en escritorio no se repite (hasta que sale de la vista al desplazarse)
   const compactOnly = useTitleStore((s) => s.compactOnly)
   // pantalla estrecha (el teléfono): atrás solo si hay adónde volver, el título y la lupa
   if (compact) {
@@ -52,7 +52,8 @@ export function TopBar({ title, right, compact }: { title?: ReactNode; right?: R
       <IconButton label={t('nav.forward')} size="sm" disabled={!canForward} onClick={forward}>
         <Icon name="chevron-right" size={16} />
       </IconButton>
-      <div className="min-w-0 flex-1 truncate t-headline pl-1.5">{compactOnly ? null : title}</div>
+      {/* si la pantalla recoge su título al desplazarse (el curso), entra con un fundido breve */}
+      <div key={compactOnly ? 'own' : 'bar'} className="min-w-0 flex-1 truncate t-headline pl-1.5 tab-enter">{compactOnly ? null : title}</div>
       {right && <div className="no-drag flex items-center gap-1.5 mr-1.5">{right}</div>}
       {/* al estudiar no hay buscador a la vista (modo concentración): ⌘K sigue abriéndolo */}
       {route.name !== 'study' && (

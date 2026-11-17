@@ -3,7 +3,8 @@
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { CourseIcon, Icon, Tooltip, cx, spring, SelectionPaint } from '@renderer/design'
-import { useNav, navigate } from '../router'
+import { useNav } from '../router'
+import { goFromSidebar } from './sidebarNav'
 import { useCourses } from '@renderer/lib/courses'
 import { daysUntil } from '@renderer/lib/format'
 import { courseBuilding, courseRunIssue, coursePartial } from '@renderer/screens/course/failure'
@@ -43,7 +44,7 @@ export function SidebarCourses({ collapsed }: { collapsed: boolean }) {
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.03 * i }}
-            onClick={() => navigate({ name: 'course', id: c.id })}
+            onClick={(e) => goFromSidebar(e, { name: 'course', id: c.id })}
             aria-label={collapsed ? c.title : undefined}
             aria-current={active ? 'page' : undefined}
             className={cx('no-drag relative flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition-colors', !active && 'hover:bg-fill1', collapsed && 'justify-center')}
@@ -94,7 +95,7 @@ function NewCourseRow({ collapsed, delay }: { collapsed: boolean; delay: number 
       initial={{ opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay }}
-      onClick={() => navigate({ name: 'create' })}
+      onClick={(e) => goFromSidebar(e, { name: 'create' })}
       aria-label={collapsed ? label : undefined}
       aria-current={active ? 'page' : undefined}
       className={cx('no-drag relative flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1 text-left transition-colors', !active && 'hover:bg-fill1', collapsed && 'justify-center')}

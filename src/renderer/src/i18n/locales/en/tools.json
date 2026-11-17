@@ -1,6 +1,8 @@
 {
   "title": "Tools",
   "subtitle": "Calculator, grapher, periodic table and more. Pin the calculator, converter or timer to keep it over any screen.",
+  "pinnedGroup": "Pinned",
+  "allGroup": "All tools",
   "open": "Open",
   "pin": "Pin as floating",
   "unpin": "Unpin",

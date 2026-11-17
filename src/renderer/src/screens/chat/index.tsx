@@ -5,7 +5,7 @@
 // La conversación en sí (pensando, pasos, texto que fluye, desplazamiento) está en Conversation.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { studentTextOf } from '@engine/assistant/trust'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { LayoutGroup, motion } from 'motion/react'
 import { AulaMark, Button, Drawer, Icon, InkSpot, cx, toast, useMarkPhase } from '@renderer/design'
 import { useRoute } from '@renderer/app/router'
@@ -20,7 +20,7 @@ import { ThreadList } from './ThreadList'
 import { Conversation } from './Conversation'
 import { Composer, type ComposerHandle } from './Composer'
 import { ChatActionsContext, type ChatActions } from './actions'
-import { openingFor, type OpeningSuggestion } from './opening'
+import { keepWhole, openingFor, type OpeningSuggestion } from './opening'
 import { IdeaList } from './IdeaList'
 
 export default function ChatScreen() {
@@ -154,7 +154,13 @@ function EmptyOpening({ busy, onAsk }: { busy: boolean; onAsk: (text: string) =>
   if (opening?.mistakes) pending.push(t('opening.mistakes', { count: opening.mistakes }))
   if (opening?.dueCards) pending.push(t('opening.cards', { count: opening.dueCards }))
   const exam = opening?.exam
-  const title = exam ? (exam.days === 0 ? t('opening.examToday', { exam: exam.title }) : t('opening.exam', { exam: exam.title, count: exam.days })) : t('emptyTitle')
+  // el nombre del examen, entero en su línea si es corto (y en español, con su «para»): el título no se parte por la mitad
+  const keep = <span className={exam && keepWhole(exam.title) ? 'whitespace-nowrap' : undefined} />
+  const title = exam ? (
+    exam.days === 0
+      ? <Trans t={t} i18nKey="opening.examToday" values={{ exam: exam.title }} components={{ keep }} />
+      : <Trans t={t} i18nKey="opening.exam" count={exam.days} values={{ exam: exam.title, count: exam.days }} components={{ keep }} />
+  ) : t('emptyTitle')
   return (
     <div data-chat-opening className="mx-auto grid w-full max-w-[700px] grid-cols-[100px_minmax(0,1fr)] gap-x-6 pt-[9vh] text-left">
       {/* el flexo encendido sobre la mesa, pequeño, en el margen de lo que dice Aula (mientras piensa, su marca) */}

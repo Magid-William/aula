@@ -1,6 +1,8 @@
 {
   "title": "Herramientas",
   "subtitle": "Calculadora, graficadora, tabla periódica y más. Fija la calculadora, el conversor o el temporizador para tenerlos sobre cualquier pantalla.",
+  "pinnedGroup": "Fijadas",
+  "allGroup": "Todas las herramientas",
   "open": "Abrir",
   "pin": "Dejar flotando",
   "unpin": "Quitar",

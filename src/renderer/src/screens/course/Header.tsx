@@ -5,7 +5,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
-import { Button, DrawnTile, Icon, IconButton, Menu, PixelIcon, toneForHue, useTheme } from '@renderer/design'
+import { Button, DrawnTile, Icon, IconButton, Menu, PixelIcon, cx, toneForHue, useTheme } from '@renderer/design'
 import type { Pack } from '@shared/schema/pack'
 import { daysUntil, fmtDate, fmtTime } from '@renderer/lib/format'
 import { navigate, type CourseView } from '@renderer/app/router'
@@ -38,14 +38,14 @@ export function CourseHeader({ pack, view }: { pack: Pack; view: CourseView }) {
         <motion.h1 className="t-title1 truncate" title={pack.title} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.15 }}>
           {pack.title}
         </motion.h1>
-        <div className="t-callout text-text2 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        {/* cada dato lleva su «·» delante, en su margen: la línea se corre ese margen a la izquierda y lo recorta, así que el
+            punto del primero de cada línea no se ve. Al partirse, ninguna línea empieza ni acaba en «·» */}
+        <div className="t-callout text-text2 mt-0.5 -ml-4 flex flex-wrap items-center gap-y-0.5 [clip-path:inset(0_0_0_1rem)]">
           {/* un curso de ejemplo lo dice (A4-P1-1) */}
-          {showsAsSample(pack.id) && <SampleTag className="mr-0.5" />}
-          {/* el punto va detrás de cada dato: si la línea se parte, no empieza por «·» */}
+          {showsAsSample(pack.id) && <span className="inline-flex pl-4"><SampleTag /></span>}
           {facts.map((f, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5">
+            <span key={i} className={cx('relative pl-4', i > 0 && "before:absolute before:left-0 before:w-4 before:text-center before:text-text3 before:content-['·']")}>
               {f}
-              {i < facts.length - 1 && <span aria-hidden className="text-text3">·</span>}
             </span>
           ))}
         </div>

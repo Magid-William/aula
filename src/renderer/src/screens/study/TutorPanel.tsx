@@ -19,7 +19,7 @@ import { draftContext, useConversation, type Draft } from '../chat/data'
 import { ChatActionsContext, type ChatActions } from '../chat/actions'
 import { IdeaList } from '../chat/IdeaList'
 import { useStudyStore } from './data'
-import { tutorLooking, tutorVisibleFor, useTutor, type TutorLooking } from './tutorStore'
+import { tutorLooking, tutorQuickIdeas, tutorVisibleFor, useTutor, type TutorLooking } from './tutorStore'
 import { exerciseTarget, focusBackTarget, shouldMoveFocus } from './tutorFocus'
 import { tabbables } from '@renderer/design/focusTrap'
 
@@ -97,7 +97,8 @@ export function TutorPanel({ screenKey }: { screenKey: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, thread?.id, threadId, prompt])
 
-  const quick = t('tutorQuick', { returnObjects: true }) as string[]
+  // «¿Dónde me equivoqué?» solo después de fallar (antes de responder no hay nada en que equivocarse)
+  const quick = tutorQuickIdeas(t('tutorQuick', { returnObjects: true }) as string[], t('tutorQuickWrong'), context?.lastResult)
   const emptyMark = useMarkPhase(busy.busy)
   // vacío: Aula habla primero (como en el chat) y propone preguntas rápidas en filas con filete
   const emptyView = (
