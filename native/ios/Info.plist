@@ -22,5 +22,8 @@
 		<key>UIColorName</key>
 		<string>Paper</string>
 	</dict>
+	<!-- Cumplimiento de exportación: solo TLS de Apple y ed25519/Curve25519 del propio sistema, algoritmos estándar. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
