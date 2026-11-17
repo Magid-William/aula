@@ -10,6 +10,7 @@ import { Chip, Dialog, Icon, IconButton, Button, SegmentedTabs, Menu, toast, ton
 import { useRoute, navigate } from '@renderer/app/router'
 import { useScreenTitle } from '@renderer/app/title'
 import { api, isAulaError } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 import { useCourses } from '@renderer/lib/courses'
 import { capitalize, fmtDate, quoted, relativeDay } from '@renderer/lib/format'
 import { useCalendarEvents } from './data'
@@ -199,11 +200,12 @@ export default function CalendarScreen() {
                 <Icon name="more" size={16} />
               </IconButton>
             )}
+            // suscribirse, importar y exportar .ics, solo donde se puede (un dispositivo los tiene negados: remote/policy.ts)
             items={[
-              { label: t('menu.subscribe'), icon: <Icon name="link" size={15} />, onSelect: () => setSubsOpen(true) },
-              { label: t('menu.import'), icon: <Icon name="upload" size={15} />, onSelect: () => void importICS() },
-              { label: t('export'), icon: <Icon name="download" size={15} />, onSelect: () => void exportICS() },
-              { label: t('refresh'), icon: <Icon name="refresh" size={15} />, onSelect: () => void refreshFeeds(), separatorBefore: true }
+              ...(canFrom(api.role, 'calendar.subscribe') ? [{ label: t('menu.subscribe'), icon: <Icon name="link" size={15} />, onSelect: () => setSubsOpen(true) }] : []),
+              ...(canFrom(api.role, 'calendar.importICS') ? [{ label: t('menu.import'), icon: <Icon name="upload" size={15} />, onSelect: () => void importICS() }] : []),
+              ...(canFrom(api.role, 'calendar.exportICS') ? [{ label: t('export'), icon: <Icon name="download" size={15} />, onSelect: () => void exportICS() }] : []),
+              { label: t('refresh'), icon: <Icon name="refresh" size={15} />, onSelect: () => void refreshFeeds(), separatorBefore: canFrom(api.role, 'calendar.subscribe') }
             ]}
           />
         </div>
@@ -223,7 +225,7 @@ export default function CalendarScreen() {
           <div className="flex flex-wrap gap-1.5">
             {feeds.map((f) =>
               f.subscription ? (
-                <Chip key={f.label} onClick={() => setSubsOpen(true)} icon={<Icon name="link" size={12} />}>
+                <Chip key={f.label} onClick={canFrom(api.role, 'calendar.subscribe') ? () => setSubsOpen(true) : undefined} icon={<Icon name="link" size={12} />}>
                   {f.label}
                 </Chip>
               ) : (

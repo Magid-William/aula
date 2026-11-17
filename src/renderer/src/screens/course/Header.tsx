@@ -12,6 +12,8 @@ import { navigate, type CourseView } from '@renderer/app/router'
 import { CourseActions, COURSE_EDIT_EVENT, type CourseAction } from './Actions'
 import { RequestChangesDialog } from './RequestChanges'
 import { SampleTag, showsAsSample } from '@renderer/lib/sample'
+import { api } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 
 export function CourseHeader({ pack, view }: { pack: Pack; view: CourseView }) {
   const { t } = useTranslation(['course', 'common'])
@@ -65,9 +67,10 @@ export function CourseHeader({ pack, view }: { pack: Pack; view: CourseView }) {
           items={[
             { label: t('common:actions.edit'), icon: <Icon name="edit" size={15} />, onSelect: () => setAction('edit') },
             { label: t('refineMenu'), icon: <Icon name="refine" size={15} />, onSelect: () => setChanges(true) },
-            { label: t('export'), icon: <Icon name="share" size={15} />, onSelect: () => setAction('export') },
+            // exportar y eliminar, solo donde se puede (un dispositivo los tiene negados: remote/policy.ts)
+            ...(canFrom(api.role, 'courses.export') ? [{ label: t('export'), icon: <Icon name="share" size={15} />, onSelect: () => setAction('export') }] : []),
             { label: t('history.title'), icon: <Icon name="history" size={15} />, onSelect: () => setAction('history') },
-            { label: t('common:actions.delete'), icon: <Icon name="trash" size={15} />, danger: true, separatorBefore: true, onSelect: () => setAction('delete') }
+            ...(canFrom(api.role, 'courses.delete') ? [{ label: t('common:actions.delete'), icon: <Icon name="trash" size={15} />, danger: true, separatorBefore: true, onSelect: () => setAction('delete') }] : [])
           ]}
         />
         <CourseActions pack={pack} action={action} onClose={() => setAction(null)} />

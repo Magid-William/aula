@@ -9,6 +9,7 @@ import type { DocumentRef } from '@shared/documents'
 import { docKey } from '@shared/documents'
 import { AulaMark, Button, Card, EmptyState, Icon, IconButton, Menu, Spinner, cx, spring, toast, toneForHue, useTheme, type MenuItem } from '@renderer/design'
 import { api } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 import { useRpc } from '@renderer/lib/useRpc'
 import { percentSuffix } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
@@ -182,10 +183,11 @@ function Toolbar({ hasAI, onExport }: { hasAI: boolean | null; onExport: () => v
   const ink = dark ? tone.inkDark : tone.inkLight
   const busy = items.some((i) => !i.done)
   const menu: MenuItem[] = [
-    ...(entry.courseId ? [{ label: t('reader.makeDocument'), icon: <Icon name="file-text" size={14} />, onSelect: onExport }] : []),
+    // crear un documento lo guarda en el ordenador, y «Mostrar en Finder» y quitar los niega la política a un dispositivo
+    ...(entry.courseId && canFrom(api.role, 'documents.save') ? [{ label: t('reader.makeDocument'), icon: <Icon name="file-text" size={14} />, onSelect: onExport }] : []),
     ...(entry.courseId ? [{ label: t('reader.toCourse'), icon: <Icon name="course" size={14} />, onSelect: () => navigate({ name: 'course', id: entry.courseId as string, tab: 'materials' }) }] : []),
-    ...(entry.hasFile ? [{ label: t('reader.reveal'), icon: <Icon name="folder-open" size={14} />, onSelect: () => void api.invoke('documents.reveal', { ref: entry.ref }).catch(() => toast.warning(t('reader.revealFailed'))) }] : []),
-    ...(entry.origin !== 'source' ? [{ label: t('library.remove'), icon: <Icon name="trash" size={14} />, danger: true, separatorBefore: true, onSelect: () => void api.invoke('documents.remove', { ref: entry.ref }).then(() => { toast.success(t('library.removed')); navigate({ name: 'documents' }, { replace: true }) }).catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e))) }] : [])
+    ...(entry.hasFile && canFrom(api.role, 'documents.reveal') ? [{ label: t('reader.reveal'), icon: <Icon name="folder-open" size={14} />, onSelect: () => void api.invoke('documents.reveal', { ref: entry.ref }).catch(() => toast.warning(t('reader.revealFailed'))) }] : []),
+    ...(entry.origin !== 'source' && canFrom(api.role, 'documents.remove') ? [{ label: t('library.remove'), icon: <Icon name="trash" size={14} />, danger: true, separatorBefore: true, onSelect: () => void api.invoke('documents.remove', { ref: entry.ref }).then(() => { toast.success(t('library.removed')); navigate({ name: 'documents' }, { replace: true }) }).catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e))) }] : [])
   ]
   return (
     <div className="flex h-11 shrink-0 items-center gap-1.5 rounded-[16px] bg-surface border-[0.5px] border-line px-1.5 shadow-[var(--e1)]">
@@ -230,11 +232,13 @@ function Toolbar({ hasAI, onExport }: { hasAI: boolean | null; onExport: () => v
 }
 
 function PageInput({ page, count, onGo }: { page: number; count: number; onGo: (p: number) => void }) {
+  const { t } = useTranslation('documents')
   const [draft, setDraft] = useState<string | null>(null)
   return (
     <span className="flex items-center gap-1 t-ui tabular text-text2">
       <input
-        aria-label="page"
+        aria-label={t('reader.pageField')}
+        inputMode="numeric"
         value={draft ?? String(page)}
         onFocus={(e) => { setDraft(String(page)); e.currentTarget.select() }}
         onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 5))}

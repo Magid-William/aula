@@ -60,7 +60,8 @@ export function App() {
   useEffect(() => {
     if (!api.remote) return
     return useNav.subscribe((s) => {
-      try { window.history.replaceState(null, '', routeToHash(s.route) || window.location.pathname) } catch { /* sin historial: no se apunta */ }
+      // sin ruta que apuntar, la dirección se queda con su consulta («?demo=1»: al recargar, la demostración sigue siéndolo)
+      try { window.history.replaceState(null, '', routeToHash(s.route) || window.location.pathname + window.location.search) } catch { /* sin historial: no se apunta */ }
     })
   }, [])
 

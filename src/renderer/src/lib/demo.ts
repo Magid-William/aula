@@ -8,8 +8,12 @@ export function demoText(es: string, en: string): string {
   return (i18n.language ?? 'es').startsWith('en') ? en : es
 }
 
+// se lee una vez, al cargar: luego la dirección se reescribe al navegar (App.tsx deja solo la ruta) y, al pasar por Ajustes o
+// Nuevo curso, «?demo=1» se perdía y la demostración cambiaba a medias (otro «Hoy», el curso marcado como ejemplo)
+const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+
 export function isDemo(): boolean {
-  return typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+  return DEMO
 }
 
 function synthetic(id: string, title: string, subject: string, icon: string, hue: number, units: [string, string[]][]): Pack {

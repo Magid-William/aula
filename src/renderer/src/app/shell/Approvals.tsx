@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { AulaMark, Button, Icon, ProgressBar, spring } from '@renderer/design'
 import { api } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 import type { PlatformApprovalRequest } from '@shared/platforms/types'
 
 export function Approvals() {
@@ -13,6 +14,9 @@ export function Approvals() {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
+    // un dispositivo que no es propietario no puede responder (la política lo niega): ni pide la cola ni enseña la hoja, que
+    // antes salía también en el teléfono y su «Permitir» no aprobaba nada en el Mac
+    if (!canFrom(api.role, 'platforms.approvals')) return
     api
       .invoke('platforms.approvals')
       .then((list) => setQueue(list))

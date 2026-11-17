@@ -121,6 +121,11 @@ const go = async (route, wait = 2200) => {
 }
 const snap = async (name) => { if (shots) { mkdirSync(shots, { recursive: true }); await page.screenshot({ path: join(shots, `${name}.png`) }) } }
 const course = (tab) => ({ name: 'course', id: ID, tab })
+// pulsar un botón por su nombre, si está (el recorrido no se para si una pantalla cambia)
+const tap = async (name, wait = 1200) => {
+  await page.getByRole('button', { name }).last().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(wait)
+}
 const study = (mode, extra = {}) => ({ name: 'study', id: ID, mode, ...extra })
 
 async function tour(tag) {
@@ -138,12 +143,22 @@ async function tour(tag) {
   await go(study('plan'), 2200)
   await go(study('mistakes'), 2200)
   await go(study('exam'), 2200)
+  // el simulacro de verdad (sin grabarlo, «Empezar» fallaba en la demostración): empezar, contestar la primera pregunta y
+  // entregar (el botón de la barra abre la confirmación; el último «Submit» es el suyo)
+  await tap(/^(Start the mock exam|Resume)$/, 3000)
+  await page.locator('[data-exercise] [role="radio"], [data-exercise] [role="option"]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(800)
+  await tap(/^Submit$/, 1000)
+  await tap(/^Submit$/, 3500)
   for (const view of ['agenda', 'week', 'month']) await go({ name: 'calendar', view }, 1800)
   await snap(`${tag}-calendar`)
   await go({ name: 'stats' }, 2500)
   await go({ name: 'tools' }, 1800)
   for (const tool of ['formulas', 'calculator', 'grapher', 'periodic', 'units', 'timer']) await go({ name: 'tools', tool }, 1500)
   await go({ name: 'documents' }, 2000)
+  // y uno abierto en el lector (si no, en la demostración ninguno se podía abrir)
+  await page.locator('[class*="group/doc"]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(3000)
   await go({ name: 'inbox' }, 2500)
   await snap(`${tag}-inbox`)
   await go({ name: 'create' }, 2000)

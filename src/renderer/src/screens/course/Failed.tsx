@@ -8,6 +8,7 @@ import { fmtPercent, fmtTime } from '@renderer/lib/format'
 import type { RunSummary, RunView } from '@shared/generation/types'
 import type { Pack } from '@shared/schema/pack'
 import { api } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 import { navigate } from '@renderer/app/router'
 import { CourseActions, type CourseAction } from './Actions'
 import { failureReason, type CoursePartial, type CourseRunIssue } from './failure'
@@ -95,8 +96,8 @@ export function CourseCreationFailed({ pack, runId, issue }: { pack: Pack; runId
                   </Button>
                 </>
               )}
-              {/* mientras el equipo escribe no se borra (antes se detiene desde el monitor) */}
-              {issue !== 'building' && (
+              {/* mientras el equipo escribe no se borra (antes se detiene desde el monitor); desde un dispositivo, solo el propietario */}
+              {issue !== 'building' && canFrom(api.role, 'courses.delete') && (
                 <Button variant="ghost" icon={<Icon name="trash" size={14} />} className="text-danger! hover:text-danger!" onClick={() => setAction('delete')}>
                   {t('failure.delete')}
                 </Button>

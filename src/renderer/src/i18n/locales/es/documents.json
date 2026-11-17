@@ -81,6 +81,7 @@
     "toCourse": "Ir al curso",
     "reveal": "Mostrar en la carpeta",
     "revealFailed": "No se pudo mostrar el archivo",
+    "pageField": "Página",
     "pageShort": "p. {{n}}",
     "pageOf": "Página {{n}} de {{total}}",
     "ocr": "Texto reconocido de una página escaneada",
