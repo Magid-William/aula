@@ -65,18 +65,28 @@ struct ConnectView: View {
                 Button(Texts.signOut) { model.askingSignOut = true }
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 8)
             } else {
                 // quien llega sin Aula en el Mac: dónde se descarga
                 Button(Texts.macLink) { model.showingMacInfo = true }
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(Color.accentColor)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 8)
             }
+            LegalLinks(model: model)
+                .padding(.bottom, 12)
         }
         .sheet(isPresented: Binding(get: { model.showingMacInfo }, set: { model.showingMacInfo = $0 })) {
             MacInfo { model.showingMacInfo = false }
         }
+        #if canImport(UIKit)
+        .sheet(isPresented: Binding(get: { model.signInPage != nil }, set: { if !$0 { model.signInPage = nil } })) {
+            if let page = model.signInPage {
+                SafariView(url: page) { model.signInPage = nil }
+                    .ignoresSafeArea()
+            }
+        }
+        #endif
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: art)
@@ -86,6 +96,15 @@ struct ConnectView: View {
         } message: {
             Text(Texts.signOutConfirm)
         }
+    }
+
+    /// Inicia sesión en Tailscale en una hoja dentro de la app (en macOS, en el navegador).
+    private func signIn(_ url: URL) {
+        #if canImport(UIKit)
+        model.signInPage = url
+        #else
+        openURL(url)
+        #endif
     }
 
     /// Con sesión de Tailscale iniciada (todo lo que no sea arrancar o pedirla) se puede cerrar.
@@ -123,7 +142,7 @@ struct ConnectView: View {
             .padding(.top, 10)
         case .signIn(let url):
             Message(title: Texts.signInTitle, text: Texts.signInBody, footnote: Texts.signInAfter) {
-                Button(Texts.signInAction) { openURL(url) }.buttonStyle(BrickButton())
+                Button(Texts.signInAction) { signIn(url) }.buttonStyle(BrickButton())
             }
         case .waitingApproval:
             Message(title: Texts.approvalTitle, text: Texts.approvalBody, footnote: nil) { ProgressView() }
@@ -221,6 +240,27 @@ struct MacInfo: View {
     }
 }
 
+/// La política de privacidad (en la web) y las licencias (en la app), discretas al pie de las pantallas de espera.
+private struct LegalLinks: View {
+    let model: AppModel
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(Texts.privacyLink) { openURL(Legal.privacy) }
+            Text("·").accessibilityHidden(true)
+            Button(Texts.licensesLink) { model.showingLicenses = true }
+        }
+        .buttonStyle(.plain)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(minHeight: 28)
+        .sheet(isPresented: Binding(get: { model.showingLicenses }, set: { model.showingLicenses = $0 })) {
+            LicensesView { model.showingLicenses = false }
+        }
+    }
+}
+
 /// El arco de Aula según la hora: los mismos cuatro momentos que en el Mac (design/InkArt.tsx → archLightFor).
 enum ArchLight {
     static func asset(hour: Int) -> String {
@@ -259,7 +299,13 @@ private struct Message<Action: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
             action().padding(.top, 14)
             if let footnote {
-                Text(footnote).font(.footnote).foregroundStyle(.tertiary).multilineTextAlignment(.center).padding(.top, 4)
+                // entera también en pantallas bajas (iPhone SE): encoge el dibujo, no la frase
+                Text(footnote)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
             }
         }
     }

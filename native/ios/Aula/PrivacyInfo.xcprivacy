@@ -2,15 +2,57 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- La app no rastrea ni recoge datos: habla con la Aula del Mac del propio estudiante por su red privada. -->
+	<!-- La app no rastrea: habla con la Aula del Mac del propio estudiante por su red privada. -->
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
+	<!-- Luum Labs no recibe nada. Lo que se declara lo guarda Tailscale (el componente que lleva la app): la cuenta de
+	     Tailscale del estudiante (el correo de la cuenta que elige, que ve el inicio de sesión de Tailscale dentro de
+	     la app, y su usuario) y este dispositivo en su red privada, solo para conectarlo (docs/PRIVACY.md). -->
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
-	<!-- Funciones del sistema «con motivo» que usa el nodo de Tailscale incluido (libtailscale, Go): mira archivos de su
-	     propia carpeta (stat/fstat/lstat) y mide tiempos con el reloj del sistema (mach_absolute_time). -->
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeDeviceID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Funciones del sistema «con motivo». Las de archivos y reloj las usa el nodo de Tailscale incluido (libtailscale,
+	     Go): mira archivos de su propia carpeta (stat/fstat/lstat) y mide tiempos (mach_absolute_time); su framework
+	     lleva además su propio manifiesto (tailscalekit/PrivacyInfo.xcprivacy). UserDefaults lo usa la app para
+	     recordar qué Aula abrir (AppModel.swift). -->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
@@ -27,6 +69,14 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>35F9.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
 			</array>
 		</dict>
 	</array>
