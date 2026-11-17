@@ -9,6 +9,9 @@ import { mixesCourses, planLeft } from './derive'
 
 const KIND_ICON: Record<PlanKind, IconName> = { cards: 'cards', mistakes: 'mistakes', learn: 'learn', practice: 'practice', exam: 'exam', review: 'repeat' }
 
+/** Dentro de la fila (una línea con «…»): en el teléfono, hasta dos líneas. */
+const WRAP = 'block truncate phone:whitespace-normal phone:line-clamp-2'
+
 export function PlanCard({ plan }: { plan: HomePlanItem[] }) {
   const { t } = useTranslation('home')
   const total = planLeft(plan).minutes
@@ -34,10 +37,11 @@ export function PlanCard({ plan }: { plan: HomePlanItem[] }) {
                     <span className="block truncate">{p.title}</span>
                   </InkStrike>
                 ) : (
-                  p.title
+                  // en el teléfono, hasta dos líneas: cortado a una («Repasa 4 tarjetas y 8 …») no decía qué tocaba
+                  <span className={WRAP}>{p.title}</span>
                 )
               }
-              subtitle={several ? `${p.courseTitle} · ${p.detail}` : p.detail}
+              subtitle={<span className={WRAP}>{several ? `${p.courseTitle} · ${p.detail}` : p.detail}</span>}
               trailing={`${p.minutes} min`}
               chevron
             />

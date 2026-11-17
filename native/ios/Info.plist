@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Cifrado: TLS y WireGuard de Tailscale, algoritmos estándar y mercado masivo; sin documentos para App Store Connect
+	     (contestado así en el build 1, Francia fuera). Con NO deja de preguntarlo en cada build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!-- La interfaz se carga por el túnel local (http://127.0.0.1:<puerto>): sin TLS solo en este mismo dispositivo. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

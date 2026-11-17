@@ -92,6 +92,41 @@ describe('el plan de hoy y la cola de repaso', () => {
     expect(activePlan('otro', 'review')).toBeNull()
   })
 
+  it('salir de un paso con «atrás» del sistema (no con su ×) lo deja: cerrar luego una lección vuelve a Aprender', () => {
+    useNav.getState().navigate({ name: 'course', id: PACK })
+    startPlan(PACK, PLAN)
+    runStep(PACK, 2)
+    useNav.getState().back()
+    expect(usePlanStore.getState().running).toBeNull()
+    expect(activePlan(PACK, 'plan')?.current).toBe(-1)
+    // lo hecho del plan se queda
+    expect(activePlan(PACK, 'plan')?.items).toHaveLength(4)
+    useNav.getState().navigate({ name: 'study', id: PACK, mode: 'learn', skill: 'b' })
+    leaveStep(PACK, 'learn')
+    expect(route()).toEqual({ name: 'course', id: PACK, tab: 'learn' })
+  })
+
+  it('el repaso de fórmulas (en la pestaña del curso) sigue siendo el paso en marcha', () => {
+    startPlan(PACK, [item('formulas', 'review'), item('mistakes', 'mistakes')])
+    runStep(PACK, 0)
+    expect(route()).toEqual({ name: 'course', id: PACK, tab: 'reference' })
+    expect(currentStep(PACK)?.id).toBe('formulas')
+  })
+
+  it('seguir con el siguiente paso no deja el anterior en el historial: «atrás» sale de la sesión', () => {
+    useNav.getState().navigate({ name: 'course', id: PACK })
+    useNav.getState().navigate({ name: 'study', id: PACK, mode: 'plan', start: true })
+    startPlan(PACK, PLAN)
+    runStep(PACK, 0, { replace: true })
+    completeCurrentStep(PACK)
+    const next = nextStep(PACK)
+    runStep(PACK, next?.index ?? -1, { scope: next?.scope, replace: true })
+    expect(route()).toEqual({ name: 'study', id: PACK, mode: 'mistakes' })
+    useNav.getState().back()
+    expect(route()).toEqual({ name: 'course', id: PACK })
+    expect(currentStep(PACK)).toBeNull()
+  })
+
   it('el paso en marcha (con cuántos errores caben) lo sabe el modo; sin sesión, ninguno', () => {
     expect(currentStep(PACK)).toBeNull()
     startPlan(PACK, [item('review', 'review'), { ...item('mistakes', 'mistakes'), count: 8 }], { scope: 'review' })

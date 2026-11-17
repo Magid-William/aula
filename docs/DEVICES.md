@@ -124,7 +124,8 @@ A small SwiftUI app, no third-party packages:
 | `Aula/AulaApp.swift`, `AppModel.swift`, `RootView.swift`, `Texts.swift` | The app, its state machine (sign in → find the Mac → open) and the waiting screens (es/en), which end with *Privacy policy · Licenses* |
 | `Aula/SafariView.swift` | Tailscale's sign-in page in a sheet inside the app (`SFSafariViewController`), which closes by itself once the node is signed in |
 | `Aula/LicensesView.swift`, `Aula/Licenses.json` | The *Licenses* sheet: Aula's notice and license, and the full license text of everything TailscaleKit puts in the binary (libtailscale, the Go standard library, wireguard-go and the other Go modules it links) |
-| `Aula/WebView.swift` | The `WKWebView` that shows Aula through the loopback tunnel; outside links open in the browser. It tells the page the real safe-area margins (SwiftUI hides them from a full-screen view), turns off iOS 26's blur under the status bar, and makes the page behave like an app: no zoom, no long-press menus on links and images, no selecting the text of buttons |
+| `Aula/WebView.swift` | The `WKWebView` that shows Aula through the loopback tunnel; outside links open in the browser. It tells the page the real safe-area margins (SwiftUI hides them from a full-screen view; never less than the status bar), turns off iOS 26's blur under the status bar, ends above the keyboard (the page itself never scrolls or pans), has no form bar (‹ › ✓) over the keyboard, follows Aula's own theme and offers the page `window.aulaApp` (see *The native shell and the page*) |
+| `Aula/Shell.js` | What both apps put in the page (Android copies it when building): it makes the page behave like an app (no zoom, no tap flash, only what the interface marks `.selectable` and fields can be selected) and tells the app the page's theme and edge colors |
 | `Aula/Tailnet/TailnetController.swift` | Owns the embedded TailscaleKit node, lists the student's Aulas among the tailnet's machines and dials only their tailnet addresses |
 | `Aula/Tailnet/AulaHosts.swift` | Which machines are the student's Aulas (same Tailscale user, untagged, an Aula's name): pure logic, the same rule as the Android app's `native/tsnet/client` and the desktop; `_verify/verify.sh` tests it |
 | `Aula/Tailnet/LoopbackForwarder.swift` | `127.0.0.1` listener piped through the tailnet. Only connections that present the listener's secret (the `aula_gate` cookie the app sets for the web view, or `_ft` for native requests) are dialed; the port and secret change after a suspension |
@@ -176,6 +177,53 @@ missing or empty; run the build first to generate the dependency licenses.
 Git does not keep `Demo.aulademo` (it is rebuilt from the app): **record it before archiving the app**, and again
 whenever the interface changes. Without the file the app builds and runs the same, just without the demo button.
 `_verify/verify.sh` checks the server against the recording (`_verify/DemoTest`).
+
+## The native shell and the page (iPhone, iPad and Android)
+
+Both apps are a native shell around Aula's own interface. They share `native/ios/Aula/Shell.js`, which they run in the
+page, and offer the page the same `window.aulaApp` (`WebView.swift`, `MainActivity.AppBridge`):
+
+| Call | What it does |
+| --- | --- |
+| `page(json)` | Sent by `Shell.js`: whether the page is dark (`html.dark`, the theme of *Settings → Appearance*) and the color of each edge, with the paper's grain, the sidebar beside the sheet and any dimming layer composited. The apps paint what is outside the web view with it (the status bar area, the demo bar; on Android, the system bars) and follow **Aula's** theme, not the system's: the time and the battery stay readable when Aula is dark on a light phone. The web view itself keeps the system's `prefers-color-scheme`, so *As the system* keeps working |
+| `switchAula()`, `aulaCount()` | *Open another Aula*; with one Aula the list says so and has *Cancel* (and Back) to return to the open one without reloading. `aulaCount()` is Android only |
+| `setCanGoBack(bool)` | The interface has somewhere to go back to even if its history does not say so. Android's Back (gesture, button, predictive back) and, on iOS, a swipe from the left edge first ask the interface with `window.__aulaBack()` (it closes what is open on top or goes back, and says whether it did; `src/renderer/src/app/shell/deviceBack.ts`, which also keeps a guard history entry while there is something to undo), then go back in the web view's history (only within the same Aula); with nowhere to go, Android sends the app to the background without closing it (the private network keeps running). On iOS the page follows the finger during the swipe when `window.__aulaBackKind()` says it is a plain step back (`'back'` or `'home'`; with `'overlay'`, something on top that only closes, it acts on release) |
+| `showLicenses()` | The native *Licenses* screen (Aula and everything the app carries) |
+| `exitDemo()`, `demoNotice(bool)` | Leave the demo; with `demoNotice(true)` the interface shows its own demo notice and the native bar goes away |
+| `edgeToEdge(bool)` | Android only: the interface draws under the system bars itself. By default the web view stops at the bars and the app paints them with the page's colors; with `edgeToEdge(true)` it fills the screen and the page gets the room it must leave as `--aula-safe-top/right/bottom/left` (also `--aula-inset-*`), to use as `max(env(safe-area-inset-top), var(--aula-safe-top, 0px))`. An `aula:insets` event says they changed |
+| `fontScale()` | Android only: the system font size, 1 to 1.3. The app also hands it to the interface with `window.__aulaFontScale(n)` (or `__aulaPendingFontScale` before it loads; `design/theme.tsx` multiplies it into the text size) and as `--aula-font-scale`. The iOS app does the same with the system text size (Dynamic Type, also clamped to 1 to 1.3), before the page paints and whenever it changes |
+
+On iOS a tap on the status bar calls `window.__aulaScrollTop()` (`app/shell/screenScroll.ts`), which scrolls the screen in
+front back to the top, like tapping the current bottom tab again on a phone.
+
+Both apps also put `ime-open` on `<html>` while the on-screen keyboard is up (`app/shell/keyboard.ts` then moves the
+bottom tabs out of the way).
+
+On iOS the web view ends at the top of the keyboard (only the system safe areas are ignored, not the keyboard's),
+so the composer sits on the keyboard and nothing slides away. On Android, turning the system dark, changing the font
+size or the language no longer recreates the activity: the interface keeps what was being typed (if a web view did not
+pick up the new `prefers-color-scheme` by itself, the app falls back to recreating it). A slide presentation or a
+video can go full screen (Back leaves it), and adding materials offers the camera next to the file picker (the photo
+goes to the app's own `PhotoProvider`; no camera permission). The 502/403 of a tunnel whose Aula stopped answering
+takes the app back to *Your Aula isn't answering* instead of showing the raw text.
+
+**Android: the demo and a development Aula.** The Android app plays the same recording as the iPhone
+(`DemoServer.java`, `Demo.aulademo` copied to `assets/` by `build.sh` when it exists): *Try it with an example course*
+on the sign-in, *can't find* and *won't start* screens, with a bar that says it is the demo and *Exit*. A debug build
+(`build.sh --debug`) can also open the Aula of the Mac it is plugged into, with no Tailscale: turn on *Aula on your
+devices* on the Mac, note the port of its local address (`http://127.0.0.1:<port>`, the remote server; `remote.status`
+gives it as `localURL`), then
+
+```bash
+adb reverse tcp:<port> tcp:<port>
+adb shell am start -n com.luumlabs.aula/.MainActivity --ei aula.devPort <port>
+```
+
+The same port on both sides keeps the server's `Host` check happy, and plain HTTP only ever goes to `127.0.0.1`.
+
+**Android: licenses.** `build.sh` writes `assets/licenses.json` with `native/ios/scripts/licenses.mjs --android`: Aula's
+notice and every Go module linked into `libaulatsnet.so` (Tailscale, wireguard-go, the Go standard library…), each
+with its full license text. *Privacy policy · Licenses* is at the foot of every waiting screen, as on the iPhone.
 
 ## Sending the app to the App Store
 

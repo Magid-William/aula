@@ -1,5 +1,6 @@
 // Campos de texto, interruptores, deslizadores y selector. El foco de un campo se ve: un anillo de 2 px con `--focus`
-// (antes, un velo ladrillo que se quedaba en 1,3–1,7:1 sobre el papel).
+// (antes, un velo ladrillo que se quedaba en 1,3–1,7:1 sobre el papel). Con el dedo, `autoFocus` no enfoca: sacaría el
+// teclado de la pantalla sin que nadie lo pidiera (se escribe al tocar el campo).
 import { forwardRef, useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -7,6 +8,7 @@ import { Check, ChevronDown, X } from 'lucide-react'
 import { cx } from './cx'
 import { spring } from './tokens'
 import { placePopover } from './popover'
+import { canAutoFocus } from './input'
 
 /** Anillo de foco de un campo (borde de 0,5 px + sombra de 1,5 px = 2 px de `--focus`). Lo usan también herramientas y bloques. */
 export const focusRing = 'focus:border-[color:var(--focus)] focus:shadow-[0_0_0_1.5px_var(--focus)]'
@@ -16,7 +18,7 @@ export const focusWithinRing = 'focus-within:border-[color:var(--focus)] focus-w
 const field = `w-full bg-field border-[0.5px] border-line-strong/40 rounded-[10px] px-3 text-[14px] text-text placeholder:text-text3 outline-none transition ${focusRing}`
 
 export const TextField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { icon?: ReactNode; trailing?: ReactNode; label?: ReactNode; hint?: ReactNode }>(function TextField(
-  { icon, trailing, label, hint, className, ...rest },
+  { icon, trailing, label, hint, className, autoFocus, ...rest },
   ref
 ) {
   const [outer, inner] = splitLayout(className)
@@ -25,7 +27,7 @@ export const TextField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
       {label && <span className="block t-ui font-medium text-text2 mb-1.5">{label}</span>}
       <span className="relative flex items-center">
         {icon && <span className="absolute left-3 text-text3 pointer-events-none">{icon}</span>}
-        <input ref={ref} className={cx(field, 'h-9 min-w-0', icon && 'pl-10', trailing && 'pr-10', inner)} {...rest} />
+        <input ref={ref} className={cx(field, 'h-9 min-w-0', icon && 'pl-10', trailing && 'pr-10', inner)} autoFocus={autoFocus && canAutoFocus()} {...rest} />
         {trailing && <span className="absolute right-2">{trailing}</span>}
       </span>
       {hint && <span className="block text-[12.5px] text-text3 mt-1.5">{hint}</span>}
@@ -41,7 +43,7 @@ function splitLayout(className: string | undefined): [string, string] {
 }
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: ReactNode; autoGrow?: boolean }>(function TextArea(
-  { label, className, autoGrow, onChange, ...rest },
+  { label, className, autoGrow, onChange, autoFocus, ...rest },
   ref
 ) {
   const inner = useRef<HTMLTextAreaElement | null>(null)
@@ -66,6 +68,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
           onChange?.(e)
           grow()
         }}
+        autoFocus={autoFocus && canAutoFocus()}
         {...rest}
       />
     </label>
@@ -83,7 +86,7 @@ export function Switch({ checked, onChange, label, disabled, size = 'md' }: { ch
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={cx('relative shrink-0 rounded-full transition-colors duration-300 no-drag disabled:opacity-50', checked ? '' : 'bg-fill4')}
+      className={cx('relative touch-target shrink-0 rounded-full transition-colors duration-300 no-drag disabled:opacity-50', checked ? '' : 'bg-fill4')}
       style={{ width: w, height: h, background: checked ? 'var(--accent)' : undefined }}
     >
       <motion.span className="absolute top-[2px] left-[2px] rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,.25)]" style={{ width: k, height: k }} animate={{ x: checked ? w - k - 4 : 0 }} transition={spring.bouncy} />

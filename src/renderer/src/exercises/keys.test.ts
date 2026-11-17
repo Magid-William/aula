@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Answer } from '@shared/schema/exercises'
-import { chemKeys, functionsIn, KEYS, keysFor, variablesIn } from './keys'
+import { signedNumberKeyboard } from '@renderer/lib/device'
+import { answerInputMode, chemKeys, functionsIn, KEYS, keysFor, variablesIn } from './keys'
 
 const labels = (groups: { label: string }[][]): string[][] => groups.map((g) => g.map((k) => k.label))
 
@@ -29,6 +30,20 @@ describe('teclas de símbolos (port de AnswerKeyboard)', () => {
     const groups = labels(keysFor(deg))
     expect(groups[0]).toContain('π')
     expect(groups.flat()).toContain('°')
+  })
+  it('numérico: la primera tecla es «−» (el teclado decimal del iPhone no lo tiene) y escribe un guion', () => {
+    const n: Answer = { kind: 'numeric', value: '-0.5', alternatives: [], absTol: 0, relTol: 0, form: 'any', unitMode: 'ignore', angle: 'radians' }
+    expect(labels(keysFor(n))[0][0]).toBe('−')
+    expect(KEYS.minus.insert).toBe('-')
+  })
+  it('el teclado de la pantalla: entero para un número exacto; numérico para un valor medido, salvo en iOS', () => {
+    const n: Answer = { kind: 'numeric', value: '-0.5', alternatives: [], absTol: 0, relTol: 0, form: 'any', unitMode: 'ignore', angle: 'radians' }
+    expect(answerInputMode(n, 'decimal')).toBe('text')
+    const chem = { kind: 'chem', mode: 'number', expected: '-285.8' } as unknown as Answer
+    expect(answerInputMode(chem, signedNumberKeyboard('android'))).toBe('decimal')
+    expect(answerInputMode(chem, signedNumberKeyboard('ios'))).toBe('text')
+    expect(answerInputMode(chem, signedNumberKeyboard('ipados'))).toBe('text')
+    expect(answerInputMode({ kind: 'short', expected: ['x'] } as unknown as Answer, 'decimal')).toBe('text')
   })
   it('expresión: variables, básicas y funciones', () => {
     const a: Answer = { kind: 'expression', expected: '1 + sin(x)', domainMin: -1, domainMax: 1, form: 'any', forbidden: [], angle: 'radians' }

@@ -126,6 +126,7 @@
     "next": "Próxima: {{what}} · {{when}}",
     "nothing": "Nada programado",
     "offer": "Cada mañana te resume el día, te avisa antes de entregas y exámenes y revisa tu plataforma, también con la ventana cerrada. En tu plataforma solo lee.",
+    "offer_device": "Cada mañana te resume el día, te avisa antes de entregas y exámenes y revisa tu plataforma, aunque no tengas Aula abierta en tu ordenador. En tu plataforma solo lee.",
     "activate": "Activar",
     "resume": "Reanudar",
     "pause": "Pausar",
@@ -304,6 +305,7 @@
   },
   "settingsCard": {
     "hint": "Enciéndela y Aula sigue trabajando por ti aunque cierres la ventana. No hay nada más que configurar.",
+    "hint_device": "Enciéndela y Aula sigue trabajando por ti aunque no la tengas abierta en tu ordenador. No hay nada más que configurar.",
     "style": "Estilo",
     "styles": {
       "quiet": "Discreta",

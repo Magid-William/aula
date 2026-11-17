@@ -68,11 +68,12 @@ export function SegmentedTabs<T extends string>({ items, value, onChange, size =
             role="tab"
             aria-selected={active}
             onClick={() => onChange(it.id)}
-            className={cx('relative inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors outline-none', h, fill && 'flex-1', active ? 'text-text' : 'text-text2 hover:text-text')}
+            // en el teléfono, lleno y sin sitio, cada etiqueta encoge con «…» (antes «All of them» quedaba cortada por el borde)
+            className={cx('relative touch-target inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors outline-none', h, fill && 'flex-1 phone:min-w-0 phone:flex-auto phone:shrink phone:px-2', active ? 'text-text' : 'text-text2 hover:text-text')}
           >
-            <span className="relative inline-flex items-center gap-1.5">
+            <span className="relative inline-flex min-w-0 items-center gap-1.5">
               {it.icon}
-              {it.label}
+              <span className="min-w-0 truncate">{it.label}</span>
               {it.badge ? <span className="t-caption tabular text-accent-text">{it.badge}</span> : null}
             </span>
           </button>

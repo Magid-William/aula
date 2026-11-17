@@ -5,10 +5,10 @@ import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import type { AnswerOf } from '@shared/schema/exercises'
 import { RichText } from '@renderer/lib/RichText'
-import { Button, cx, Icon } from '@renderer/design'
+import { Button, canAutoFocus, cx, Icon, useTouchOnly } from '@renderer/design'
 import { wordCount } from '../normalize'
 import type { GradeResult } from '../types'
-import { KeyCap } from '../ui'
+import { KeyCap, ReturnKey } from '../ui'
 import type { InputProps } from './shared'
 import { answerField } from './answerField'
 
@@ -25,13 +25,19 @@ export function OpenInput({ answer, draft, set, locked, autoFocus, onSubmit }: I
   }
   useEffect(grow, [draft.text])
   useEffect(() => {
-    if (autoFocus && !locked) requestAnimationFrame(() => ref.current?.focus({ preventScroll: true }))
+    // con el dedo no: sacaría el teclado al llegar a cada pregunta (se escribe al tocar el campo)
+    if (autoFocus && !locked && canAutoFocus()) requestAnimationFrame(() => ref.current?.focus({ preventScroll: true }))
   }, [autoFocus, locked])
   const mac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
+  const touch = useTouchOnly()
   return (
     <div className="flex flex-col gap-1.5">
       <textarea
         {...answerField}
+        // una respuesta larga se escribe como un texto: frases con mayúscula, corrector, e Intro hace un salto de línea
+        autoCapitalize="sentences"
+        autoCorrect="on"
+        enterKeyHint="enter"
         ref={ref}
         value={draft.text}
         readOnly={locked}
@@ -52,10 +58,11 @@ export function OpenInput({ answer, draft, set, locked, autoFocus, onSubmit }: I
       />
       <div className="flex items-center justify-between t-footnote text-text3 px-1">
         <span className={cx('tabular', over && 'text-warning')}>{answer.maxWords ? t('ex.open.wordsOf', { count: words, max: answer.maxWords }) : t('ex.open.words', { count: words })}</span>
-        {!locked && (
+        {/* el atajo, solo con teclado (con el dedo se comprueba con el botón) */}
+        {!locked && !touch && (
           <span className="inline-flex items-center gap-1">
             <KeyCap>{mac ? '⌘' : 'Ctrl'}</KeyCap>
-            <KeyCap>↩</KeyCap>
+            <KeyCap><ReturnKey /></KeyCap>
             <span className="ml-1">{t('ex.open.toCheck')}</span>
           </span>
         )}

@@ -10,5 +10,6 @@ function tellAnswerField(_e: MouseEvent<HTMLElement>): void {
 }
 
 /** Se pone en cada campo de respuesta: `<input {...answerField} … />`. `dir="auto"`: el sentido lo da lo escrito (una
- *  respuesta en árabe, de derecha a izquierda; «-3» o «2x+1», de izquierda a derecha aunque el curso sea de derecha a izquierda). */
-export const answerField = { 'data-answer-field': '', dir: 'auto', onContextMenu: tellAnswerField }
+ *  respuesta en árabe, de derecha a izquierda; «-3» o «2x+1», de izquierda a derecha aunque el curso sea de derecha a izquierda).
+ *  En el teclado de la pantalla: sin mayúscula al empezar ni autocorrector (cambiaría la respuesta), e Intro dice «OK». */
+export const answerField = { 'data-answer-field': '', dir: 'auto', onContextMenu: tellAnswerField, autoCapitalize: 'off', autoCorrect: 'off', enterKeyHint: 'done' } as const

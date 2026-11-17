@@ -198,7 +198,7 @@ function PracticeExercise({ data, exercise, index, total, label, streak, onExit,
         </TopCapsule>
       }
       bottom={
-        <GlassCapsule className="px-2">
+        <GlassCapsule className="px-2 phone:w-full phone:rounded-[24px]">
           <ExerciseActions controller={c} variant="bar" continueLabel={last ? t('practice.seeResults') : t('practice.next')} />
         </GlassCapsule>
       }

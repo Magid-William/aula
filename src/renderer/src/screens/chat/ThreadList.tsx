@@ -51,7 +51,7 @@ export function ThreadList({ threads, active, onOpen, onNew }: { threads: Assist
             <div className="t-ui font-semibold text-text3 px-2 mb-1">{g.label}</div>
             {g.items.map((x, i) => (
               <motion.div key={x.id} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: i * 0.03 }} className="group relative">
-                <button onClick={() => onOpen(x.id)} className={cx('relative w-full rounded-[12px] px-2.5 py-2 text-left transition-colors', x.id !== active && 'hover:bg-fill1')}>
+                <button onClick={() => onOpen(x.id)} className={cx('relative w-full rounded-[12px] px-2.5 py-2 text-left transition-colors touch:pr-10', x.id !== active && 'hover:bg-fill1')}>
                   {x.id === active && <motion.span layoutId="thread-active" transition={spring.snappy} className="absolute inset-0"><SelectionPaint seed="conversaciones" /></motion.span>}
                   <span className="relative flex items-baseline justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 t-callout font-medium">
@@ -63,10 +63,10 @@ export function ThreadList({ threads, active, onOpen, onNew }: { threads: Assist
                   </span>
                   <span className="relative block t-ui text-text3 truncate">{plainPreview(x.preview)}</span>
                 </button>
-                <div className="absolute right-1.5 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute right-1.5 top-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 touch:opacity-100 transition-opacity">
                   <Menu
                     trigger={(open) => (
-                      <button className="grid place-items-center w-6 h-6 rounded-[6px] bg-surface text-text3 hover:text-text shadow-[var(--e1)]" onClick={(e) => { e.stopPropagation(); open() }} aria-label={t('moreActions')}>
+                      <button className="relative touch-target grid place-items-center w-6 h-6 rounded-[6px] bg-surface text-text3 hover:text-text shadow-[var(--e1)]" onClick={(e) => { e.stopPropagation(); open() }} aria-label={t('moreActions')}>
                         <Icon name="more" size={13} />
                       </button>
                     )}

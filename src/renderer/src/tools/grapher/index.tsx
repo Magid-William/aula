@@ -10,12 +10,13 @@ import { derivative } from '@engine/math/algebra/derivative'
 import { Tex } from '../shared/Tex'
 import { formatNumber, localizeTex, niceTicks, parseNumber } from '../shared/lib/num'
 import { seriesColor } from '../shared/palette'
-import { CardTitle, NumField, useComma, useCopy, useStored } from '../shared/ui'
+import { CardTitle, NumField, mathField, useComma, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { compileFn, sampleFx, sampleParam, toClosure, type Compiled, type Env, type FnKind, type Pt, type Range } from './lib/compile'
 import { notablePoints, type Notable } from './lib/notable'
 import { niceValue } from './lib/nice'
 import { defaultViewport, panned, rangeOf, toScreen, toWorld, zoomed, type Viewport } from './lib/viewport'
+import { Fingers, pinchFactor, type Spot } from '@renderer/blocks/plot/pinch'
 
 // MARK: Estado
 
@@ -296,9 +297,9 @@ const FnRow = memo(function FnRow({ f, name, color, compiled, selected, comma, o
           {f.kind !== 'fx' && (
             <div className="mt-1.5 flex items-center gap-1.5 t-caption">
               <span>{f.kind === 'polar' ? 'θ' : 't'} ∈</span>
-              <input value={f.t0} onChange={(e) => onChange({ t0: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
+              <input {...mathField} value={f.t0} onChange={(e) => onChange({ t0: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
               <span>…</span>
-              <input value={f.t1} onChange={(e) => onChange({ t1: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
+              <input {...mathField} value={f.t1} onChange={(e) => onChange({ t1: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
             </div>
           )}
           {err ? (
@@ -334,7 +335,7 @@ function FnInput({ label, value, onChange, invalid, className }: { label: string
       <span className="text-[13px] text-text3 shrink-0">
         <Tex tex={label} />
       </span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} spellCheck={false} autoComplete="off" className="flex-1 min-w-0 bg-transparent outline-none text-[14px] font-mono text-text" />
+      <input value={value} onChange={(e) => onChange(e.target.value)} {...mathField} className="flex-1 min-w-0 bg-transparent outline-none text-[14px] font-mono text-text" />
     </label>
   )
 }
@@ -444,8 +445,20 @@ function Graph({ fns, compiled, env, colorOf, nameOf, selected, viewport, setVie
   const comma = useComma()
   const v = viewport ?? defaultViewport(w || 800)
   const drag = useRef<{ x: number; y: number } | null>(null)
+  const fingers = useRef(new Fingers<null>())
+  const pinchAt = useRef<{ spread: number; mid: Spot } | null>(null)
   const [cursor, setCursor] = useState<[number, number] | null>(null)
   const [dragging, setDragging] = useState(false)
+  const endPointer = (id: number): void => {
+    const left = fingers.current.up(id)
+    if (!fingers.current.pinch) pinchAt.current = null
+    // al soltar uno de los dos dedos, el otro sigue arrastrando
+    if (left) drag.current = left
+    else if (fingers.current.count === 0) {
+      drag.current = null
+      setDragging(false)
+    }
+  }
 
   // rueda: zoom en el punto del ratón (escucha nativa para poder impedir el desplazamiento de la página)
   useEffect(() => {
@@ -519,16 +532,33 @@ function Graph({ fns, compiled, env, colorOf, nameOf, selected, viewport, setVie
   return (
     <div
       ref={ref}
-      className={cx('absolute inset-0 select-none touch-none', dragging ? 'cursor-grabbing' : 'cursor-crosshair')}
+      // con el dedo: deslizar en vertical desplaza la pantalla; con dos dedos, pellizco y arrastre (pinch.ts)
+      className={cx('absolute inset-0 select-none touch-pan-y', dragging ? 'cursor-grabbing' : 'cursor-crosshair')}
       onPointerDown={(e) => {
         if (e.button !== 0) return
-        drag.current = { x: e.clientX, y: e.clientY }
         ;(e.target as Element).setPointerCapture?.(e.pointerId)
+        const p = { x: e.clientX, y: e.clientY }
+        if (fingers.current.down(e.pointerId, p, null)) {
+          drag.current = null
+          pinchAt.current = fingers.current.pinch && { spread: fingers.current.pinch.spread, mid: fingers.current.pinch.mid }
+        } else if (fingers.current.count === 1) drag.current = p
         setDragging(true)
       }}
       onPointerMove={(e) => {
         const rect = ref.current?.getBoundingClientRect()
         if (!rect) return
+        const two = fingers.current.move(e.pointerId, { x: e.clientX, y: e.clientY })
+        const prev = pinchAt.current
+        if (two && prev) {
+          // cada paso: zoom alrededor del punto medio de antes y arrastre por lo que se movió
+          pinchAt.current = two
+          setViewport((cur) => {
+            const base = cur ?? defaultViewport(rect.width)
+            const anchor = toWorld(base, rect.width, rect.height, prev.mid.x - rect.left, prev.mid.y - rect.top)
+            return panned(zoomed(base, pinchFactor(prev.spread, two.spread), anchor), two.mid.x - prev.mid.x, two.mid.y - prev.mid.y)
+          })
+          return
+        }
         if (drag.current) {
           const dx = e.clientX - drag.current.x
           const dy = e.clientY - drag.current.y
@@ -536,10 +566,8 @@ function Graph({ fns, compiled, env, colorOf, nameOf, selected, viewport, setVie
           setViewport((cur) => panned(cur ?? defaultViewport(rect.width), dx, dy))
         } else setCursor(toWorld(v, w, h, e.clientX - rect.left, e.clientY - rect.top))
       }}
-      onPointerUp={() => {
-        drag.current = null
-        setDragging(false)
-      }}
+      onPointerUp={(e) => endPointer(e.pointerId)}
+      onPointerCancel={(e) => endPointer(e.pointerId)}
       onPointerLeave={() => setCursor(null)}
       onDoubleClick={(e) => {
         const rect = ref.current?.getBoundingClientRect()

@@ -2,6 +2,7 @@
 // pantalla y detalles animados (pixel-art, flotar, cifras que cuentan). Ver README.md.
 export * from './tokens'
 export * from './theme'
+export * from './input'
 export * from './cx'
 export * from './Surfaces'
 export * from './PigmentMark'

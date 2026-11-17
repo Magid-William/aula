@@ -6,7 +6,8 @@ import { Sigma } from 'lucide-react'
 import { cx, PixelCheck, useTheme, type IconName } from '@renderer/design'
 import type { BlockOf, CalloutKind } from '@shared/schema/blocks'
 import type { BlockProps } from './types'
-import { BlockTitle, Eyebrow, Inline, MathTex, Prose, SourceLink, useAnimate, useBlocksT, useSeen } from './shared'
+import { BlockTitle, cleanTex, Eyebrow, Inline, MathTex, Prose, SourceLink, useAnimate, useBlocksT, useSeen } from './shared'
+import { splitEquations } from './mathSplit'
 import { inkColor } from './colors'
 
 export function TextBlockView({ block, ctx }: BlockProps<BlockOf<'text'>>) {
@@ -20,11 +21,20 @@ export function MathBlockView({ block, ctx }: BlockProps<BlockOf<'math'>>) {
   const label = block.label?.trim()
   const number = label && EQ_NUMBER.test(label) ? label.replace(EQ_NUMBER, '($1)') : undefined
   const chat = ctx.mode === 'chat'
+  // una fila de ecuaciones («a = b \qquad c = d»): cada una aparte, una al lado de otra si caben y si no, una debajo de otra
+  const parts = splitEquations(cleanTex(block.tex))
+  const look = cx('blk-math min-w-0 max-w-full text-text', chat && 'blk-math-compact')
   return (
     <div className={cx('flex flex-col items-center', chat ? 'py-1' : 'py-2')}>
       {label && !number && <div className="t-ui font-semibold text-text2 mb-1.5 text-center"><Inline text={label} /></div>}
       <div className="relative flex w-full items-center">
-        <MathTex tex={block.tex} className={cx('blk-math min-w-0 flex-1 text-text', chat && 'blk-math-compact')} />
+        {parts.length > 1 ? (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-[2.5em] gap-y-1">
+            {parts.map((tex, i) => <MathTex key={i} tex={tex} className={look} />)}
+          </div>
+        ) : (
+          <MathTex tex={block.tex} className={cx(look, 'flex-1')} />
+        )}
         {number && <span className="shrink-0 pl-4 font-serif text-[16px] tabular text-text3">{number}</span>}
       </div>
       {block.note?.trim() && (

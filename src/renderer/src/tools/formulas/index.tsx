@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Copy, Search, Star, X } from 'lucide-react'
-import { Card, EmptyState, IconButton, cx, focusRing, spring, useTheme } from '@renderer/design'
+import { Card, EmptyState, IconButton, canAutoFocus, cx, focusRing, spring, useTheme } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { toneInk } from '../shared/palette'
-import { useCopy, useStored } from '../shared/ui'
+import { mathField, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { CONSTANTS, FORMULAS, texOf, type Constant, type FormulaEntry, type Subject } from './lib/data'
 import { groupByTopic, localizeDecimal, searchConstants, searchFormulas, type Lang } from './lib/search'
@@ -45,12 +45,14 @@ export default function FormulasTool(_props: ToolProps) {
         <label className="relative flex items-center">
           <Search size={17} className="absolute left-3.5 text-text3 pointer-events-none" />
           <input
+            {...mathField}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
             placeholder={t('formulas.search')}
             aria-label={t('formulas.search')}
-            autoFocus
+            // con el dedo no: sacaría el teclado sin pedirlo
+            autoFocus={canAutoFocus()}
             className={`w-full h-11 rounded-[12px] bg-field border-[0.5px] border-line-strong/40 pl-10 pr-9 text-[15px] outline-none ${focusRing}`}
           />
           {query && (
@@ -120,7 +122,7 @@ function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: La
           <div className="t-headline">{f.name[lang]}</div>
           <div className="t-caption mt-0.5">{f.topic[lang]}</div>
         </div>
-        <IconButton label={fav ? t('formulas.unfav') : t('formulas.fav')} size="sm" onClick={onFav} className={cx(fav ? 'text-sun' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}>
+        <IconButton label={fav ? t('formulas.unfav') : t('formulas.fav')} size="sm" onClick={onFav} className={cx(fav ? 'text-sun' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100')}>
           <motion.span animate={{ scale: fav ? [1, 1.35, 1] : 1 }} transition={{ duration: 0.3 }} className="grid place-items-center">
             <Star size={15} fill={fav ? 'currentColor' : 'none'} />
           </motion.span>
@@ -133,7 +135,7 @@ function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: La
             setCopied(true)
             window.setTimeout(() => setCopied(false), 1400)
           }}
-          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.span key={copied ? 'ok' : 'copy'} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} className="grid place-items-center">
@@ -192,7 +194,7 @@ function Constants({ list, lang }: { list: Constant[]; lang: Lang }) {
               <Tex tex={localizeDecimal(c.value, lang)} />
             </span>
             <span className="hidden @3xl:block t-ui text-text3">{c.unit}</span>
-            <IconButton label={t('formulas.copyValue')} size="sm" onClick={() => copy(plainValue(c, lang))} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+            <IconButton label={t('formulas.copyValue')} size="sm" onClick={() => copy(plainValue(c, lang))} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100">
               <Copy size={14} />
             </IconButton>
           </motion.div>

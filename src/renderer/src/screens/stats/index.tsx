@@ -98,7 +98,7 @@ function StatsBody({ stats, courses, filtered }: { stats: StatsData; courses: St
         <StaggerItem className="col-span-12">
           <SummaryCard days={days} today={stats.today} />
         </StaggerItem>
-        <StaggerItem className="col-span-12 @5xl:col-span-8">
+        <StaggerItem className="col-span-12 min-w-0 @5xl:col-span-8">
           <HeatmapCard days={days} today={stats.today} />
         </StaggerItem>
         <StaggerItem className="col-span-12 @5xl:col-span-4">

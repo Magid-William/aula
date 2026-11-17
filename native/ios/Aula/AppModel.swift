@@ -48,14 +48,38 @@ final class AppModel {
     var signInPage: URL?
     /// La demostración está abierta (la interfaz la sirve la propia app, sin Mac).
     private(set) var inDemo = false
+    /// La interfaz enseña ella misma el aviso de la demostración (window.aulaApp.demoNotice): la franja nativa sobra.
+    private(set) var pageShowsDemoNotice = false
     /// La demostración con su barra de aviso. Solo las capturas del App Store (compilación de depuración, con el
     /// argumento «-AulaStoreShots») la enseñan sin ella, como se ve Aula conectada al Mac.
     var showsDemoBar: Bool {
         #if DEBUG
-        return inDemo && !ProcessInfo.processInfo.arguments.contains("-AulaStoreShots")
+        return inDemo && !pageShowsDemoNotice && !ProcessInfo.processInfo.arguments.contains("-AulaStoreShots")
         #else
-        return inDemo
+        return inDemo && !pageShowsDemoNotice
         #endif
+    }
+    /// El tema de Aula (Ajustes → Apariencia) cuando no es el del sistema: true oscuro, false claro, nil el del sistema.
+    /// Las pantallas de espera lo siguen. Se recuerda para que la app arranque ya con él.
+    private(set) var pageDark: Bool? = AppModel.savedPageDark
+    /// Lo que dice la página ahora (oscura o clara); nil hasta que lo diga.
+    private(set) var lookDark: Bool?
+    /// Cómo se pinta lo nativo (la hora y la batería, la franja de la demostración, las pantallas de espera): con la
+    /// interfaz a la vista, siempre como ella (nunca «el del sistema» a ciegas: si el sistema cambiaba con el tema de Aula
+    /// impuesto, la franja quedaba con los colores del otro tema sobre la página); si no, el tema guardado de Aula.
+    var chromeDark: Bool? {
+        if case .ready = stage, let lookDark { return lookDark }
+        return pageDark
+    }
+    /// El color de arriba de la página («#rrggbb»): la franja de la demostración se pinta igual.
+    private(set) var pageTop: String?
+    private static let themeKey = "aula.theme"
+    private static var savedPageDark: Bool? {
+        switch UserDefaults.standard.string(forKey: themeKey) {
+        case "dark": return true
+        case "light": return false
+        default: return nil
+        }
     }
     private var demo: DemoServer?
 
@@ -257,6 +281,24 @@ final class AppModel {
         await startNode()
     }
 
+    // MARK: Cómo se ve la página
+
+    /// La página dijo cómo se ve (o el sistema cambió de claro a oscuro). Si su tema es el del sistema, la app sigue al
+    /// sistema; si no, al de Aula: así la hora y la batería se leen sobre la página.
+    func pageLook(_ look: PageLook, systemDark: Bool) {
+        pageTop = look.top
+        if lookDark != look.dark { lookDark = look.dark }
+        let next: Bool? = look.dark == systemDark ? nil : look.dark
+        guard next != pageDark else { return }
+        pageDark = next
+        UserDefaults.standard.set(next.map { $0 ? "dark" : "light" }, forKey: Self.themeKey)
+    }
+
+    /// La interfaz enseña (o deja de enseñar) su propio aviso de la demostración.
+    func demoNotice(_ on: Bool) {
+        pageShowsDemoNotice = inDemo && on
+    }
+
     // MARK: La demostración
 
     /// Abre la demostración: el curso de ejemplo, servido por la propia app.
@@ -282,6 +324,10 @@ final class AppModel {
 
     /// Sale de la demostración y vuelve a donde estaba la conexión con el Mac.
     func exitDemo() async {
+        guard inDemo else { return }
+        pageShowsDemoNotice = false
+        pageTop = nil
+        lookDark = nil
         demo?.stop()
         demo = nil
         inDemo = false

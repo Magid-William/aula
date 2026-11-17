@@ -1,9 +1,9 @@
 // Pantalla de un curso: al entrar, una cortina de píxeles con el tono del curso se abre y su icono se enciende píxel
 // a píxel. Cinco pestañas en cápsula: Resumen, Aprender, Repasar, Simulacro y Materiales. Los ids de antes (Práctica,
 // Tarjetas, Errores y Referencia) siguen funcionando: abren su vista y llevan hasta su sección.
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EmptyState, Icon, PixelCurtain, SegmentedTabs, Spinner, toneForHue, useTheme, Button } from '@renderer/design'
+import { cx, EmptyState, Icon, PixelCurtain, SegmentedTabs, Spinner, toneForHue, useTheme, Button } from '@renderer/design'
 import { useRoute, navigate, canonicalTab, COURSE_VIEWS, type CourseTab, type CourseView } from '@renderer/app/router'
 import { useInView, useScreenTitle } from '@renderer/app/title'
 import { useCoursePack, useOverview } from './data'
@@ -98,11 +98,7 @@ export default function CourseScreen() {
         </div>
         {partial && lastRun && <CoursePartialBanner run={lastRun} partial={partial} ready={ready} total={total} />}
         {building && lastRun && <CourseBuildingBanner run={lastRun} ready={ready} total={total} />}
-        {/* en ventanas estrechas las pestañas se desplazan en horizontal en vez de partirse; centradas solo si caben («safe»:
-            si no, empiezan por la izquierda y «Overview» no queda cortado fuera de alcance: A4-P2-17) */}
-        <div className="mt-5 mb-5 flex [justify-content:safe_center] overflow-x-auto no-scrollbar -mx-6 px-6">
-          <SegmentedTabs className="shrink-0" value={view} onChange={setTab} items={COURSE_VIEWS.map((x) => ({ id: x, label: t(`tabs.${x}`) }))} />
-        </div>
+        <CourseTabs view={view} onChange={setTab} />
         {/* cambiar de pestaña: la nueva entra al momento (sin esperar a que se vaya la anterior ni pasar por el vacío) */}
         <div key={view} className="tab-enter">
           {view === 'overview' && <Overview pack={pack} ov={ov} phase={phase} writing={writing} />}
@@ -115,3 +111,50 @@ export default function CourseScreen() {
     </div>
   )
 }
+
+/**
+ * Las cinco pestañas. En ventanas estrechas (un teléfono) se desplazan en horizontal en vez de partirse; centradas solo si
+ * caben («safe»: si no, empiezan por la izquierda y «Overview» no queda cortado fuera de alcance: A4-P2-17). La elegida se
+ * trae a la vista (Materiales quedaba cortada en el borde) y, si queda más a un lado, ese borde se desvanece.
+ */
+function CourseTabs({ view, onChange }: { view: CourseView; onChange: (v: CourseView) => void }) {
+  const { t } = useTranslation('course')
+  const { reducedMotion } = useTheme()
+  const strip = useRef<HTMLDivElement>(null)
+  const [more, setMore] = useState({ left: false, right: false })
+  const measure = (): void => {
+    const el = strip.current
+    if (!el) return
+    const next = { left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 }
+    setMore((m) => (m.left === next.left && m.right === next.right ? m : next))
+  }
+  useLayoutEffect(() => {
+    const el = strip.current
+    const tab = el?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+    if (el && tab && el.scrollWidth > el.clientWidth) {
+      const box = el.getBoundingClientRect()
+      const r = tab.getBoundingClientRect()
+      const by = r.left < box.left + 24 ? r.left - box.left - 24 : r.right > box.right - 24 ? r.right - box.right + 24 : 0
+      if (by) el.scrollBy({ left: by, behavior: reducedMotion ? 'auto' : 'smooth' })
+    }
+    measure()
+  }, [view, reducedMotion])
+  useEffect(() => {
+    const el = strip.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const fade = more.left && more.right ? FADE_BOTH : more.right ? FADE_RIGHT : more.left ? FADE_LEFT : undefined
+  return (
+    <div ref={strip} onScroll={measure} className={cx('mt-5 mb-5 flex [justify-content:safe_center] overflow-x-auto no-scrollbar -mx-6 px-6', fade)}>
+      <SegmentedTabs className="shrink-0" value={view} onChange={onChange} items={COURSE_VIEWS.map((x) => ({ id: x, label: t(`tabs.${x}`) }))} />
+    </div>
+  )
+}
+
+// el borde por donde siguen las pestañas se desvanece (una máscara, no un color)
+const FADE_RIGHT = '[mask-image:linear-gradient(to_right,black_calc(100%-40px),transparent)]'
+const FADE_LEFT = '[mask-image:linear-gradient(to_left,black_calc(100%-40px),transparent)]'
+const FADE_BOTH = '[mask-image:linear-gradient(to_right,transparent,black_40px,black_calc(100%-40px),transparent)]'

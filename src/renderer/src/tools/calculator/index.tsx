@@ -1,15 +1,16 @@
 // Calculadora exacta tipo cuaderno: escribes una operación y ves al vuelo su fórmula (KaTeX) y el resultado exacto
 // (fracción, π, √) con su decimal; ↩ la guarda en el historial. Variables (`a = 5`), `ans`, grados o radianes y un
-// teclado en pantalla que se hunde al pulsarlo (también se ilumina con el teclado físico). Modo compacto para la ventanita.
+// teclado en pantalla que se hunde al pulsarlo (también se ilumina con el teclado físico). Modo compacto para la ventanita y,
+// en el teléfono, una pantalla fija: el visor arriba, las teclas abajo y el historial en una hoja.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Copy, CornerDownLeft, Delete, Trash2, X } from 'lucide-react'
-import { Button, Card, IconButton, SegmentedTabs, Sprite, cx, focusWithinRing, spring, toast, useTheme } from '@renderer/design'
+import { Check, Copy, CornerDownLeft, Delete, History as HistoryIcon, Keyboard, Trash2, X } from 'lucide-react'
+import { Button, Card, Drawer, IconButton, SegmentedTabs, Sprite, cx, focusWithinRing, spring, toast, useTheme, useTouchOnly } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import { Tex } from '../shared/Tex'
 import { localizeTex } from '../shared/lib/num'
-import { useComma, useCopy } from '../shared/ui'
+import { mathField, useComma, useCopy } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { MV, type MathValue } from '@engine/math/core/types'
 import { displayValue, loadValue, previewCalc, type CalcDisplay, type CalcIssue } from './lib/engine'
@@ -74,6 +75,11 @@ function compactKeys(sep: string): Key[] {
   return [...top, ...all.slice(4)]
 }
 
+/** Las científicas en el teléfono: dos filas que se deslizan de lado, por parejas (la función y su inversa o su vecina). */
+const PHONE_SCIENTIFIC: Key[] = ['sqrt', 'sq', 'pow', 'pi', 'sin', 'asin', 'cos', 'acos', 'tan', 'atan', 'ln', 'exp', 'log', 'pow10', 'cbrt', 'abs', 'fact', 'ncr', 'e', 'ans']
+  .map((id) => SCIENTIFIC.find((k) => k.id === id))
+  .filter((k): k is Key => !!k)
+
 /** Tecla en pantalla que corresponde a una pulsación física (para iluminarla). */
 function keyIdFor(e: KeyboardEvent): string | null {
   if (e.key === 'Enter') return 'eq'
@@ -86,13 +92,19 @@ function keyIdFor(e: KeyboardEvent): string | null {
 
 // MARK: Pantalla
 
-export default function CalculatorTool({ compact }: ToolProps) {
+export default function CalculatorTool({ compact, phone }: ToolProps) {
+  const { t } = useTranslation('tools')
   const comma = useComma()
   const sep = comma ? ',' : '.'
   const s = useCalc()
   const inputRef = useRef<HTMLInputElement>(null)
+  // con el dedo, las teclas de la calculadora son su teclado: el del sistema (letras, «a = 5») solo si se pide, porque taparía
+  // las teclas
+  const touch = useTouchOnly()
+  const [systemKeys, setSystemKeys] = useState(false)
   const [lit, setLit] = useState<string | null>(null)
   const [landed, setLanded] = useState(0)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const ctx = useMemo(() => contextOf(s), [s.vars, s.ans, s.degrees]) // eslint-disable-line react-hooks/exhaustive-deps
   const preview = useMemo(() => previewCalc(s.input, ctx), [s.input, ctx])
   const last = s.entries[s.entries.length - 1]
@@ -157,9 +169,21 @@ export default function CalculatorTool({ compact }: ToolProps) {
     }
     s.setInput(next)
     requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(caret, caret)
+      // con el dedo, el campo no se enfoca solo al pulsar una tecla (saldría el teclado del sistema encima de las teclas)
+      if (!el || (touch && document.activeElement !== el)) return
+      el.focus()
+      el.setSelectionRange(caret, caret)
     })
+  }
+
+  const toggleSystemKeys = (): void => {
+    const on = !systemKeys
+    setSystemKeys(on)
+    const el = inputRef.current
+    if (!el) return
+    // el teclado del sistema sale al enfocar con el modo nuevo; al quitarlo, se suelta el campo para que se esconda
+    if (on) requestAnimationFrame(() => el.focus())
+    else el.blur()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -183,8 +207,13 @@ export default function CalculatorTool({ compact }: ToolProps) {
 
   const display = (
     <Display
-      compact={compact}
+      compact={compact || phone}
+      phone={phone}
+      aside={phone ? <HistoryButton count={s.entries.length} onOpen={() => setHistoryOpen(true)} /> : null}
       inputRef={inputRef}
+      touch={touch}
+      systemKeys={systemKeys}
+      onToggleSystemKeys={toggleSystemKeys}
       onKeyDown={onKeyDown}
       previewTex={preview ? localizeTex(preview.tex, comma) : null}
       partial={!!preview?.partial}
@@ -195,6 +224,36 @@ export default function CalculatorTool({ compact }: ToolProps) {
     />
   )
   const keys = compact ? compactKeys(sep) : null
+
+  // en el teléfono, una pantalla que no se desplaza: lo escrito y el resultado arriba, siempre a la vista junto a las teclas
+  if (phone) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0">{display}</div>
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-2 pt-2">
+          <div role="group" aria-label={t('calculator.scientific')} className="no-scrollbar -mx-4 grid shrink-0 auto-cols-[calc((100%-5*6px)/5.5)] grid-flow-col grid-rows-2 gap-1.5 overflow-x-auto px-4">
+            {PHONE_SCIENTIFIC.map((k) => (
+              <KeyButton key={k.id} k={k} lit={lit === k.id} onPress={press} />
+            ))}
+          </div>
+          <div className="grid max-h-[318px] min-h-[196px] flex-1 grid-cols-4 grid-rows-5 gap-1.5">
+            {numericKeys(sep).map((k) => (
+              <KeyButton key={k.id} k={k} lit={lit === k.id} onPress={press} fill />
+            ))}
+          </div>
+        </div>
+        <Drawer open={historyOpen} onClose={() => setHistoryOpen(false)} title={t('calculator.history')}>
+          <History
+            bare
+            onUse={(e) => {
+              s.setInput(e.input)
+              setHistoryOpen(false)
+            }}
+          />
+        </Drawer>
+      </div>
+    )
+  }
 
   if (compact) {
     return (
@@ -220,9 +279,17 @@ export default function CalculatorTool({ compact }: ToolProps) {
 
 // MARK: Visor
 
-function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, landed, issue, degHint }: {
+function Display({ compact, phone, aside, inputRef, touch, systemKeys, onToggleSystemKeys, onKeyDown, previewTex, partial, shown, landed, issue, degHint }: {
   compact?: boolean
+  /** A pantalla completa en el teléfono: compacto, pero con números más grandes (hay sitio a lo ancho). */
+  phone?: boolean
+  /** Lo que va a la derecha de grados/radianes (en el teléfono, el historial). */
+  aside?: ReactNode
   inputRef: React.RefObject<HTMLInputElement | null>
+  /** Con el dedo: el campo no saca el teclado del sistema (escriben las teclas) salvo con `systemKeys`. */
+  touch: boolean
+  systemKeys: boolean
+  onToggleSystemKeys: () => void
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void
   previewTex: string | null
   partial: boolean
@@ -249,20 +316,34 @@ function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, lan
           ]}
         />
         {!compact && <Variables />}
+        {aside}
       </div>
-      <div className={cx('relative mt-4 rounded-[16px] bg-sunken border-[0.5px] border-line transition', focusWithinRing, compact ? 'px-3 pt-2.5 pb-2' : 'px-5 pt-4 pb-3')}>
+      <div className={cx('relative rounded-[16px] bg-sunken border-[0.5px] border-line transition', focusWithinRing, phone ? 'mt-3 px-3.5 pt-2.5 pb-2' : compact ? 'mt-4 px-3 pt-2.5 pb-2' : 'mt-4 px-5 pt-4 pb-3')}>
         <input
           ref={inputRef}
           value={s.input}
           onChange={(e) => s.setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          spellCheck={false}
-          autoComplete="off"
-          autoFocus={!compact}
+          {...mathField}
+          autoFocus={!compact && !touch}
+          inputMode={touch && !systemKeys ? 'none' : undefined}
           aria-label={t('calculator.inputLabel')}
           placeholder={t('calculator.placeholder')}
-          className={cx('w-full bg-transparent outline-none text-text placeholder:text-text3 tracking-[-0.01em]', compact ? 'text-[18px] h-8' : 'text-[24px] h-10')}
+          className={cx('w-full bg-transparent outline-none text-text placeholder:text-text3 tracking-[-0.01em]', phone ? 'text-[21px] h-9' : compact ? 'text-[18px] h-8' : 'text-[24px] h-10', touch && 'pr-10')}
         />
+        {touch && (
+          <IconButton
+            label={systemKeys ? t('calculator.calcKeys') : t('calculator.systemKeys')}
+            size="sm"
+            aria-pressed={systemKeys}
+            active={systemKeys}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onToggleSystemKeys}
+            className={cx('absolute right-2', phone ? 'top-3.5' : compact ? 'top-3' : 'top-[22px]')}
+          >
+            <Keyboard size={16} />
+          </IconButton>
+        )}
         <div className={cx('overflow-x-auto overflow-y-hidden text-text2', compact ? 'min-h-[30px] text-[15px]' : 'min-h-[40px] text-[19px]')}>
           <AnimatePresence mode="popLayout" initial={false}>
             {previewTex && (
@@ -274,7 +355,7 @@ function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, lan
         </div>
       </div>
 
-      <div className={cx('relative', compact ? 'mt-2 min-h-[64px]' : 'mt-5 min-h-[112px]')}>
+      <div className={cx('relative', phone ? 'mt-2 min-h-[58px]' : compact ? 'mt-2 min-h-[64px]' : 'mt-5 min-h-[112px]')}>
         <AnimatePresence mode="popLayout" initial={false}>
           {issue ? (
             <motion.div key="issue" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-start gap-2 rounded-[12px] bg-danger-soft px-3 py-2.5 t-callout text-danger">
@@ -297,7 +378,7 @@ function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, lan
                 </div>
               ) : (
               <div className="flex items-end justify-between gap-3">
-                <div className={cx('min-w-0 overflow-x-auto overflow-y-hidden font-serif', compact ? 'text-[26px]' : 'text-[44px]')}>
+                <div className={cx('min-w-0 overflow-x-auto overflow-y-hidden font-serif', phone ? 'text-[30px]' : compact ? 'text-[26px]' : 'text-[44px]')}>
                   <span className="text-text3 mr-2">{d.approx ? '≈' : '='}</span>
                   <Tex tex={d.tex} />
                 </div>
@@ -416,7 +497,7 @@ const ROLE_LOOK: Record<Role, string> = {
   eq: 'bg-accent text-on-accent font-semibold shadow-[var(--accent-halo)]'
 }
 
-function KeyButton({ k, lit, onPress, big, compact }: { k: Key; lit: boolean; onPress: (k: Key) => void; big?: boolean; compact?: boolean }) {
+function KeyButton({ k, lit, onPress, big, compact, fill }: { k: Key; lit: boolean; onPress: (k: Key) => void; big?: boolean; compact?: boolean; fill?: boolean }) {
   const { t } = useTranslation('tools')
   const { reducedMotion } = useTheme()
   const help = t(`calculator.keys.${k.id}`, { defaultValue: '' })
@@ -432,7 +513,8 @@ function KeyButton({ k, lit, onPress, big, compact }: { k: Key; lit: boolean; on
       transition={{ type: 'spring', stiffness: 700, damping: 28 }}
       className={cx(
         'relative overflow-hidden rounded-[12px] select-none outline-none grid place-items-center transition-colors no-drag',
-        compact ? 'h-10 text-[15px]' : big ? 'h-12 text-[18px]' : 'h-10 text-[13.5px]',
+        // `fill`: el teclado del teléfono, que ocupa el alto que queda (la fila de la cuadrícula decide)
+        fill ? 'h-full min-h-0 text-[20px]' : compact ? 'h-10 text-[15px]' : big ? 'h-12 text-[18px]' : 'h-10 text-[13.5px]',
         ROLE_LOOK[k.role],
         k.role !== 'eq' && 'hover:bg-fill2',
         k.role === 'eq' && 'hover:bg-accent-hover'
@@ -457,7 +539,19 @@ function KeyButton({ k, lit, onPress, big, compact }: { k: Key; lit: boolean; on
 
 // MARK: Historial
 
-function History({ onUse }: { onUse: (e: CalcEntry) => void }) {
+/** El historial en el teléfono: un botón junto a grados/radianes (con cuántas cuentas hay) que abre la hoja. */
+function HistoryButton({ count, onOpen }: { count: number; onOpen: () => void }) {
+  const { t } = useTranslation('tools')
+  return (
+    <Button size="sm" variant="ghost" icon={<HistoryIcon size={15} />} onClick={onOpen} aria-haspopup="dialog">
+      {t('calculator.history')}
+      {count > 0 && <span className="ml-1 tabular text-text3">{count}</span>}
+    </Button>
+  )
+}
+
+/** El historial. `bare`: sin tarjeta (dentro de una hoja, que ya trae su título). */
+function History({ onUse, bare }: { onUse: (e: CalcEntry) => void; bare?: boolean }) {
   const { t } = useTranslation('tools')
   const s = useCalc()
   const comma = useComma()
@@ -467,10 +561,10 @@ function History({ onUse }: { onUse: (e: CalcEntry) => void }) {
     const before = s.clearAll()
     toast.action(t('calculator.cleared'), { label: t('calculator.undo'), run: () => useCalc.getState().restore(before) })
   }
-  return (
-    <Card padded={false} className="min-w-0 overflow-hidden">
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <h3 className="font-serif text-[19px] leading-6">{t('calculator.history')}</h3>
+  const body = (
+    <>
+      <div className={cx('flex items-center justify-between px-5 pb-2', bare ? 'pt-1' : 'pt-4')}>
+        {bare ? <span /> : <h3 className="font-serif text-[19px] leading-6">{t('calculator.history')}</h3>}
         {entries.length > 0 && (
           <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={clear}>
             {t('calculator.clear')}
@@ -480,7 +574,7 @@ function History({ onUse }: { onUse: (e: CalcEntry) => void }) {
       {entries.length === 0 ? (
         <div className="px-5 pb-5 t-callout text-text3">{t('calculator.historyEmpty')}</div>
       ) : (
-        <div className="max-h-[420px] overflow-y-auto pb-2">
+        <div className={cx('pb-2', !bare && 'max-h-[420px] overflow-y-auto')}>
           <AnimatePresence initial={false}>
             {entries.map((e) => {
               const v = loadValue(e.value)
@@ -530,6 +624,12 @@ function History({ onUse }: { onUse: (e: CalcEntry) => void }) {
           </AnimatePresence>
         </div>
       )}
+    </>
+  )
+  if (bare) return <div className="min-w-0">{body}</div>
+  return (
+    <Card padded={false} className="min-w-0 overflow-hidden">
+      {body}
     </Card>
   )
 }

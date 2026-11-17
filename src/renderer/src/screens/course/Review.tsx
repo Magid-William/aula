@@ -156,14 +156,16 @@ function CardsSection({ data, ink, now, open, setOpen }: { data: CourseData; ink
                   <span className="min-w-0 flex-1">
                     <span className="block t-callout font-medium [text-wrap:pretty]"><RichText text={glueLastWord(s.title)} inline /></span>
                     <span className="block t-footnote text-text2 mt-0.5">{facts}</span>
+                    {/* en una columna estrecha (un teléfono) la barra va debajo y el nombre se queda el ancho */}
+                    <span className="mt-1.5 flex @xl:hidden"><MasteryBar value={seen ? deckStrength(progress, now) : undefined} ink={ink} width={56} /></span>
                   </span>
-                  <MasteryBar value={seen ? deckStrength(progress, now) : undefined} ink={ink} width={56} />
+                  <span className="hidden @xl:inline-flex"><MasteryBar value={seen ? deckStrength(progress, now) : undefined} ink={ink} width={56} /></span>
                   <Icon name="chevron-right" size={14} className="shrink-0 text-text3 transition-transform group-hover/row:translate-x-0.5" />
                 </RowButton>
               )
             })}
           </div>
-          <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
+          <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="relative touch-target mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
             <Icon name={open ? 'chevron-up' : 'chevron-down'} size={13} />
             {t('study:tab.cards.all')} <span className="tabular text-text3">{all.length}</span>
           </button>
@@ -277,7 +279,7 @@ function MistakesSection({ data, list }: { data: CourseData; list: MistakeView[]
         </div>
       )}
       {(hidden > 0 || expanded) && shown.length > MISTAKES_PREVIEW && (
-        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
+        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className="relative touch-target mt-3 inline-flex items-center gap-1.5 rounded-full px-1 t-ui font-medium text-text2 hover:text-text">
           <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={13} />
           {expanded ? t('review.showFewer') : t('review.showAll', { count: shown.length })}
         </button>
@@ -358,13 +360,18 @@ function PracticeSection({ data, ink, now }: { data: CourseData; ink: string; no
             const right = rightOfLast(data.progress.attempts.filter((a) => a.skill === s.id && a.mode !== 'exam'))
             const facts = [t('study:tab.practice.exercises', { count: s.exercises.length + s.templates.length }), right ? t('review.right', { n: right.right, m: right.total }) : t('study:tab.practice.notYet')].join(' · ')
             return (
-              <RowButton key={s.id}>
+              // toda la fila practica el tema; en una columna estrecha, sin el botón (un chevron) y con la barra debajo
+              <RowButton key={s.id} onOpen={() => start(s.id)}>
                 <span className="min-w-0 flex-1">
                   <span className="block t-callout font-medium [text-wrap:pretty]"><RichText text={glueLastWord(s.title)} inline /></span>
                   <span className="block t-footnote text-text2 mt-0.5">{facts}</span>
+                  <span className="mt-1.5 flex @xl:hidden"><MasteryBar value={skillMastery(data.progress.skills[s.id], now)} ink={ink} width={56} /></span>
                 </span>
-                <MasteryBar value={skillMastery(data.progress.skills[s.id], now)} ink={ink} width={56} />
-                <Button size="sm" variant="secondary" onClick={() => start(s.id)}>{t('study:exam.practiceSkill')}</Button>
+                <span className="hidden @xl:inline-flex"><MasteryBar value={skillMastery(data.progress.skills[s.id], now)} ink={ink} width={56} /></span>
+                <span className="hidden @xl:inline-flex">
+                  <Button size="sm" variant="secondary" tabIndex={-1} onClick={(e) => { e.stopPropagation(); start(s.id) }}>{t('study:exam.practiceSkill')}</Button>
+                </span>
+                <Icon name="chevron-right" size={14} className="shrink-0 text-text3 transition-transform group-hover/row:translate-x-0.5 @xl:hidden" />
               </RowButton>
             )
           })}

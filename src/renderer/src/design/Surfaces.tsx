@@ -44,8 +44,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     [ref]
   )
   const sheet = variant === 'sheet'
-  // la hoja no lleva relleno a los lados: su texto se alinea con el resto de la página
-  const pad = padded === false ? '' : sheet ? 'pt-5 pb-2' : padded === 'sm' ? 'p-4' : padded === 'lg' ? 'p-7' : 'p-5'
+  // la hoja no lleva relleno a los lados: su texto se alinea con el resto de la página; en el teléfono, la holgada encoge
+  // (con 28 px por lado el texto de dentro se quedaba en una columna)
+  const pad = padded === false ? '' : sheet ? 'pt-5 pb-2' : padded === 'sm' ? 'p-4' : padded === 'lg' ? 'p-7 phone:p-5' : 'p-5'
   const shadow = sheet ? undefined : elevation === 3 ? 'var(--e3)' : elevation === 2 ? 'var(--e2)' : 'var(--e1)'
   // una tarjeta que se pulsa es un botón: se enfoca con Tab y se abre con Intro o Espacio, como `Row` (A4-P1-4). Solo
   // reacciona a las teclas sobre ella misma, no sobre un campo o un botón de dentro.

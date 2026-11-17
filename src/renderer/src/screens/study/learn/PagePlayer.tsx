@@ -146,6 +146,7 @@ export function PagePlayer({ data, skill, ctx: baseCtx, ink, reading, modeMenu, 
       label={<RichText text={skill.title} inline />}
       onExit={onExit}
       tutor
+      brief={<span className="t-ui tabular text-text2 whitespace-nowrap">{t('common.nOfM', { n: index + 1, m: pages.length })}</span>}
       trailing={
         <>
           {canSpeak() && (

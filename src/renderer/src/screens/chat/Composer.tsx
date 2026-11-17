@@ -6,7 +6,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef, useState, type DragEv
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { MAX_MESSAGE_CHARS, type AssistantRef } from '@shared/assistant/types'
-import { Icon, IconButton, Tooltip, cx, spring, useTheme } from '@renderer/design'
+import { canAutoFocus, Icon, IconButton, Tooltip, cx, spring, useTheme } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import type { Draft } from './data'
 import { MentionChip, MentionPicker, refKey, useMentionResults } from './Mentions'
@@ -206,7 +206,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             ref={area}
             rows={1}
             value={text}
-            autoFocus={autoFocus}
+            // con el dedo no se enfoca sola: el teclado taparía la conversación al llegar
+            autoFocus={autoFocus && canAutoFocus()}
+            // Intro envía (Mayús+Intro, salto de línea): la tecla del teclado de la pantalla dice «Enviar», que es lo que hace
+            enterKeyHint="send"
             onChange={(e) => {
               setText(e.target.value)
               setCaret(e.target.selectionStart)

@@ -1,13 +1,15 @@
 // Herramientas: la galería es un cajón a dos columnas (la loseta a tinta, el nombre en serif y una línea de qué hace, con
 // filetes entre filas). Las fijadas van aparte, en su grupo, arriba; la chincheta de las que se pueden fijar sale al pasar por
-// encima (fija, solo en las fijadas). Al abrir una, ocupa toda la pantalla (y se puede fijar flotante).
+// encima (fija, solo en las fijadas; con el dedo, siempre). Al abrir una, ocupa toda la pantalla (y se puede fijar flotante;
+// en el teléfono no hay herramientas flotantes, así que tampoco chinchetas).
 import { Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { ArrowLeft } from 'lucide-react'
 import { Spinner, cx, enter } from '@renderer/design'
-import { useRoute, navigate } from '@renderer/app/router'
+import { useRoute, navigate, useNav } from '@renderer/app/router'
 import { useScreenTitle } from '@renderer/app/title'
+import { useCompact } from '@renderer/app/shell/CompactTabs'
 import { TOOLS, pinnedGroups, toolById, type ToolDef } from '@renderer/tools/registry'
 import { PinToolButton, usePinnedTools } from '@renderer/tools/floating'
 import { ToolTile } from '@renderer/tools/ToolTile'
@@ -17,19 +19,26 @@ export default function ToolsScreen() {
   const route = useRoute()
   const toolId = route.name === 'tools' ? route.tool : undefined
   const tool = toolById(toolId)
-  useScreenTitle(tool ? t(`${tool.id}.name`) : t('title'), tool?.floating ? <PinToolButton id={tool.id} onPinned={() => navigate({ name: 'tools' })} /> : null, [tool?.id])
+  const compact = useCompact()
+  const canBack = useNav((s) => s.canBack)
+  useScreenTitle(tool ? t(`${tool.id}.name`) : t('title'), tool?.floating && !compact ? <PinToolButton id={tool.id} onPinned={() => navigate({ name: 'tools' })} /> : null, [tool?.id, compact])
 
   // sus comandos de ⌘K los registra el armazón (app/shell/commands.tsx), no esta pantalla
 
   if (tool) {
     const Comp = tool.component
+    // en el teléfono, la que lo pide ocupa la pantalla sin desplazarse (la calculadora: visor y teclas a la vez)
+    const fill = compact && !!tool.phoneFill
     return (
-      <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pb-24">
-        <button className="mb-3 inline-flex items-center gap-1.5 t-ui font-medium text-text2 hover:text-text" onClick={() => navigate({ name: 'tools' })}>
-          <ArrowLeft size={15} /> {t('back')}
-        </button>
+      <div className={cx('@container flex-1 min-h-0', fill ? 'flex flex-col px-4 pb-3' : 'overflow-y-auto px-6 pb-24')}>
+        {/* en el teléfono la barra de arriba ya trae «atrás» */}
+        {!(compact && canBack) && (
+          <button className="relative touch-target mb-3 inline-flex shrink-0 items-center gap-1.5 self-start t-ui font-medium text-text2 hover:text-text" onClick={() => navigate({ name: 'tools' })}>
+            <ArrowLeft size={15} /> {t('back')}
+          </button>
+        )}
         <Suspense fallback={<div className="grid place-items-center h-80"><Spinner size={22} /></div>}>
-          <Comp />
+          <Comp phone={fill} />
         </Suspense>
       </div>
     )
@@ -41,13 +50,14 @@ export default function ToolsScreen() {
 /** La galería: el título visible es el de la barra de arriba (aquí, solo para lectores de pantalla). */
 function Gallery() {
   const { t } = useTranslation('tools')
+  const compact = useCompact()
   // las fijadas, en su grupo y en el orden de al llegar (fijar una no la hace saltar bajo el ratón)
   const [{ pinned, rest }] = useState(() => pinnedGroups(TOOLS, usePinnedTools.getState().pinned))
   return (
     <div className="@container flex-1 min-h-0 overflow-y-auto px-6 pt-4 pb-24">
       <div className="mx-auto max-w-[1080px]">
         <h1 className="sr-only">{t('title')}</h1>
-        <p className="t-callout text-text2 max-w-[640px] text-pretty">{t('subtitle')}</p>
+        <p className="t-callout text-text2 max-w-[640px] text-pretty">{t('subtitle', { context: compact ? 'phone' : undefined })}</p>
         {pinned.length > 0 && <ToolGroup label={t('pinnedGroup')} tools={pinned} className="mt-7" />}
         <ToolGroup label={pinned.length > 0 ? t('allGroup') : undefined} tools={rest} className={pinned.length > 0 ? 'mt-8' : 'mt-6'} />
       </div>
@@ -77,6 +87,7 @@ function ToolGroup({ label, tools, className }: { label?: string; tools: ToolDef
 function ToolRow({ tool }: { tool: ToolDef }) {
   const { t } = useTranslation('tools')
   const pinned = usePinnedTools((s) => s.pinned.includes(tool.id))
+  const compact = useCompact()
   return (
     <motion.li variants={enter} className="group/tool flex items-center gap-1 border-b border-rule py-1.5">
       <button type="button" onClick={() => navigate({ name: 'tools', tool: tool.id })} className="-ml-2.5 flex min-w-0 flex-1 items-center gap-4 rounded-[14px] px-2.5 py-2.5 text-left transition-colors hover:bg-fill1">
@@ -86,8 +97,8 @@ function ToolRow({ tool }: { tool: ToolDef }) {
           <span className="block t-callout text-text2">{t(`${tool.id}.desc`)}</span>
         </span>
       </button>
-      {tool.floating && (
-        <span className={cx('transition-opacity', !pinned && 'opacity-0 group-hover/tool:opacity-100 focus-within:opacity-100')}>
+      {tool.floating && !compact && (
+        <span className={cx('transition-opacity', !pinned && 'opacity-0 group-hover/tool:opacity-100 focus-within:opacity-100 touch:opacity-100')}>
           <PinToolButton id={tool.id} look="icon" />
         </span>
       )}

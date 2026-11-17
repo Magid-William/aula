@@ -81,6 +81,7 @@
     "toCourse": "Go to course",
     "reveal": "Show in folder",
     "revealFailed": "Couldn’t show the file",
+    "pageField": "Page",
     "pageShort": "p. {{n}}",
     "pageOf": "Page {{n}} of {{total}}",
     "ocr": "Text recognized from a scanned page",

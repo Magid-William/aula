@@ -66,7 +66,7 @@ export function Hero({ data, mode }: { data: HomeSummary; mode: HeroMode }) {
                   {t('firstRun.create')}
                 </Button>
                 {/* probar con el ejemplo: un enlace de texto, no otro botón */}
-                <button type="button" className="t-callout font-medium text-accent-text hover:underline underline-offset-4 outline-none focus-visible:underline" onClick={startPlan}>
+                <button type="button" className="relative touch-target t-callout font-medium text-accent-text hover:underline underline-offset-4 outline-none focus-visible:underline" onClick={startPlan}>
                   {t('firstRun.tryExample')}
                 </button>
               </div>

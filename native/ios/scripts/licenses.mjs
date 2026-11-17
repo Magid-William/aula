@@ -3,6 +3,8 @@
 // estándar de Go y cada módulo de Go que se enlaza para iOS (lo que dice `go list -deps`, no todo el go.mod), cada uno
 // con el texto entero de sus LICENSE/NOTICE/PATENTS. Lo llama build-tailscalekit.sh; a mano:
 //   node native/ios/scripts/licenses.mjs
+// Con --android <salida.json>, lo mismo para la app de Android (lo llama native/android/build.sh): Aula y lo que lleva
+// libaulatsnet.so, el componente de Tailscale de native/tsnet/client compilado para Linux (arm64), sin CGO.
 // Usa el Go de <raíz>/.toolchain (o el de AULA_TOOLCHAIN, o el del PATH) y libtailscale en el commit fijado en
 // build-tailscalekit.sh. Sale igual cada vez (sin fechas), así que un cambio en git es un cambio de verdad.
 import { execFileSync } from 'node:child_process'
@@ -16,7 +18,12 @@ const IOS = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(IOS, '../..')
 const TC = process.env.AULA_TOOLCHAIN || join(ROOT, '.toolchain')
 const SRC = join(TC, 'src/libtailscale')
-const OUT = join(IOS, 'Aula/Licenses.json')
+const ANDROID = process.argv[2] === '--android'
+if (ANDROID && !process.argv[3]) {
+  console.error('uso: node native/ios/scripts/licenses.mjs --android <salida.json>')
+  process.exit(2)
+}
+const OUT = ANDROID ? resolve(process.argv[3]) : join(IOS, 'Aula/Licenses.json')
 
 /** Archivos con el texto de una licencia (no el código Go que se llame así). */
 const LICENSE_FILE = /^(licen[cs]e|copying|notice|patents)([._-].*)?$/i
@@ -34,7 +41,9 @@ function run(cmd, args, opts = {}) {
 
 /** El entorno de Go: el del proyecto si está (sin red: los módulos ya están en .toolchain), si no el del PATH. */
 function goEnv() {
-  const env = { ...process.env, GOOS: 'ios', GOARCH: 'arm64', CGO_ENABLED: '1', GOFLAGS: `${process.env.GOFLAGS ?? ''} -mod=readonly`.trim() }
+  // Android: el binario estático de Linux que la app lanza (native/tsnet/build.sh android)
+  const target = ANDROID ? { GOOS: 'linux', GOARCH: 'arm64', CGO_ENABLED: '0' } : { GOOS: 'ios', GOARCH: 'arm64', CGO_ENABLED: '1' }
+  const env = { ...process.env, ...target, GOFLAGS: `${process.env.GOFLAGS ?? ''} -mod=readonly`.trim() }
   if (existsSync(join(TC, 'go/bin/go'))) {
     Object.assign(env, {
       PATH: `${join(TC, 'go/bin')}:${process.env.PATH}`,
@@ -86,29 +95,34 @@ function component(id, name, version, files, base) {
   return { id, name, ...(version ? { version } : {}), license: kinds.join(', '), text }
 }
 
-// el commit de libtailscale que se compila (el fijado en build-tailscalekit.sh, o el que se le pase)
-const pinned = readFileSync(join(IOS, 'build-tailscalekit.sh'), 'utf8').match(/LIBTAILSCALE_REF="\$\{LIBTAILSCALE_REF:-([0-9a-f]{40})\}"/)?.[1]
-if (!pinned) fail('no encuentro LIBTAILSCALE_REF en build-tailscalekit.sh')
-const wanted = process.env.LIBTAILSCALE_REF || pinned
-if (!existsSync(join(SRC, '.git'))) fail(`falta libtailscale en ${SRC}: native/ios/build-tailscalekit.sh lo descarga`)
-const head = run('git', ['-C', SRC, 'rev-parse', 'HEAD'])
-const ref = run('git', ['-C', SRC, 'rev-parse', `${wanted}^{commit}`])
-if (head !== ref) fail(`libtailscale está en ${head.slice(0, 12)} y build-tailscalekit.sh compila ${ref.slice(0, 12)}: ejecuta antes native/ios/build-tailscalekit.sh`)
-
 const env = goEnv()
 const goVersion = run('go', ['env', 'GOVERSION'], { env })
 const goroot = run('go', ['env', 'GOROOT'], { env })
+const format = '{{with .Module}}{{.Path}}\t{{.Version}}\t{{.Dir}}{{with .Replace}}\t{{.Version}}\t{{.Dir}}{{end}}{{end}}|{{.Dir}}'
 
-// lo que se enlaza de verdad, con aula_nologs.go dentro como en la compilación (por -overlay: libtailscale no se toca)
-const tmp = mkdtempSync(join(tmpdir(), 'aula-licenses-'))
+let ref = ''
 let listed
-try {
-  const overlay = join(tmp, 'overlay.json')
-  writeFileSync(overlay, JSON.stringify({ Replace: { [join(SRC, 'aula_nologs.go')]: join(IOS, 'tailscalekit/aula_nologs.go') } }))
-  const format = '{{with .Module}}{{.Path}}\t{{.Version}}\t{{.Dir}}{{with .Replace}}\t{{.Version}}\t{{.Dir}}{{end}}{{end}}|{{.Dir}}'
-  listed = run('go', ['list', '-tags', 'ios', '-overlay', overlay, '-deps', '-f', format, '.'], { cwd: SRC, env })
-} finally {
-  rmSync(tmp, { recursive: true, force: true })
+if (ANDROID) {
+  // lo que se enlaza de verdad en libaulatsnet.so
+  listed = run('go', ['list', '-deps', '-f', format, './client'], { cwd: join(ROOT, 'native/tsnet'), env })
+} else {
+  // el commit de libtailscale que se compila (el fijado en build-tailscalekit.sh, o el que se le pase)
+  const pinned = readFileSync(join(IOS, 'build-tailscalekit.sh'), 'utf8').match(/LIBTAILSCALE_REF="\$\{LIBTAILSCALE_REF:-([0-9a-f]{40})\}"/)?.[1]
+  if (!pinned) fail('no encuentro LIBTAILSCALE_REF en build-tailscalekit.sh')
+  const wanted = process.env.LIBTAILSCALE_REF || pinned
+  if (!existsSync(join(SRC, '.git'))) fail(`falta libtailscale en ${SRC}: native/ios/build-tailscalekit.sh lo descarga`)
+  const head = run('git', ['-C', SRC, 'rev-parse', 'HEAD'])
+  ref = run('git', ['-C', SRC, 'rev-parse', `${wanted}^{commit}`])
+  if (head !== ref) fail(`libtailscale está en ${head.slice(0, 12)} y build-tailscalekit.sh compila ${ref.slice(0, 12)}: ejecuta antes native/ios/build-tailscalekit.sh`)
+  // lo que se enlaza de verdad, con aula_nologs.go dentro como en la compilación (por -overlay: libtailscale no se toca)
+  const tmp = mkdtempSync(join(tmpdir(), 'aula-licenses-'))
+  try {
+    const overlay = join(tmp, 'overlay.json')
+    writeFileSync(overlay, JSON.stringify({ Replace: { [join(SRC, 'aula_nologs.go')]: join(IOS, 'tailscalekit/aula_nologs.go') } }))
+    listed = run('go', ['list', '-tags', 'ios', '-overlay', overlay, '-deps', '-f', format, '.'], { cwd: SRC, env })
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
 }
 
 /** Módulo → su versión, su carpeta y las carpetas de sus paquetes enlazados. */
@@ -128,10 +142,11 @@ function moduleFiles(m) {
   return [...licenseFiles(m.dir), ...sub]
 }
 
-const MAIN = 'github.com/tailscale/libtailscale'
+// el código de la propia app (libtailscale en iOS; en Android, native/tsnet, que es de Aula y va con su aviso)
+const MAIN = ANDROID ? 'aula/tsnet' : 'github.com/tailscale/libtailscale'
 const FIRST = ['tailscale.com', 'github.com/tailscale/wireguard-go']
 const main = modules.get(MAIN)
-if (!main) fail('go list no devolvió libtailscale')
+if (!main) fail(`go list no devolvió ${MAIN}`)
 modules.delete(MAIN)
 
 const ofModule = (m) => component(m.path, m.path, m.version, moduleFiles(m), m.dir)
@@ -143,18 +158,15 @@ const components = [
     license: 'AGPL-3.0-only',
     text: aulaNotice(ROOT)
   },
-  component(MAIN, 'TailscaleKit (libtailscale)', ref.slice(0, 12), moduleFiles(main), main.dir),
+  ...(ANDROID ? [] : [component(MAIN, 'TailscaleKit (libtailscale)', ref.slice(0, 12), moduleFiles(main), main.dir)]),
   ...FIRST.filter((p) => modules.has(p)).map((p) => ofModule(modules.get(p))),
   component('go', 'Go', goVersion, licenseFiles(goroot), goroot),
   ...[...modules.values()].filter((m) => !FIRST.includes(m.path)).sort((a, b) => a.path.localeCompare(b.path)).map(ofModule)
 ]
 
-const catalog = {
-  about: 'Generated by native/ios/scripts/licenses.mjs (run by native/ios/build-tailscalekit.sh). Do not edit.',
-  libtailscale: ref,
-  go: goVersion,
-  components
-}
+const catalog = ANDROID
+  ? { about: 'Generated by native/ios/scripts/licenses.mjs --android (run by native/android/build.sh). Do not edit.', go: goVersion, components }
+  : { about: 'Generated by native/ios/scripts/licenses.mjs (run by native/ios/build-tailscalekit.sh). Do not edit.', libtailscale: ref, go: goVersion, components }
 const json = `${JSON.stringify(catalog, null, 2)}\n`
 const before = existsSync(OUT) ? readFileSync(OUT, 'utf8') : ''
 writeFileSync(OUT, json)

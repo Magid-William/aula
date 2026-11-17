@@ -13,4 +13,10 @@ describe('tamaño del texto', () => {
     expect(rootFontSize(0.1)).toBe(12.75)
     expect(rootFontSize(Number.NaN)).toBe(15)
   })
+  it('suma el tamaño de letra del sistema del teléfono (Android), con su propio tope', () => {
+    expect(rootFontSize(1, 1.3)).toBe(19.5)
+    expect(rootFontSize(1.2, 1.3) / rootFontSize(1.2)).toBeCloseTo(1.3, 5)
+    expect(rootFontSize(1, 4)).toBe(24)
+    expect(rootFontSize(1, Number.NaN)).toBe(15)
+  })
 })

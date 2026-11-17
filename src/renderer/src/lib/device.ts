@@ -51,3 +51,45 @@ export function keySafeNote(role: DeviceRole, protection: 'os' | 'basic' | 'unav
   if (role === 'owner') return basic ? 'keySafeServerBasic' : 'keySafeServer'
   return basic ? 'keySafeBasic' : 'keySafe'
 }
+
+/**
+ * Lo que un dispositivo no puede pedir (remote/policy.ts lo niega): 'window', solo desde la ventana del ordenador (también
+ * lo niega a un propietario: abre un diálogo o una carpeta allí, exporta todo); 'owner', también desde un dispositivo
+ * propietario. Esas acciones no se ofrecen donde no se pueden hacer: antes se rellenaba un diálogo para acabar en «Esto solo
+ * se puede hacer desde Aula en tu Mac». device.test.ts comprueba que la tabla dice lo mismo que la política.
+ */
+export const ONLY_FROM = {
+  'courses.export': 'window',
+  'courses.delete': 'owner',
+  'calendar.exportICS': 'window',
+  'calendar.importICS': 'window',
+  'calendar.subscribe': 'owner',
+  'calendar.unsubscribe': 'owner',
+  'calendar.renameSubscription': 'owner',
+  'calendar.refreshSubscription': 'owner',
+  'documents.pick': 'window',
+  'documents.reveal': 'window',
+  'documents.remove': 'owner',
+  'documents.renderPDF': 'owner',
+  'documents.save': 'window',
+  'documents.revealSaved': 'window',
+  'figures.save': 'window',
+  'platforms.approvals': 'owner',
+  'platforms.approve': 'owner'
+} as const satisfies Record<string, 'window' | 'owner'>
+
+export type DeviceGatedMethod = keyof typeof ONLY_FROM
+
+/** ¿Se puede pedir `method` desde aquí? (la ventana, siempre; un propietario, lo suyo; los demás dispositivos, nada de esto). */
+export function canFrom(role: DeviceRole, method: DeviceGatedMethod): boolean {
+  if (role === 'window') return true
+  return role === 'owner' && ONLY_FROM[method] === 'owner'
+}
+
+/**
+ * El teclado de la pantalla para un número que puede ser negativo (una respuesta, −5 °C, una matriz): el numérico, salvo en
+ * iOS, cuyo teclado decimal no tiene «−» (allí, el entero, con su capa de números). `platform`: `api.platform`.
+ */
+export function signedNumberKeyboard(platform: string): 'decimal' | 'text' {
+  return platform === 'ios' || platform === 'ipados' ? 'text' : 'decimal'
+}

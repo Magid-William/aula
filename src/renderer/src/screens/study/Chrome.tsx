@@ -2,7 +2,7 @@
 // qué se estudia, progreso) y la barra flotante de abajo con las acciones. Escape sale (si hay texto seleccionado, primero
 // lo suelta). El texto de la columna se puede seleccionar (copiar, consultar, traducir); el idioma del curso no lo declara la
 // columna (también lleva botones y avisos de la interfaz) sino el texto del curso (RichText, lib/contentLanguage.ts).
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { cx, Icon, IconButton, spring, Tooltip, useTheme, type IconName } from '@renderer/design'
@@ -10,6 +10,7 @@ import { isTypingTarget } from '@renderer/exercises/normalize'
 import { dropSelection } from './reading'
 import { TutorButton } from './TutorButton'
 import { useTutor } from './tutorStore'
+import { useCompact } from '@renderer/app/shell/CompactTabs'
 
 export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, scrollKey, className }: {
   capsule: ReactNode
@@ -44,6 +45,7 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, s
   useEffect(() => {
     scroller.current?.scrollTo({ top: 0 })
   }, [scrollKey])
+  useKeyboardReveal(scroller)
   const { reducedMotion } = useTheme()
   // Al responder dentro de un bloque (predecir, detectar el error…), lo que contesta Aula aparece debajo: si queda tapado por
   // la barra de abajo, se desplaza lo justo para verlo (sin perder de vista el principio del bloque).
@@ -68,7 +70,7 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, s
       {/* velo de papel (un solo color que se desvanece) tras las cápsulas: el texto no se lee a través de ellas */}
       {/* lo que se desplaza se pierde bajo las cápsulas: el mismo papel (con su grano) que se desvanece, no una franja lisa más clara */}
       <div aria-hidden className="paper-grain pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-paper [mask-image:linear-gradient(to_bottom,black_45%,transparent)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-6">{capsule}</div>
+      <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-6 phone:px-3">{capsule}</div>
       <div ref={scroller} onClickCapture={revealAnswer} className="@container flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* se selecciona el texto, no lo que se arrastra o gira (lienzos) */}
         <div className={cx('selectable mx-auto w-full shrink-0 px-6 pt-[76px] [&_canvas]:select-none', bottom ? 'pb-4' : 'pb-36', wide ? 'max-w-[1080px]' : reading ? 'max-w-[700px]' : 'max-w-[800px]', className)}>
@@ -80,20 +82,67 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, s
           {bottom && (
             <motion.div
               key="bottom"
-              className="pointer-events-none sticky bottom-0 z-20 flex shrink-0 justify-center px-6 pt-6 pb-5"
+              data-study-bottom
+              // en el teléfono la sesión llega hasta abajo (sin pestañas): la barra queda por encima de la de inicio, y siempre
+              // abajo del todo (mt-auto), no flotando a media pantalla bajo un ejercicio corto ni saltando de uno a otro
+              className="pointer-events-none sticky bottom-0 z-20 flex shrink-0 justify-center px-6 pt-6 pb-5 phone:mt-auto phone:px-3 phone:pb-[calc(env(safe-area-inset-bottom,0px)+12px)]"
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
               transition={spring.smooth}
             >
               <div aria-hidden className="paper-grain absolute inset-x-0 bottom-0 h-full bg-paper [mask-image:linear-gradient(to_top,black_55%,transparent)]" />
-              <div className="relative flex max-w-full justify-center">{bottom}</div>
+              <div className="relative flex max-w-full justify-center phone:w-full">{bottom}</div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
     </div>
   )
+}
+
+/**
+ * Con el teclado de la pantalla abierto, lo que se escribe no queda bajo la barra de abajo: el campo con foco y lo suyo de
+ * debajo (la vista previa «Lo leo como…» y la fila de símbolos, `[data-answer-block]`) se desplazan lo justo para verse
+ * encima de ella, también mientras crecen al escribir. Sin teclado (el escritorio) no hace nada.
+ */
+function useKeyboardReveal(scroller: RefObject<HTMLDivElement | null>): void {
+  useEffect(() => {
+    const box = scroller.current
+    if (!box) return
+    const root = document.documentElement
+    let frame = 0
+    const reveal = (): void => {
+      frame = 0
+      const field = document.activeElement
+      if (!root.classList.contains('kb-open') || !(field instanceof HTMLElement) || !box.contains(field)) return
+      const block = field.closest<HTMLElement>('[data-answer-block]') ?? field
+      const bar = box.querySelector<HTMLElement>('[data-study-bottom]')
+      const view = box.getBoundingClientRect()
+      const limit = view.bottom - (bar?.getBoundingClientRect().height ?? 0) - 8
+      const hidden = block.getBoundingClientRect().bottom - limit
+      if (hidden <= 0) return
+      // sin que el campo se vaya bajo la cápsula de arriba
+      const room = field.getBoundingClientRect().top - (view.top + 76)
+      const by = Math.min(hidden, Math.max(0, room))
+      if (by > 2) box.scrollBy({ top: by })
+    }
+    const schedule = (): void => {
+      if (!frame) frame = requestAnimationFrame(reveal)
+    }
+    const classes = new MutationObserver(schedule)
+    classes.observe(root, { attributes: true, attributeFilter: ['class'] })
+    const grows = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    if (box.firstElementChild) grows?.observe(box.firstElementChild)
+    grows?.observe(box)
+    box.addEventListener('focusin', schedule)
+    return () => {
+      classes.disconnect()
+      grows?.disconnect()
+      box.removeEventListener('focusin', schedule)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [scroller])
 }
 
 /** Cápsula de vidrio (arriba: progreso; abajo: acciones). */
@@ -110,9 +159,12 @@ export function GlassCapsule({ children, className }: { children: ReactNode; cla
 }
 
 /** La cápsula de arriba: salir · icono y nombre del modo · lo que va en medio (progreso) · extras y, con `tutor`, la puerta fija
- *  al tutor (aprender, practicar, tarjetas y errores; nunca en el simulacro). */
-export function TopCapsule({ icon, label, onExit, children, trailing, tutor }: { icon: IconName; label: ReactNode; onExit: () => void; children?: ReactNode; trailing?: ReactNode; tutor?: boolean }) {
+ *  al tutor (aprender, practicar, tarjetas y errores; nunca en el simulacro). En el teléfono no cabe todo: el nombre se queda
+ *  en su icono (si hay algo más que enseñar), el progreso en su versión breve (`brief`, «3 de 9») y los botones de la derecha
+ *  siempre a la vista; si aun así no cabe, la cápsula se desliza de lado en vez de dejarlos fuera de la pantalla. */
+export function TopCapsule({ icon, label, onExit, children, brief, trailing, tutor }: { icon: IconName; label: ReactNode; onExit: () => void; children?: ReactNode; brief?: ReactNode; trailing?: ReactNode; tutor?: boolean }) {
   const { t } = useTranslation('study')
+  const compact = useCompact()
   // sin nada publicado (aún no hay ejercicio ni paso a la vista) no hay puerta: ni el separador
   const canAsk = useTutor((s) => !!s.published)
   const extras = tutor && canAsk ? (
@@ -121,23 +173,26 @@ export function TopCapsule({ icon, label, onExit, children, trailing, tutor }: {
       <TutorButton className="rounded-full!" />
     </>
   ) : trailing
+  const middle = compact && brief ? brief : children
+  // en el teléfono, con progreso o botones al lado, el nombre solo lo oye el lector de pantalla
+  const iconOnly = compact && !!(middle || extras)
   return (
-    <GlassCapsule>
+    <GlassCapsule className={compact ? 'overflow-x-auto no-scrollbar' : undefined}>
       <Tooltip label={t('chrome.exit')} side="bottom">
         <IconButton label={t('chrome.exit')} size="sm" onClick={onExit} className="rounded-full!">
           <Icon name="close" size={15} />
         </IconButton>
       </Tooltip>
-      <span className="flex min-w-0 items-center gap-1.5 pl-1 pr-2 t-ui font-semibold text-text">
+      <span className={cx('flex min-w-0 items-center gap-1.5 pl-1 t-ui font-semibold text-text', iconOnly ? 'shrink-0 pr-1' : 'pr-2')}>
         <Icon name={icon} size={15} className="shrink-0 text-text2" />
-        <span className="max-w-[260px] truncate">{label}</span>
+        <span className={iconOnly ? 'sr-only' : 'max-w-[260px] truncate'}>{label}</span>
       </span>
       {/* con texto grande o ventana estrecha encoge (con «…») solo el título: el progreso y los botones de la derecha no encogen,
           así el contador nunca se monta sobre ellos (A4-P2-17: «16 mi♫») */}
-      {children && (
+      {middle && (
         <>
           <span className="h-5 w-[0.5px] shrink-0 bg-line" aria-hidden />
-          <span className="flex shrink-0 items-center gap-2 px-2">{children}</span>
+          <span className={cx('flex items-center gap-2 px-2', compact ? 'min-w-0' : 'shrink-0')}>{middle}</span>
         </>
       )}
       {extras && (
@@ -180,7 +235,8 @@ export function ProgressDots({ states, current, ink = 'var(--accent)', onPick, m
             onClick={() => onPick?.(i)}
             layout={!reducedMotion}
             transition={spring.snappy}
-            className="grid h-6 place-items-center disabled:cursor-default"
+            // con el dedo, cada punto se pulsa en 44 px sin cambiar cómo se ve
+            className="touch-target relative grid h-6 place-items-center disabled:cursor-default"
             style={{ width: on ? 32 : 24 }}
           >
             <motion.span
@@ -202,7 +258,7 @@ export function CapsuleProgress({ value, total, label }: { value: number; total:
   const pct = total > 0 ? Math.min(1, value / total) : 0
   return (
     <span className="flex items-center gap-2.5">
-      <span className="relative h-[5px] w-[120px] overflow-hidden rounded-full bg-fill2">
+      <span className="relative h-[5px] w-[120px] overflow-hidden rounded-full bg-fill2 phone:w-12">
         <motion.span className="absolute inset-y-0 left-0 rounded-full bg-accent" initial={false} animate={{ width: `${pct * 100}%` }} transition={spring.smooth} />
       </span>
       <span className="t-ui tabular text-text2 whitespace-nowrap">{label}</span>

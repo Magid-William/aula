@@ -4,7 +4,8 @@
   "views": {
     "agenda": "Agenda",
     "week": "Semana",
-    "month": "Mes"
+    "month": "Mes",
+    "days3": "3 días"
   },
   "prev": "Anterior",
   "next": "Siguiente",

@@ -13,6 +13,7 @@ import { useEventColor } from './data'
 import { eventsOn, fitChips, isAssessment, monthGrid } from './util'
 import { fmtDate, fmtTime } from '@renderer/lib/format'
 import { openEventSheet } from './sheet'
+import { useSwipe } from './swipe'
 
 const EXAM_SPRITE = ['.pppp..', '.p...p.', '.p.ll.p', '.p....p', '.p.lll.', '.p....p', '.pppppp']
 /** Lo que ocupa la cabecera de un día (el número y sus márgenes), con el texto al 100 %. */
@@ -38,7 +39,7 @@ function useChipSpace(rows: number) {
   return { ref, avail }
 }
 
-export function MonthView({ month, dir, events, selected, onSelect, onMore }: { month: Date; dir: number; events: CalEvent[]; selected: Date; onSelect: (d: Date) => void; onMore: (d: Date) => void }) {
+export function MonthView({ month, dir, events, selected, onSelect, onMore, onStep }: { month: Date; dir: number; events: CalEvent[]; selected: Date; onSelect: (d: Date) => void; onMore: (d: Date) => void; onStep?: (n: number) => void }) {
   const { t, i18n } = useTranslation('calendar')
   const { dark } = useTheme()
   const color = useEventColor()
@@ -47,8 +48,10 @@ export function MonthView({ month, dir, events, selected, onSelect, onMore }: { 
   const headers = days.slice(0, 7).map((d) => fmtDate(d, { weekday: 'short' }).replace('.', ''))
   const today = new Date()
   const { ref, avail } = useChipSpace(weeks)
+  // con el dedo se pasa de mes deslizando (el desplazamiento vertical sigue siendo del navegador)
+  const swipe = useSwipe((n) => onStep?.(n))
   return (
-    <div className="relative h-full" style={{ perspective: 1600 }}>
+    <div className="relative h-full touch-pan-y" style={{ perspective: 1600 }} {...(onStep ? swipe : {})}>
       <AnimatePresence mode="popLayout" initial={false} custom={dir}>
         <motion.div
           key={format(month, 'yyyy-MM')}
@@ -142,7 +145,7 @@ export function MonthView({ month, dir, events, selected, onSelect, onMore }: { 
                               >
                                 {!e.allDay && <span className="mt-[calc(4.5rem/15)] h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: c }} />}
                                 {/* el título entero en dos líneas si hay sitio; si no, en una */}
-                                <span className={cx('min-w-0', li < fit.wrap ? 'line-clamp-2 break-words' : 'truncate')}>{e.title}</span>
+                                <span className={cx('min-w-0', li < fit.wrap ? 'line-clamp-2 break-words hyphens-auto' : 'truncate')}>{e.title}</span>
                               </button>
                               {last && (
                                 <button

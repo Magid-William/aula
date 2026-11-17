@@ -2,12 +2,13 @@
 // Aula —. Arriba, una sola barra: búsqueda en el texto de todo, filtro por curso, lo que hay y los dos botones (añadir y crear).
 // Debajo, «Recientes» con su página en miniatura y los documentos por curso. Los archivos se sueltan sobre la ventana (como en
 // los Materiales del curso): una capa con la hoja pixel encendida. El título es el de la barra de arriba.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import type { DocumentEntry, DocumentLibrary, DocumentSearchHit } from '@shared/documents'
 import { Button, Card, Chip, EmptyState, Icon, IconButton, Menu, PixelIcon, ProgressBar, SectionTitle, Spinner, Stagger, StaggerItem, TextField, toast, toneForHue, useTheme, type MenuItem } from '@renderer/design'
 import { api } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 import i18n from '@renderer/i18n'
 import { useRpc, useRpcEvent } from '@renderer/lib/useRpc'
 import { fmtDate } from '@renderer/lib/format'
@@ -46,7 +47,8 @@ export function Library() {
     <div className="@container flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pt-1 pb-24">
       <Stagger className="grid grid-cols-12 gap-4" gap={0.05}>
         <StaggerItem className="col-span-12">
-          <Toolbar lib={lib} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} onCreate={() => setExportOpen(true)} />
+          {/* «Crear documento» guarda un archivo en el ordenador: desde un dispositivo no se ofrece */}
+          <Toolbar lib={lib} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} onCreate={canFrom(api.role, 'documents.save') ? () => setExportOpen(true) : undefined} />
         </StaggerItem>
 
         {query.trim().length >= 2 && (
@@ -102,7 +104,7 @@ function i18nT(key: string, opts?: Record<string, unknown>): string {
 
 /** La barra de arriba, en una fila: buscar, el filtro por curso, lo que hay (en text2, sin ceros) y los dos botones. Soltar
  *  archivos en cualquier parte de la ventana los importa (la capa lo dice mientras se arrastran). */
-function Toolbar({ lib, query, setQuery, filter, setFilter, onCreate }: { lib: DocumentLibrary; query: string; setQuery: (q: string) => void; filter: string; setFilter: (f: string) => void; onCreate: () => void }) {
+function Toolbar({ lib, query, setQuery, filter, setFilter, onCreate }: { lib: DocumentLibrary; query: string; setQuery: (q: string) => void; filter: string; setFilter: (f: string) => void; onCreate?: () => void }) {
   const { t } = useTranslation('documents')
   const { dark } = useTheme()
   const [busy, setBusy] = useState<{ name: string; fraction: number } | null>(null)
@@ -120,6 +122,9 @@ function Toolbar({ lib, query, setQuery, filter, setFilter, onCreate }: { lib: D
     }
   }
   const dragging = useFileDrop((files) => void importPaths(filePaths(files)))
+  // en un dispositivo no hay diálogo del ordenador: se eligen con el del propio dispositivo y se suben
+  const picker = useRef<HTMLInputElement>(null)
+  const choose = (): void => (canFrom(api.role, 'documents.pick') ? void pick() : picker.current?.click())
   const imports = lib.items.filter((i) => i.origin === 'import').length
   const pages = lib.items.reduce((n, i) => n + i.pages, 0)
   const marks = lib.items.reduce((n, i) => n + i.marks, 0)
@@ -160,8 +165,9 @@ function Toolbar({ lib, query, setQuery, filter, setFilter, onCreate }: { lib: D
         facts.length > 0 && <span className="t-callout text-text2">{facts.join(' · ')}</span>
       )}
       <div className="ml-auto flex flex-wrap gap-2">
-        <Button variant="primary" icon={<Icon name="upload" size={14} />} onClick={() => void pick()} disabled={!!busy}>{t('library.pick')}</Button>
-        <Button variant="secondary" icon={<Icon name="file-text" size={14} />} onClick={onCreate} disabled={!lib.courses.length}>{t('library.create')}</Button>
+        <Button variant="primary" icon={<Icon name="upload" size={14} />} onClick={choose} disabled={!!busy}>{t('library.pick')}</Button>
+        {onCreate && <Button variant="secondary" icon={<Icon name="file-text" size={14} />} onClick={onCreate} disabled={!lib.courses.length}>{t('library.create')}</Button>}
+        <input ref={picker} type="file" multiple hidden onChange={(e) => { void importPaths(filePaths(e.target.files)); e.target.value = '' }} />
       </div>
       <FileDropOverlay show={dragging} title={t('library.dropNow')} body={t('library.kinds')} />
     </Card>
@@ -300,8 +306,9 @@ function DocCard({ entry: e, index, progress }: { entry: DocumentEntry; index: n
   const facts = [kindLabel(e.kind), e.pages > 0 ? t('library.pages', { count: e.pages }) : ''].filter(Boolean).join(' · ')
   const menu: MenuItem[] = [
     { label: t('library.open'), icon: <Icon name="book" size={14} />, onSelect: () => openDocument(e.ref, e.lastPage) },
-    ...(e.hasFile ? [{ label: t('reader.reveal'), icon: <Icon name="folder-open" size={14} />, onSelect: () => void api.invoke('documents.reveal', { ref: e.ref }).catch(() => toast.warning(t('reader.revealFailed'))) }] : []),
-    ...(e.origin !== 'source' ? [{ label: t('library.remove'), icon: <Icon name="trash" size={14} />, danger: true, separatorBefore: true, onSelect: () => void api.invoke('documents.remove', { ref: e.ref }).then(() => toast.success(t('library.removed'))).catch((err: unknown) => toast.error(err instanceof Error ? err.message : String(err))) }] : [])
+    // «Mostrar en Finder» y quitar, solo donde se puede (en un dispositivo, la política lo niega)
+    ...(e.hasFile && canFrom(api.role, 'documents.reveal') ? [{ label: t('reader.reveal'), icon: <Icon name="folder-open" size={14} />, onSelect: () => void api.invoke('documents.reveal', { ref: e.ref }).catch(() => toast.warning(t('reader.revealFailed'))) }] : []),
+    ...(e.origin !== 'source' && canFrom(api.role, 'documents.remove') ? [{ label: t('library.remove'), icon: <Icon name="trash" size={14} />, danger: true, separatorBefore: true, onSelect: () => void api.invoke('documents.remove', { ref: e.ref }).then(() => toast.success(t('library.removed'))).catch((err: unknown) => toast.error(err instanceof Error ? err.message : String(err))) }] : [])
   ]
   return (
     <Card enterAnim interactive padded={false} className="group/doc overflow-hidden" onClick={() => openDocument(e.ref, e.lastPage)}>
@@ -319,7 +326,7 @@ function DocCard({ entry: e, index, progress }: { entry: DocumentEntry; index: n
           {e.origin === 'saved' && <span className="inline-flex items-center gap-1 rounded-full bg-surface/95 px-2 py-0.5 t-caption font-medium text-accent-text shadow-[var(--e1)]"><Icon name="aula" size={11} />{t('library.byAula')}</span>}
           {e.marks > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-surface/95 px-2 py-0.5 t-caption font-medium text-text2 shadow-[var(--e1)]"><span className="h-2 w-2 rounded-full" style={{ background: 'rgb(250 214 89)' }} />{e.marks}</span>}
         </div>
-        <span onClick={(ev) => ev.stopPropagation()} className="absolute right-2 top-2 opacity-0 transition-opacity group-hover/doc:opacity-100 focus-within:opacity-100">
+        <span onClick={(ev) => ev.stopPropagation()} className="absolute right-2 top-2 opacity-0 transition-opacity group-hover/doc:opacity-100 focus-within:opacity-100 touch:opacity-100">
           <Menu items={menu} trigger={(open) => <IconButton label={t('library.options')} size="sm" variant="raised" onClick={open}><Icon name="more" size={14} /></IconButton>} />
         </span>
       </div>

@@ -81,7 +81,8 @@ export function SessionSummary({ title, body, stats, celebrate = true, children,
   )
 }
 
-/** Siguiendo «Estudiar ahora» (o «Empezar el repaso»): el paso queda hecho y se ofrece el siguiente. */
+/** Siguiendo «Estudiar ahora» (o «Empezar el repaso»): el paso queda hecho y se ofrece el siguiente. Los pasos comparten una
+ *  entrada del historial: «atrás» sale de la sesión en vez de volver a empezar el paso ya hecho. */
 export function PlanContinue({ packId }: { packId: string }) {
   const { t } = useTranslation('study')
   const plan = activePlan(packId)
@@ -97,7 +98,7 @@ export function PlanContinue({ packId }: { packId: string }) {
         <span className="block t-ui font-semibold text-accent-text">{next.scope === 'review' ? t('plan.nextReview') : t('plan.nextStep')}</span>
         <span className="block t-callout truncate"><RichText text={next.item.title} inline /></span>
       </span>
-      <Button variant="primary" size="lg" iconRight={<Icon name="arrow-right" size={15} />} onClick={() => runStep(packId, next.index, { scope: next.scope })}>{t('plan.continue')}</Button>
+      <Button variant="primary" size="lg" iconRight={<Icon name="arrow-right" size={15} />} onClick={() => runStep(packId, next.index, { scope: next.scope, replace: true })}>{t('plan.continue')}</Button>
     </div>
   )
 }

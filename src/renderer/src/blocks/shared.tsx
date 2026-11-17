@@ -1,7 +1,7 @@
 // Piezas comunes de los bloques: texto de lectura, fórmula en pantalla, rótulos, pies, el marco de las figuras, la memoria
 // de los bloques interactivos y los ganchos de movimiento (que respetan «Reducir movimiento» y la impresión).
 import { timecode } from '@shared/ingest'
-import { memo, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type RefObject } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { motion, useInView } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import katex from 'katex'
@@ -100,8 +100,38 @@ export function Inline({ text, className }: { text: string; className?: string }
 
 const katexCache = new Map<string, string>()
 
+/** ¿Se desplaza de lado y hacia dónde hay más? (`blk-fade-start` / `blk-fade-end`, blocks.css: el borde se desvanece). */
+function markScroll(el: HTMLElement): void {
+  const over = el.scrollWidth - el.clientWidth
+  el.classList.toggle('blk-fade-start', over > 1 && el.scrollLeft > 1)
+  el.classList.toggle('blk-fade-end', over > 1 && el.scrollLeft < over - 1)
+}
+
+/** Una fórmula en pantalla más ancha que su sitio se desplaza de lado: el borde por el que sigue se desvanece, para que se
+ *  note (antes, en un teléfono, el final de la fila quedaba oculto sin ninguna pista). */
+function useScrollFade(ref: RefObject<HTMLElement | null>, html: string | null): void {
+  useEffect(() => {
+    const box = html ? ref.current?.querySelector<HTMLElement>('.katex-display') : null
+    if (!box) return
+    const mark = (): void => markScroll(box)
+    mark()
+    box.addEventListener('scroll', mark, { passive: true })
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(mark)
+    ro?.observe(box)
+    // las letras de KaTeX llegan después: la fórmula puede crecer sin que cambie su caja
+    let alive = true
+    void document.fonts?.ready.then(() => alive && mark())
+    return () => {
+      alive = false
+      box.removeEventListener('scroll', mark)
+      ro?.disconnect()
+    }
+  }, [ref, html])
+}
+
 /** Fórmula con KaTeX (y \ce de química). `display` la centra en su propia línea. */
 export const MathTex = memo(function MathTex({ tex, display = true, className }: { tex: string; display?: boolean; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
   const html = useMemo(() => {
     const key = `${display ? 'd' : 'i'}:${tex}`
     const hit = katexCache.get(key)
@@ -116,8 +146,9 @@ export const MathTex = memo(function MathTex({ tex, display = true, className }:
     katexCache.set(key, out)
     return out
   }, [tex, display])
+  useScrollFade(ref, display ? html : null)
   if (!html) return <code className={cx('t-mono text-text2', className)}>{tex}</code>
-  return <span className={cx(display ? 'block' : 'inline', className)} dangerouslySetInnerHTML={{ __html: html }} />
+  return <span ref={ref} className={cx(display ? 'block' : 'inline', className)} dangerouslySetInnerHTML={{ __html: html }} />
 })
 
 /** Quita los delimitadores que a veces trae la fórmula («$$…$$», «\[…\]»). */

@@ -4,7 +4,7 @@
 // terminar, vuelve a Repasar.
 import { create } from 'zustand'
 import type { PlanItem } from '@engine/learn'
-import { navigate, type CourseTab, type Route } from '@renderer/app/router'
+import { navigate, useNav, type CourseTab, type Route } from '@renderer/app/router'
 
 /** El plan de hoy entero o la cola de repaso. */
 export type PlanScope = 'plan' | 'review'
@@ -117,3 +117,33 @@ export function leaveStep(packId: string, tab?: CourseTab): void {
   } else if (s && s.current >= 0) navigate({ name: 'study', id: packId, mode: 'plan' }, { replace: true })
   else navigate({ name: 'course', id: packId, tab }, { replace: true })
 }
+
+/** ¿La ruta sigue dentro de la sesión? Cualquier pantalla de estudio de su curso (la agenda incluida) o la del paso en marcha
+ *  (el repaso de fórmulas se hace en la pestaña Aprender del curso). */
+export function insideSession(s: PlanSession, r: Route): boolean {
+  if (r.name === 'study') return r.id === s.packId
+  const step = s.current >= 0 ? s.items[s.current] : undefined
+  return !!step && JSON.stringify(routeForStep(s.packId, step)) === JSON.stringify(r)
+}
+
+/** Se salió de la sesión por otro camino que su «×» (atrás del sistema, el gesto del borde, una pestaña de abajo, otra
+ *  pantalla): el paso deja de estar en marcha. Si no, cerrar después una lección abierta desde Aprender llevaba a la agenda
+ *  del plan que el estudiante ya había dejado. */
+export function leftSession(r: Route): void {
+  const { sessions, running } = usePlanStore.getState()
+  const next = { ...sessions }
+  let changed = false
+  for (const scope of ['plan', 'review'] as const) {
+    const s = sessions[scope]
+    if (s && s.current >= 0 && !insideSession(s, r)) {
+      next[scope] = { ...s, current: -1 }
+      changed = true
+    }
+  }
+  const still = running && (next[running]?.current ?? -1) >= 0 ? running : null
+  if (changed || still !== running) usePlanStore.setState({ sessions: next, running: still })
+}
+
+useNav.subscribe((nav, prev) => {
+  if (nav.route !== prev.route) leftSession(nav.route)
+})

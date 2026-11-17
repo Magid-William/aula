@@ -23,11 +23,14 @@ certificate paths).
 
 | File | What it does |
 | --- | --- |
-| `src/…/MainActivity.java` | The screens (start, sign in to Tailscale, approval, which Aula, not answering), then the interface in a `WebView` that feels like an app: no zoom, no long-press menus, outside links in the browser, Back through the interface's history (also with Android 16's predictive back), files picked on the phone (one or several), edge to edge with the system bars and the keyboard respected, light and dark |
+| `src/…/MainActivity.java` | The screens (start, sign in to Tailscale in a browser tab over the app, approval, which Aula, not answering, the demo), then the interface in a `WebView` that feels like an app: no zoom, no long-press menus, outside links in the browser, Back inside Aula (also with Android 16's predictive back; with nowhere to go the app goes to the background without closing), files picked on the phone (one or several, or a photo), full screen for slides and videos, the system bars painted with the page's colors and following Aula's theme, the keyboard respected, no reload when the system theme, font size or language change. The page's `window.aulaApp` is described in [DEVICES.md](../../docs/DEVICES.md#the-native-shell-and-the-page-iphone-ipad-and-android) |
+| `src/…/Bands.java` | What shows under the system bars: the app's paper, or each edge's color as the page reports it (`../ios/Aula/Shell.js`) |
+| `src/…/DemoServer.java`, `DemoDates.java`, `DemoRequest.java` | The demo, as on the iPhone: the recording (`Demo.aulademo`) served on `127.0.0.1`, its dates moved to today; `tools/DemoTest.java` checks the pure parts on the JVM on every build |
+| `src/…/LicensesView.java`, `PhotoProvider.java` | *Licenses* (from `assets/licenses.json`, written by `build.sh`); where the camera app leaves a photo of the notes (no camera permission) |
 | `src/…/Tailnet.java` | Starts the Tailscale process, reads its events and sends it commands; if it dies, says so (`exited`: its tunnel is gone, the app asks the new process for another) and restarts it with back-off; it survives rotation and theme changes |
 | `src/…/Tunnel.java` | The rules that need no Android, checked on the JVM by `tools/TunnelTest.java` on every build: only the tunnel the interface is shown on opens inside the app (cookies are not per port, so any other `127.0.0.1` port would get them), and what a `/health` answer means (show it, wait for the same tunnel, or ask for a new one) |
 | `../tsnet/client/` | The Tailscale side: `needs_login` with the sign-in page, `running` with the Aulas it found, and the loopback proxy (`forwarding`), which serves only requests that carry its secret (the `aula_gate` cookie the app sets for the WebView) |
-| `res/` | Texts (English, Spanish), the paper-and-brick theme in light and dark, the network rules (plain HTTP only to 127.0.0.1) and the adaptive icon. The drawings and the icon are taken from the iPhone app when building |
+| `res/` | Texts (English, Spanish), the paper-and-brick theme in light and dark (the interface's tokens), the network rules (plain HTTP only to 127.0.0.1) and the adaptive icon with its themed (monochrome) layer. The drawings, the icon, `Shell.js` and the demo are taken from the iPhone app when building |
 | `build.sh`, `setup.sh` | Build without Gradle; install the JDK and the Android SDK in `<root>/.toolchain` |
 
 **Which Aula.** A machine of the **same Tailscale user** as the phone whose name (the first DNS label, lowercase ASCII)
@@ -54,8 +57,9 @@ native/android/build.sh              # build/Aula-<version>-android.apk, signed
 native/android/build.sh --debug      # signed with a throwaway key, for the emulator
 ```
 
-No Gradle, no AndroidX, no third-party libraries: `aapt2`, `javac`, `d8`, `zipalign` and `apksigner`; before packaging,
-`tools/TunnelTest.java` runs on the JVM and a failure stops the build. The APK is universal (arm64-v8a for phones, x86_64
+No Gradle, no AndroidX, no third-party libraries: `aapt2`, `javac`, `d8`, `zipalign` and `apksigner` (and Node, which
+writes the license notices the APK carries); before packaging, `tools/TunnelTest.java` and `tools/DemoTest.java` run on
+the JVM and a failure stops the build. The APK is universal (arm64-v8a for phones, x86_64
 for emulators and Chromebooks), Android 8.0 (API 26) or later, target API 36. `build.sh` runs with the `/bin/bash` 3.2 of
 macOS.
 

@@ -6,6 +6,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 /* Ventanas bajas (portátiles pequeños): lo flotante pasa a ocupar su sitio */
 @custom-variant short (@media (max-height: 760px));
+/* Con el dedo (teléfono, tableta sin trackpad): lo que solo aparece al pasar el ratón se enseña siempre, y lo pequeño se
+   pulsa mejor. La misma consulta que TOUCH_QUERY (design/input.ts). */
+@custom-variant touch {
+  @media (hover: none), (pointer: coarse) {
+    @slot;
+  }
+}
+/* En el teléfono (pestañas abajo, html.compact): avisos y hojas flotantes se colocan sobre las pestañas (`--dock`). */
+@custom-variant phone (&:where(html.compact *));
 
 /* ───────────── «Papel y luz»: los valores exactos de la app original (su REDESIGN §4.3) ─────────────
    Papel cálido donde se lee, vidrio solo en el cromo, una sola luz (el ladrillo) y el sol únicamente cuando Aula trabaja. */
@@ -288,22 +297,80 @@ textarea:focus-visible {
   -webkit-app-region: no-drag;
 }
 
-/* En la capa base: así `no-scrollbar` (utilidad) gana de verdad (A4-P2-17: las pestañas del curso enseñaban la barra). */
-@layer base {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--fill4) transparent;
+/* En la capa base: así `no-scrollbar` (utilidad) gana de verdad (A4-P2-17: las pestañas del curso enseñaban la barra).
+   Solo con ratón: en una pantalla táctil se quedan las barras del sistema, que aparecen al desplazar y no ocupan sitio. */
+@media (hover: hover) and (pointer: fine) {
+  @layer base {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--fill4) transparent;
+    }
+  }
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--fill4);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
 }
-::-webkit-scrollbar {
-  width: 11px;
-  height: 11px;
+
+/* ───────────── En un dispositivo (iPhone, iPad, Android: html.remote) ─────────────
+   Que se sienta una app y no una página: sin destello al tocar ni menú al mantener pulsado, el texto a su tamaño, y la
+   pantalla no se arrastra entera al llegar al final de una lista. */
+html.remote {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--fill4);
-  border-radius: 999px;
-  border: 3px solid transparent;
-  background-clip: content-box;
+html.remote,
+html.remote body {
+  overscroll-behavior: none;
+}
+html.remote [data-screen] :is(.overflow-y-auto, .overflow-auto, .overflow-y-scroll) {
+  overscroll-behavior-y: none;
+}
+/* En el teléfono la hoja llega a todos los bordes, también bajo la hora: debajo, papel (no el lienzo de la barra lateral). */
+html.compact body {
+  background: var(--paper);
+}
+/* Las zonas de la hora, de la barra de inicio y de los bordes: las del sistema (env) o las que pasa la app de Android
+   cuando la página llega bajo sus barras (--aula-safe-*, docs/DEVICES.md). En el escritorio, 0.
+   Lo que ocupa abajo lo fijo de la app (`--dock`): en el escritorio nada; en el teléfono las pestañas (y la barra de
+   inicio), o el teclado mientras se escribe. Los avisos flotantes se apoyan encima. */
+:root {
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--aula-safe-top, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--aula-safe-right, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--aula-safe-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--aula-safe-left, 0px));
+  --dock: var(--safe-bottom);
+}
+html.compact {
+  --dock: calc(56px + var(--safe-bottom));
+}
+html.compact.kb-open {
+  --dock: var(--kb, 0px);
+}
+/* Mientras se escribe con el teclado de la pantalla, las pestañas de abajo se apartan (en Android subirían con él). */
+html.kb-open [data-compact-tabs] {
+  display: none;
+}
+
+/* Con el dedo, un control pequeño se pulsa como si midiera 44 px, sin cambiar cómo se ve (el control tiene que estar
+   posicionado: `relative`, `absolute`…). */
+@utility touch-target {
+  @media (hover: none), (pointer: coarse) {
+    &::after {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2));
+    }
+  }
 }
 
 /* ───────────── Escala tipográfica (15 estilos con nombre) ─────────────
@@ -538,9 +605,12 @@ textarea:focus-visible {
   }
 }
 
-/* Las pantallas reservan el hueco de la barra de desplazamiento: al cambiar de pestaña nada salta 10 px */
-main .flex-1.overflow-y-auto {
-  scrollbar-gutter: stable;
+/* Las pantallas reservan el hueco de la barra de desplazamiento: al cambiar de pestaña nada salta 10 px (con ratón; con el
+   dedo la barra no ocupa sitio) */
+@media (hover: hover) and (pointer: fine) {
+  main .flex-1.overflow-y-auto {
+    scrollbar-gutter: stable;
+  }
 }
 
 /* Fecha y hora nativas (Crear curso, Nuevo evento, Ajustes): el icono del sistema, discreto y con la tinta de la app; las
@@ -572,4 +642,16 @@ input[type='time']::-webkit-datetime-edit-fields-wrapper {
 input[type='date']::-webkit-datetime-edit-text,
 input[type='time']::-webkit-datetime-edit-text {
   color: var(--text3);
+}
+/* Con el dedo (abren el selector del sistema), sin su aspecto nativo: en iOS les daba un ancho propio que no encogía con su
+   sitio (en el teléfono se salían de la fila y se pintaban encima del campo de al lado). El valor, a la izquierda. */
+@media (hover: none), (pointer: coarse) {
+  :where(input[type='date'], input[type='time'], input[type='datetime-local']) {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+  }
+  :where(input[type='date'], input[type='time'], input[type='datetime-local'])::-webkit-date-and-time-value {
+    text-align: left;
+  }
 }

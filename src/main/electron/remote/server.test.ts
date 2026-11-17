@@ -50,7 +50,7 @@ beforeAll(async () => {
   writeFileSync(join(base, 'Aula', 'settings.json'), '{"secreto":true}')
   const renderer = join(base, 'renderer')
   mkdirSync(join(renderer, 'assets'), { recursive: true })
-  writeFileSync(join(renderer, 'index.html'), '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'"><title>Aula</title></head><body><div id="root"></div></body></html>')
+  writeFileSync(join(renderer, 'index.html'), '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'"><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Aula</title></head><body><div id="root"></div></body></html>')
   writeFileSync(join(renderer, 'assets', 'app.js'), 'console.log(1)')
 
   const { handle } = await import('../rpc')
@@ -114,6 +114,9 @@ describe('servidor remoto', () => {
     const html = await page.text()
     expect(page.status).toBe(200)
     expect(html).toMatch(/<head><meta name="viewport"[^>]+viewport-fit=cover">.*<script src="\/remote-bridge\.js"><\/script>/)
+    // un solo «viewport» (el de la página de escritorio se quita), sin zoom
+    expect(html.match(/name="viewport"/g)).toHaveLength(1)
+    expect(html).toContain('maximum-scale=1')
     expect(html).not.toContain('http-equiv')
     const csp = page.headers.get('content-security-policy') ?? ''
     expect(csp).toContain("default-src 'self'")

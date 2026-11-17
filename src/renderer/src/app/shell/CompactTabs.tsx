@@ -1,47 +1,47 @@
-// Aula en una pantalla estrecha (el iPhone del estudiante, a distancia): sin barra lateral, con cuatro pestañas abajo. Allí
-// Aula es sobre todo su asistente: qué hizo por ti, qué hay pendiente, hablar con ella y el calendario; los cursos se
-// estudian mejor en el iPad o en el Mac, pero «Hoy» los deja a un toque.
-import { useEffect, useState } from 'react'
+// Aula en una pantalla de teléfono (el del estudiante, a distancia): sin barra lateral, con cuatro pestañas abajo. «Hoy» va
+// primero y es donde se abre la app: lo que toca estudiar hoy, a un toque de cada curso; luego hablar con Aula, el calendario
+// y las novedades (lo que hizo por ti y lo pendiente).
 import { useTranslation } from 'react-i18next'
 import { cx, Icon, type IconName } from '@renderer/design'
 import { navigate, useNav, type Route } from '../router'
 import { useInboxCount } from './inboxCount'
+import { scrollActiveToTop } from './screenScroll'
+import { tabOwner, tabTap, type TabRoot } from './tabs'
 
-/** ¿La ventana es estrecha como un teléfono? (se entera si cambia: girar el dispositivo, partir la pantalla del iPad). */
-export function useCompact(): boolean {
-  const query = '(max-width: 700px)'
-  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
-  useEffect(() => {
-    const m = window.matchMedia(query)
-    const on = (): void => setCompact(m.matches)
-    m.addEventListener('change', on)
-    return () => m.removeEventListener('change', on)
-  }, [])
-  return compact
-}
+// ¿pantalla de teléfono? (compact.ts: por el ancho y el aparato, no por lo que deja el teclado)
+export { useCompact } from './compact'
 
-const TABS: ReadonlyArray<{ route: Route; icon: IconName; label: string }> = [
-  { route: { name: 'inbox' }, icon: 'inbox', label: 'nav.inbox' },
+export const TABS: ReadonlyArray<{ route: Route & { name: TabRoot }; icon: IconName; label: string }> = [
+  { route: { name: 'home' }, icon: 'today', label: 'nav.home' },
   { route: { name: 'chat' }, icon: 'tutor', label: 'nav.chat' },
   { route: { name: 'calendar' }, icon: 'calendar', label: 'nav.calendar' },
-  { route: { name: 'home' }, icon: 'today', label: 'nav.home' }
+  { route: { name: 'inbox' }, icon: 'inbox', label: 'nav.inbox' }
 ]
 
 export function CompactTabs() {
   const { t } = useTranslation()
-  const current = useNav((s) => s.route.name)
+  // en una pantalla abierta desde una pestaña (un curso desde «Hoy»), esa pestaña sigue encendida
+  const owner = useNav((s) => tabOwner(s.stack, s.index))
   const unread = useInboxCount()
+  const tap = (tab: (typeof TABS)[number]): void => {
+    const action = tabTap(tab.route.name, useNav.getState())
+    // la de ahora, en su raíz: arriba del todo; si no, a su raíz (cada pestaña es una raíz, como en una app: atrás desde ella
+    // va a «Hoy» y no recorre las pestañas visitadas)
+    if (action === 'top') scrollActiveToTop()
+    else navigate(tab.route, { root: true })
+  }
   return (
-    <nav aria-label="Aula" className="shrink-0 border-t-[0.5px] border-line bg-surface" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    // mientras se escribe con el teclado de la pantalla las pestañas se apartan (styles.css: html.kb-open), para dejar sitio
+    <nav aria-label="Aula" data-compact-tabs className="shrink-0 border-t-[0.5px] border-line bg-surface" style={{ paddingBottom: 'var(--safe-bottom)' }}>
       <ul className="m-0 flex list-none items-stretch p-0">
         {TABS.map((tab) => {
-          const on = current === tab.route.name
+          const on = owner === tab.route.name
           return (
             <li key={tab.route.name} className="flex-1">
               <button
                 type="button"
                 aria-current={on ? 'page' : undefined}
-                onClick={() => navigate(tab.route)}
+                onClick={() => tap(tab)}
                 className={cx('relative flex h-[56px] w-full flex-col items-center justify-center gap-0.5 outline-none focus-visible:bg-fill1', on ? 'text-accent-text' : 'text-text3')}
               >
                 <span className="relative">

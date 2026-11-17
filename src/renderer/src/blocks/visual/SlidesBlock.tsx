@@ -514,11 +514,12 @@ function Presentation({ deck, ctx, index, dir, transition, onGo, onClose }: { de
       )}
       <AnimatePresence>
         {chrome && !presenter && (
-          <motion.div className="absolute left-1/2 bottom-5 -translate-x-1/2 flex items-center gap-4 rounded-full bg-black/55 px-4 py-2 text-[12.5px] font-medium text-white/75" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="absolute left-1/2 bottom-[calc(1.25rem+var(--safe-bottom))] -translate-x-1/2 flex items-center gap-4 rounded-full bg-black/55 px-4 py-2 text-[12.5px] font-medium text-white/75" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <span className="tabular">{index + 1} / {count}</span>
-            <span className="w-[200px]"><ProgressBar value={(index + 1) / count} height={3} color="rgba(255,255,255,.8)" /></span>
-            <span>{t('slides.keysHint')}</span>
-            <button type="button" className="ml-1 rounded-full px-2 py-0.5 hover:bg-white/10" onClick={(e) => { e.stopPropagation(); onClose() }}>{t('slides.exit')}</button>
+            <span className="w-[200px] max-w-[30vw]"><ProgressBar value={(index + 1) / count} height={3} color="rgba(255,255,255,.8)" /></span>
+            {/* las teclas, solo con teclado */}
+            <span className="touch:hidden">{t('slides.keysHint')}</span>
+            <button type="button" className="relative touch-target ml-1 rounded-full px-2 py-0.5 hover:bg-white/10" onClick={(e) => { e.stopPropagation(); onClose() }}>{t('slides.exit')}</button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -28,4 +28,21 @@
     <string name="step_3">Type the code</string>
     <string name="step_label">Step %1$d of 3: %2$s</string>
     <string name="no_browser">There is no browser on this device to open the page.</string>
+    <string name="choose_body_one">Right now this is the only Aula on your network. Tap it to open it; if you turn on another one, it will show up here.</string>
+    <string name="failed_body">Check that the phone is online and try again.</string>
+    <string name="demo_action">Try it with an example course</string>
+    <string name="demo_bar">Demo · nothing is saved</string>
+    <string name="demo_exit">Exit</string>
+    <string name="demo_unavailable">This isn’t part of the demo. Connect to your Mac to use all of Aula.</string>
+    <string name="demo_chat_reply">This is the demo, so here I can only show you this sample quiz. With Aula on your Mac, I answer from your own courses and materials.</string>
+    <string name="demo_failed">The demo couldn’t open.</string>
+    <string name="pick_title">Add a file or a photo</string>
+    <string name="privacy_link">Privacy policy</string>
+    <string name="privacy_url" formatted="false">https://github.com/luumlabs/aula/blob/main/docs/PRIVACY.md</string>
+    <string name="licenses_link">Licenses</string>
+    <string name="licenses_title">Licenses</string>
+    <string name="licenses_intro">Aula is free software by Luum Labs, under the GNU AGPL v3 and with no warranty: you can get its source code and share it under the same license. The app also carries Tailscale’s component and the Go code it uses; here are their licenses.</string>
+    <string name="licenses_source">Aula’s source code</string>
+    <string name="licenses_missing">This copy of the app doesn’t carry the license notices. They are at github.com/luumlabs/aula.</string>
+    <string name="done">Done</string>
 </resources>

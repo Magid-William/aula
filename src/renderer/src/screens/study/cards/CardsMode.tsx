@@ -9,7 +9,7 @@ import { cardIntervals, clozeText, dueCards, reviewCard, type DueCard } from '@e
 import type { Rating } from '@engine/learn'
 import { isLanguageCourse } from '@engine/grading'
 import { learnedSpeechLanguage } from '@engine/pipeline/learnedLanguage'
-import { Button, cx, EmptyState, Icon, IconButton, Tooltip, useTheme } from '@renderer/design'
+import { Button, cx, EmptyState, Icon, IconButton, Tooltip, useTheme, useTouchOnly } from '@renderer/design'
 import { RichText } from '@renderer/lib/RichText'
 import { navigate } from '@renderer/app/router'
 import { isTypingTarget } from '@renderer/exercises/normalize'
@@ -30,6 +30,7 @@ interface Tally { reviewed: number; again: number; hard: number; good: number; e
 
 export function CardsMode({ data, skillId }: { data: CourseData; skillId?: string }) {
   const { t } = useTranslation('study')
+  const touch = useTouchOnly()
   const packId = data.pack.id
   const [queue, setQueue] = useState<DueCard[]>(() => {
     try {
@@ -179,8 +180,9 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
           tutor
           trailing={
             undo ? (
-              <Tooltip label={t('cards.undoHelp')} side="bottom">
-                <IconButton label={t('cards.undoHelp')} size="sm" onClick={undoLast} className="rounded-full!">
+              // con el dedo, sin la tecla del atajo en el nombre (lo lee VoiceOver)
+              <Tooltip label={t('cards.undoHelp', { context: touch ? 'touch' : undefined })} side="bottom">
+                <IconButton label={t('cards.undoHelp', { context: touch ? 'touch' : undefined })} size="sm" onClick={undoLast} className="rounded-full!">
                   <Icon name="undo" size={15} />
                 </IconButton>
               </Tooltip>
@@ -191,7 +193,8 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
         </TopCapsule>
       }
       bottom={
-        <GlassCapsule className="px-2">
+        // en el teléfono, las cuatro notas en cuatro columnas iguales a todo el ancho (con su ancho mínimo, «Fácil» se salía)
+        <GlassCapsule className={cx('px-2', flipped && 'phone:w-full phone:rounded-[24px]')}>
           {!flipped ? (
             <>
               <span className="px-2 t-ui text-text2">{t('cards.recallFirst')}</span>
@@ -200,7 +203,7 @@ export function CardsMode({ data, skillId }: { data: CourseData; skillId?: strin
               </Button>
             </>
           ) : (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 phone:grid phone:w-full phone:grid-cols-4">
               {RATINGS.map((r) => (
                 <RatingButton key={r} rating={r} interval={intervals?.[r] ?? ''} onClick={() => rate(r)} />
               ))}
@@ -256,7 +259,7 @@ function RatingButton({ rating, interval, onClick }: { rating: Rating; interval:
         type="button"
         onClick={onClick}
         whileTap={{ scale: 0.95 }}
-        className={cx('flex min-w-[96px] flex-col items-center rounded-[16px] px-3 py-1.5 transition-colors hover:bg-fill1')}
+        className={cx('flex min-w-[96px] flex-col items-center rounded-[16px] px-3 py-1.5 transition-colors hover:bg-fill1 phone:min-w-0 phone:flex-1 phone:px-1')}
       >
         <span className="flex items-center gap-1.5 t-ui font-semibold" style={{ color: tone }}>
           <KeyCap className="h-[18px] min-w-[18px] text-[11px]">{rating}</KeyCap>

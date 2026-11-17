@@ -109,7 +109,7 @@ function OrderItem({ item, index, total, locked, grabbed, tone, correctIndex, re
       <span
         aria-label={labels.handle}
         onPointerDown={(e) => !locked && controls.start(e)}
-        className={cx('grid h-8 w-6 shrink-0 place-items-center rounded-[8px] text-text3 touch-none', !locked && 'cursor-grab hover:bg-fill1 hover:text-text active:cursor-grabbing')}
+        className={cx('relative touch-target grid h-8 w-6 shrink-0 place-items-center rounded-[8px] text-text3 touch-none touch:w-8', !locked && 'cursor-grab hover:bg-fill1 hover:text-text active:cursor-grabbing')}
       >
         <Icon name="grip" size={16} />
       </span>
@@ -119,7 +119,7 @@ function OrderItem({ item, index, total, locked, grabbed, tone, correctIndex, re
         {correctIndex !== undefined && correctIndex !== index && <span className="ml-2 t-footnote text-success">→ {correctIndex + 1}</span>}
       </span>
       {!locked && (
-        <span className="flex shrink-0 flex-col opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="flex shrink-0 flex-col opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 touch:hidden">
           <button type="button" tabIndex={-1} aria-label={labels.up} disabled={index === 0} onClick={() => onMove(-1)} className="grid h-4 w-6 place-items-center text-text3 hover:text-text disabled:opacity-30">
             <Icon name="chevron-up" size={12} />
           </button>

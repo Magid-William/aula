@@ -398,7 +398,7 @@ const openURL = (url: string) => void api.invoke('app.openExternal', { url }).ca
 
 function AboutLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" className="t-ui text-accent-text hover:underline" onClick={onClick}>
+    <button type="button" className="relative touch-target t-ui text-accent-text hover:underline" onClick={onClick}>
       {children}
     </button>
   )
@@ -440,7 +440,7 @@ function AboutSection({ s, update }: { s: AppSettings; update: Upd }) {
         {remote ? (
           <span className="flex flex-wrap items-center gap-x-3">
             {/* un enlace de verdad: se abre en el dispositivo, no en el Mac */}
-            <a className="t-ui text-accent-text hover:underline" href={sourceCodeURL(current)} target="_blank" rel="noreferrer">
+            <a className="relative touch-target t-ui text-accent-text hover:underline" href={sourceCodeURL(current)} target="_blank" rel="noreferrer">
               {t('about.source')}
             </a>
             {/* la app del iPhone, el iPad o Android: con más de una Aula en la red (un Mac y un servidor), abrir otra */}

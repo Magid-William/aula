@@ -24,8 +24,9 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
   return (
     <Card enterAnim className="h-full flex flex-col">
       <SectionTitle title={t('heat.title')} detail={t('heat.detail')} />
-      <div className="flex-1 grid place-items-center py-2">
-        <div className="w-full" style={{ maxWidth: 22 + weeks * (CELL_MAX + GAP) }} onMouseLeave={() => setHover(null)}>
+      {/* la columna no crece con lo de dentro (la frase del día, entera, la ensanchaba y se salía de la tarjeta en un teléfono) */}
+      <div className="flex-1 grid grid-cols-[minmax(0,1fr)] place-items-center py-2">
+        <div className="w-full min-w-0" style={{ maxWidth: 22 + weeks * (CELL_MAX + GAP) }} onMouseLeave={() => setHover(null)}>
           <div className="grid" style={{ gridTemplateColumns: `22px repeat(${weeks}, minmax(0, 1fr))`, columnGap: GAP }}>
             <div />
             {Array.from({ length: weeks }, (_, w) => (
@@ -52,6 +53,8 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
                   tabIndex={-1}
                   onMouseEnter={() => setHover(c.day.date)}
                   onFocus={() => setHover(c.day.date)}
+                  // con el dedo no hay «pasar por encima»: tocar un día lo lee
+                  onClick={() => setHover(c.day.date)}
                   initial={{ opacity: 0, scale: 0.3 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1], delay: 0.1 + c.week * 0.03 + c.weekday * 0.01 }}
@@ -66,7 +69,7 @@ export function HeatmapCard({ days, today }: { days: StatsDay[]; today: string }
             })}
           </div>
           <div className="flex items-center justify-between gap-4 mt-3 pl-[27px]">
-            <div className="t-footnote text-text2 truncate min-h-[18px]" aria-live="polite">
+            <div className="t-footnote text-text2 truncate min-h-[18px] min-w-0" aria-live="polite">
               {shown ? cellLabel(t, shown) : ''}
             </div>
             <div className="flex items-center gap-1.5 shrink-0" aria-hidden>

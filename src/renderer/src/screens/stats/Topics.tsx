@@ -29,12 +29,13 @@ export function TopicsCard({ topics, showCourse }: { topics: StatsTopic[]; showC
                 <Row
                   key={tp.id}
                   index={i}
-                  title={tp.title}
+                  // en el teléfono el nombre del tema, hasta en dos líneas, y la barra se va (queda el porcentaje)
+                  title={<span className="block truncate phone:whitespace-normal phone:line-clamp-2">{tp.title}</span>}
                   subtitle={[showCourse ? tp.courseTitle : '', t('topics.exercises', { count: tp.attempts })].filter(Boolean).join(' · ')}
                   onClick={() => navigate({ name: 'course', id: tp.courseId, tab: 'learn', skill: tp.skillId })}
                   trailing={
-                    <div className="flex items-center gap-3 w-[150px] justify-end">
-                      <ProgressBar value={tp.accuracy} height={5} color={ink} className="w-[84px]" label={tp.title} />
+                    <div className="flex items-center gap-3 w-[150px] justify-end phone:w-auto">
+                      <ProgressBar value={tp.accuracy} height={5} color={ink} className="w-[84px] phone:hidden" label={tp.title} />
                       <span className={cx('t-number-inline w-11 text-right', weak ? 'text-warning' : 'text-text')}>{fmtPercent(tp.accuracy)}</span>
                     </div>
                   }

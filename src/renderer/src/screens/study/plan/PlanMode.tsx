@@ -78,7 +78,7 @@ export function PlanMode({ data }: { data: CourseData }) {
     <TopCapsule icon="today" label={t('plan.title')} onExit={onExit}>
       <CapsuleProgress value={doneCount} total={steps.length} label={doneCount ? t('plan.stepsDone', { n: doneCount, m: steps.length }) : t('plan.steps', { count: steps.length })} />
       {/* sin un «0 de 45 min»: antes de estudiar, la meta */}
-      {stats && <span className="t-ui tabular text-text2 whitespace-nowrap">{Math.round(stats.minutesToday) > 0 ? t('plan.minutesToday', { n: Math.round(stats.minutesToday), m: planBudget(data.progress) }) : t('plan.goal', { m: planBudget(data.progress) })}</span>}
+      {stats && <span className="t-ui tabular text-text2 whitespace-nowrap phone:hidden">{Math.round(stats.minutesToday) > 0 ? t('plan.minutesToday', { n: Math.round(stats.minutesToday), m: planBudget(data.progress) }) : t('plan.goal', { m: planBudget(data.progress) })}</span>}
     </TopCapsule>
   )
 
@@ -123,14 +123,15 @@ export function PlanMode({ data }: { data: CourseData }) {
                   padded={false}
                   interactive={!done}
                   onClick={() => runStep(packId, i)}
-                  className={cx('relative flex items-center gap-4 px-4 py-4', current && 'ring-1 ring-accent-line')}
+                  // en el teléfono los minutos y «Empezar» bajan a una segunda fila: el paso y su porqué se leen enteros
+                  className={cx('relative flex items-center gap-4 px-4 py-4 phone:flex-wrap phone:gap-y-3', current && 'ring-1 ring-accent-line')}
                   style={current ? { background: 'color-mix(in oklab, var(--accent) 6%, var(--surface))' } : undefined}
                 >
                   <span className={cx('relative z-[1] grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full border-[0.5px] border-line', done ? 'bg-success-soft' : current ? 'bg-accent text-on-accent' : 'bg-raised text-text2')}>
                     {/* hecho: un visto bueno a mano (se dibuja la primera vez que se ve hecho) */}
                     {done ? <InkCheck seed={s.id} size={20} className="relative! block" /> : <Icon name={KIND_ICON[s.kind]} size={17} />}
                   </span>
-                  <span className="min-w-0 flex-1">
+                  <span className="min-w-0 flex-1 phone:basis-[calc(100%-54px)]">
                     {done ? (
                       // y tachado a mano, como en una lista de papel
                       <InkStrike seed={s.id} color="var(--text3)" alpha={0.75} className="block t-headline text-text2 w-fit">
@@ -141,9 +142,9 @@ export function PlanMode({ data }: { data: CourseData }) {
                     )}
                     <span className="block t-callout text-text2 mt-0.5"><RichText text={s.reason} inline /></span>
                   </span>
-                  <span className="t-number-inline tabular text-text2 shrink-0">{t('plan.min', { count: s.minutes })}</span>
+                  <span className="t-number-inline tabular text-text2 shrink-0 phone:ml-[54px]">{t('plan.min', { count: s.minutes })}</span>
                   {current && (
-                    <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}>
+                    <motion.span className="phone:ml-auto" initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}>
                       <Button variant="primary" size="lg" iconRight={<Icon name="arrow-right" size={15} />} onClick={(e) => { e.stopPropagation(); runStep(packId, i) }}>
                         {doneCount ? t('plan.continue') : t('plan.start')}
                       </Button>

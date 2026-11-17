@@ -13,7 +13,7 @@ import { createReadStream, readFileSync, statSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { PairingError, type DeviceRegistry, type RemoteDeviceView } from '@main/services/remote/devices'
 import { noopValue, remoteCall, rewriteAssets } from '@main/services/remote/policy'
-import { pairingPage, REMOTE_BRIDGE_JS, REMOTE_MANIFEST } from '@main/services/remote/bridge'
+import { DEVICE_VIEWPORT, pairingPage, REMOTE_BRIDGE_JS, REMOTE_MANIFEST } from '@main/services/remote/bridge'
 import { UploadError, type UploadStore } from '@main/services/remote/uploads'
 import { log } from '@main/services/log'
 import { tr } from '@shared/ai/i18n'
@@ -326,8 +326,10 @@ export class RemoteServer {
       if (!paired) { res.writeHead(302, { location: '/pair', 'cache-control': 'no-store' }); res.end(); return }
       let html: string
       try { html = readFileSync(file, 'utf8') } catch { return this.fail(res, 404, 'not_found') }
-      // la página trae su propia política en una etiqueta <meta>; aquí vale la del servidor, y el puente va antes que la app
-      html = html.replace(/<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/i, '').replace(/<head>/i, '<head><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Aula"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">' + (this.o.host === 'server' ? '<meta name="aula-host" content="server">' : '') + (this.isOwner(device) ? '<meta name="aula-device" content="owner">' : '') + '<script src="/remote-bridge.js"></script>')
+      // la página trae su propia política en una etiqueta <meta>; aquí vale la del servidor, y el puente va antes que la app.
+      // También trae su «viewport» de escritorio: se cambia por el de un dispositivo (uno solo: las apps nativas retocan el
+      // primero que encuentran, y hasta entonces mandaba el último)
+      html = html.replace(/<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/i, '').replace(/<meta[^>]+name=["']viewport["'][^>]*>/gi, '').replace(/<head>/i, '<head><meta name="viewport" content="' + DEVICE_VIEWPORT + '"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Aula"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">' + (this.o.host === 'server' ? '<meta name="aula-host" content="server">' : '') + (this.isOwner(device) ? '<meta name="aula-device" content="owner">' : '') + '<script src="/remote-bridge.js"></script>')
       return this.send(res, 200, type, head ? '' : html, { 'content-security-policy': REMOTE_CSP, 'cache-control': 'no-store' })
     }
     let size: number

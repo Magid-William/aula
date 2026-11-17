@@ -1,11 +1,14 @@
 // Datos de estudio de un curso en la interfaz: el curso, sus habilidades y el progreso, con una copia local que se
 // actualiza al instante (con las funciones puras del motor) y se guarda en el proceso principal por lotes.
-// En modo demostración (sin proceso principal) se leen los JSON del curso de ejemplo y el progreso vive en memoria.
+// En modo demostración (sin proceso principal) se leen los JSON del curso de ejemplo y el progreso vive en memoria. En la
+// demostración de un dispositivo (la que sirve la app de iPhone o Android, grabada) el curso llega por la red, pero el progreso
+// también vive en memoria: el servidor grabado contestaría a cada guardado con el progreso de la grabación y se perdería lo
+// hecho (el simulacro recién empezado volvía a su inicio).
 import { useEffect } from 'react'
 import { create } from 'zustand'
 import { decodeProgress, decodeSkill, emptyProgress, orderedSkills, type Pack, type Skill, type StudyProgress } from '@shared/schema'
 import { api } from '@renderer/lib/api'
-import { demoPacks, isDemo } from '@renderer/lib/demo'
+import { demoPacks, isDemo, isDeviceDemo } from '@renderer/lib/demo'
 import { coalesceOps, sendOps, type SyncOp } from './sync'
 
 export type { SyncOp }
@@ -72,7 +75,7 @@ async function fetchCourse(id: string): Promise<CourseData | null> {
     const [pack, skills, progress] = await Promise.all([invoke('courses.get', { id }), invoke('courses.getSkills', { id }), invoke('progress.get', { id })])
     if (!pack) return null
     const p = pack as Pack
-    return { pack: p, skills: sortSkills(p, (skills as Skill[]) ?? []), progress: (progress as StudyProgress) ?? emptyProgress(), demo: false }
+    return { pack: p, skills: sortSkills(p, (skills as Skill[]) ?? []), progress: (progress as StudyProgress) ?? emptyProgress(), demo: isDeviceDemo(api.remote) }
   } catch (e) {
     if (isDemo()) return demoCourse(id)
     throw e
@@ -89,8 +92,8 @@ export function loadCourse(id: string, force = false): Promise<void> {
     .then((data) => {
       useStudyStore.setState((s) => {
         if (!data) return { status: { ...s.status, [id]: 'missing' } }
-        // lo que aún no se ha guardado gana a lo que llega del disco
-        const keep = busy(id) && s.courses[id] ? s.courses[id].progress : data.progress
+        // lo que aún no se ha guardado gana a lo que llega del disco (en la demostración, lo de memoria es lo único que hay)
+        const keep = (busy(id) || s.courses[id]?.demo) && s.courses[id] ? s.courses[id].progress : data.progress
         return { courses: { ...s.courses, [id]: { ...data, progress: keep } }, status: { ...s.status, [id]: 'ready' } }
       })
     })

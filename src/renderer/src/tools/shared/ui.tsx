@@ -3,8 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { animate, motion, useMotionValue, useTransform } from 'motion/react'
-import { Card, cx, focusRing, toast, useTheme, type CardProps } from '@renderer/design'
+import { Card, canAutoFocus, cx, focusRing, toast, useTheme, type CardProps } from '@renderer/design'
+import { api } from '@renderer/lib/api'
+import { signedNumberKeyboard } from '@renderer/lib/device'
 import { formatFixed, formatNumber, parseNumber, texNumber, type NumberStyle } from './lib/num'
+
+/** Campos de números, fórmulas y búsquedas de las herramientas: en el teclado de la pantalla, sin mayúscula al empezar ni
+ *  autocorrector (cambiarían «x^2» o «sin» por otra cosa). */
+export const mathField = { autoCapitalize: 'off', autoCorrect: 'off', spellCheck: false, autoComplete: 'off' } as const
 
 /** Coma decimal si la interfaz está en español. */
 export function useComma(): boolean {
@@ -122,7 +128,9 @@ export function NumField({ label, value, onChange, unit, placeholder, className,
       {label && <span className="block t-ui font-medium text-text2 mb-1.5 truncate">{label}</span>}
       <span className="relative flex items-center">
         <input
-          inputMode="decimal"
+          {...mathField}
+          // con «−» también en el iPhone (su teclado decimal no lo tiene)
+          inputMode={signedNumberKeyboard(api.platform)}
           aria-label={ariaLabel}
           aria-invalid={bad || undefined}
           value={value}
@@ -158,9 +166,8 @@ export function TextInput({ value, onChange, placeholder, className, label, onEn
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
         placeholder={placeholder}
-        autoFocus={autoFocus}
-        spellCheck={false}
-        autoComplete="off"
+        autoFocus={autoFocus && canAutoFocus()}
+        {...mathField}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && onEnter) {

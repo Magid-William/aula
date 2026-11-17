@@ -442,7 +442,7 @@ export const CHEM_TOOL_SPECS: readonly ChemToolSpec[] = [
   {
     name: 'chem_convert',
     description:
-      'Converts quantities: grams ↔ moles ↔ particles (needs the formula), gas volume at STP ("L CN"), and plain units (°C ↔ K, atm ↔ kPa ↔ mmHg ↔ torr ↔ bar, mL ↔ L, mg ↔ g…). Explains the steps and rounds to the data\'s significant figures.',
+      'Converts quantities: between grams, moles and particles (needs the formula), gas volume at STP ("L CN"), and plain units (°C/K, atm/kPa/mmHg/torr/bar, mL/L, mg/g…). Explains the steps and rounds to the data\'s significant figures.',
     parameters: obj(
       {
         quantity: str('e.g. "10 g", "2 mol", "25 °C"'),

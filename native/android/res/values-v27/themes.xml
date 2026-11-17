@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Desde Android 8.1, de día, los botones de abajo en tinta sobre el papel desde el primer fotograma (luego los pone
+     MainActivity.applyLook según la página). De noche manda values-night, que va antes que la versión. -->
+<resources>
+    <style name="Aula" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:colorAccent">@color/brick</item>
+        <item name="android:colorPrimary">@color/paper</item>
+        <item name="android:colorPrimaryDark">@color/paper</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

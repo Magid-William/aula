@@ -200,7 +200,8 @@ function QuizQuestion({ exercise, ctx, active, continueLabel, onFirst, onContinu
   return (
     <div data-exercise={exercise.id}>
       <ExerciseView controller={c} ctx={ctx} actions="none" bare active={active} autoFocus={active} continueLabel={continueLabel} onAskTutor={onAsk ? () => onAsk(c.run) : undefined} />
-      <div className="mt-4 flex justify-end">
+      {/* a la derecha; en el teléfono, a todo el ancho (antes se salía por la izquierda: «lint 0/2») */}
+      <div className="mt-4 flex flex-wrap justify-end">
         <ExerciseActions controller={c} continueLabel={continueLabel} variant="bar" />
       </div>
     </div>

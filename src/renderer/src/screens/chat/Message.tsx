@@ -50,7 +50,7 @@ function UserMessage({ m }: { m: AssistantMessage }) {
       style={{ transformOrigin: '100% 100%' }}
     >
       <div className="max-w-[78%] rounded-[20px] rounded-br-[6px] bg-bubble px-4 py-2.5 t-body selectable">
-        {m.text && <RichText text={m.text} />}
+        {m.text && <RichText text={m.text} own />}
         {m.mentions.length > 0 && (
           <div className={cx('flex flex-wrap gap-1.5', m.text && 'mt-2')}>
             {m.mentions.map((r) => (
@@ -270,7 +270,7 @@ export function QueuedMessage({ m, onCancel }: { m: AssistantMessage; onCancel: 
       aria-label={t('queue.label', { text })}
     >
       <div className="max-w-[78%] rounded-[20px] rounded-br-[8px] border-[0.5px] border-dashed border-line bg-bubble/60 px-4 py-2.5 t-body text-text2">
-        <RichText text={text} />
+        <RichText text={text} own />
         {m.mentions.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 opacity-80">
             {m.mentions.map((r) => (

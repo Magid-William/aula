@@ -6,6 +6,9 @@ export { addDays, daysFrom, startOfDay } from './civil'
 
 const loc = () => (i18n.language === 'es' ? 'es-ES' : 'en-US')
 
+/** El idioma con su región para `Intl` (es-ES, en-US). */
+export const uiLocale = loc
+
 /** Días naturales entre hoy y `date` (0 = hoy, 1 = mañana, negativo = pasado). */
 export function daysUntil(date: string | Date, now = new Date()): number {
   const d = typeof date === 'string' ? new Date(date) : date

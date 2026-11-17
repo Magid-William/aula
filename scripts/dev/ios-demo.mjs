@@ -132,11 +132,18 @@ async function tour(tag) {
   await snap(`${tag}-course`)
   await go(study('learn', { skill: 'reference-angles' }), 3000)
   await snap(`${tag}-learn`)
+  // el tutor de la lección (sin grabarlo, abrirlo en la demostración daba «esto no está en la demostración»)
+  await page.locator('[data-tutor-button]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(1500)
+  await page.locator('[data-tutor-button]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(500)
   await go(study('practice'), 2500)
   await go(study('cards'), 2500)
   await snap(`${tag}-cards`)
   await go(study('plan'), 2200)
   await go(study('mistakes'), 2200)
+  // el simulacro no se graba: en la demostración (?demo=1 en un dispositivo) lo arma y lo corrige la interfaz con el motor y
+  // el progreso vive en memoria (study/data.ts), así que la grabación tampoco deja un intento suyo en el historial
   await go(study('exam'), 2200)
   for (const view of ['agenda', 'week', 'month']) await go({ name: 'calendar', view }, 1800)
   await snap(`${tag}-calendar`)
@@ -144,15 +151,22 @@ async function tour(tag) {
   await go({ name: 'tools' }, 1800)
   for (const tool of ['formulas', 'calculator', 'grapher', 'periodic', 'units', 'timer']) await go({ name: 'tools', tool }, 1500)
   await go({ name: 'documents' }, 2000)
+  // y uno abierto en el lector (si no, en la demostración ninguno se podía abrir)
+  await page.locator('[class*="group/doc"]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(3000)
   await go({ name: 'inbox' }, 2500)
   await snap(`${tag}-inbox`)
+  // abrir una novedad la marca como leída: también eso, para que en la demostración se abra sin aviso de error
+  await page.locator('[class*="group/entry"] > button[aria-expanded]').first().click({ timeout: 4000 }).catch(() => undefined)
+  await page.waitForTimeout(1500)
   await go({ name: 'create' }, 2000)
   // los ajustes de un dispositivo (lo de uso diario): que la demostración también los enseñe
   await go({ name: 'settings' }, 2500)
   // el chat: un cuestionario rápido con la IA simulada (lo que Aula contesta en la demostración)
   await go({ name: 'chat' }, 2500)
   const box = page.locator('textarea').first()
-  if (await box.count()) {
+  // una sola vez (en la primera vuelta): si no, la conversación de ejemplo repetía la misma pregunta y su respuesta
+  if (tag === 'wide' && (await box.count())) {
     await box.fill('Give me a quick quiz')
     await box.press('Enter')
     await page.waitForSelector('[data-studyset="quiz"]', { timeout: 30000 }).catch(() => undefined)
@@ -160,6 +174,12 @@ async function tour(tag) {
     await snap(`${tag}-chat`)
   }
   await go({ name: 'home' }, 2500)
+  // los eventos de «Esta semana» (en Hoy) abren su hoja pidiendo el evento entero: también eso, para que en la demostración
+  // no digan «Ya no está»
+  await page.evaluate(async () => {
+    const summary = await window.aula.invoke('home.summary')
+    for (const e of summary.value?.upcoming ?? []) await window.aula.invoke('calendar.get', { id: e.id })
+  })
   // las conversaciones, ya contestadas: la interfaz no las vuelve a pedir (las tiene en memoria), así que se piden aquí
   // para que lo que quede grabado sea su estado final y no «pensando»
   await page.evaluate(async () => {

@@ -8,8 +8,18 @@ export function demoText(es: string, en: string): string {
   return (i18n.language ?? 'es').startsWith('en') ? en : es
 }
 
+// se lee una vez, al cargar: luego la dirección se reescribe al navegar (App.tsx deja solo la ruta) y, al pasar por Ajustes o
+// Nuevo curso, «?demo=1» se perdía y la demostración cambiaba a medias (otro «Hoy», el curso marcado como ejemplo)
+const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+
 export function isDemo(): boolean {
-  return typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+  return DEMO
+}
+
+/** La demostración en un dispositivo (`remote`: la página llega por la red, la sirve la app grabada o su grabación): el curso
+ *  viene del servidor, pero lo que se estudia no se guarda allí (el progreso, el simulacro: en memoria, con el motor). */
+export function isDeviceDemo(remote: boolean): boolean {
+  return DEMO && remote
 }
 
 function synthetic(id: string, title: string, subject: string, icon: string, hue: number, units: [string, string[]][]): Pack {

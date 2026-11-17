@@ -170,11 +170,12 @@ function Badge({ tone, icon, children }: { tone: 'warning' | 'neutral' | 'info';
   )
 }
 
-/** Al pasar el ratón: leída · posponer · archivar (encima de la hora: la fila no cambia de alto). */
+/** Al pasar el ratón: leída · posponer · archivar (encima de la hora: la fila no cambia de alto). Con el dedo no hay «pasar
+ *  por encima»: las mismas acciones están en la novedad abierta, a un toque. */
 function QuickActions({ entry: e }: { entry: InboxEntry }) {
   const { t } = useTranslation('inbox')
   return (
-    <div className="absolute right-3 top-2 flex items-center gap-0.5 rounded-[10px] bg-surface/95 shadow-[var(--e1)] px-0.5 opacity-0 pointer-events-none group-hover/entry:opacity-100 group-hover/entry:pointer-events-auto group-focus-within/entry:opacity-100 group-focus-within/entry:pointer-events-auto transition-opacity">
+    <div className="absolute right-3 top-2 flex items-center gap-0.5 rounded-[10px] bg-surface/95 shadow-[var(--e1)] px-0.5 opacity-0 pointer-events-none group-hover/entry:opacity-100 group-hover/entry:pointer-events-auto group-focus-within/entry:opacity-100 group-focus-within/entry:pointer-events-auto transition-opacity touch:hidden">
       <IconButton size="sm" label={e.read ? t('actions.markUnread') : t('actions.markRead')} onClick={() => inboxOps.markRead([e.id], !e.read)}>
         <Icon name={e.read ? 'bell' : 'check'} size={15} />
       </IconButton>

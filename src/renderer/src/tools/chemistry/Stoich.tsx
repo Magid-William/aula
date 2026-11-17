@@ -7,7 +7,7 @@ import { Card, LiveDot, Select, cx, focusRing } from '@renderer/design'
 import { solveStoichiometry, type StoichiometryReport } from '@engine/chem/stoichiometry'
 import { Tex } from '../shared/Tex'
 import { formatNumber, percentSign } from '../shared/lib/num'
-import { CardTitle, CountUp, ErrorLine, Examples, TextInput, useComma, useStored } from '../shared/ui'
+import { CardTitle, CountUp, ErrorLine, Examples, TextInput, mathField, useComma, useStored } from '../shared/ui'
 import { balanceView, chemErrorText } from './lib/chem'
 
 const EXAMPLES = ['2H2 + O2 -> 2H2O', 'N2 + H2 -> NH3', 'Fe2O3 + CO -> Fe + CO2', 'C3H8 + O2 -> CO2 + H2O']
@@ -66,6 +66,7 @@ export default function Stoich() {
                   {r?.limitingReagent?.plainText === x.plain && <span className="t-caption text-accent-text">· {t('chemistry.limiting')}</span>}
                 </span>
                 <input
+                  {...mathField}
                   value={s.given[x.plain] ?? ''}
                   onChange={(e) => setS((p) => ({ ...p, given: { ...p.given, [x.plain]: e.target.value } }))}
                   placeholder={comma ? '10 g · 0,5 mol' : '10 g · 0.5 mol'}
@@ -79,7 +80,7 @@ export default function Stoich() {
             </div>
             <label className="block">
               <span className="block t-ui font-medium text-text2 mb-1.5">{t('chemistry.actualYield')}</span>
-              <input value={actual} onChange={(e) => setActual(e.target.value)} placeholder={t('chemistry.optional')} className={`w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 px-3 text-[14px] outline-none ${focusRing} tabular`} />
+              <input {...mathField} value={actual} onChange={(e) => setActual(e.target.value)} placeholder={t('chemistry.optional')} className={`w-full h-9 rounded-[10px] bg-field border-[0.5px] border-line-strong/40 px-3 text-[14px] outline-none ${focusRing} tabular`} />
             </label>
           </div>
         )}

@@ -14,6 +14,7 @@ export interface AnswerKey {
 const K = (label: string, insert: string, help: string, caretBack = 0, plain = false): AnswerKey => ({ label, insert, help, caretBack, plain })
 
 export const KEYS = {
+  minus: K('−', '-', 'minus'),
   pi: K('π', 'π', 'pi'),
   sqrt: K('√', '√()', 'sqrt', 1),
   square: K('x²', '^2', 'square'),
@@ -86,11 +87,13 @@ export function keysFor(answer: Answer): AnswerKey[][] {
   const basics = [KEYS.pi, KEYS.sqrt, KEYS.square, KEYS.power, KEYS.fraction, KEYS.parens, KEYS.abs]
   switch (answer.kind) {
     case 'numeric': {
+      // con «−» delante: el teclado decimal del iPhone no lo tiene (sin 210° = −1/2 no se podía escribir)
+      const signed = [KEYS.minus, ...basics]
       const extra: AnswerKey[] = []
       if (answer.angle === 'degrees' || answer.suffix === '°' || answer.unit === '°') extra.push(KEYS.degree)
       if (answer.form === 'scientific') extra.push(KEYS.sci)
       if (answer.form === 'percent') extra.push(KEYS.percent)
-      return extra.length ? [basics, extra] : [basics]
+      return extra.length ? [signed, extra] : [signed]
     }
     case 'expression': {
       const vars = (answer.variables ?? variablesIn(answer.expected)).slice(0, 3).map(variable)
@@ -117,4 +120,13 @@ export function keysFor(answer: Answer): AnswerKey[][] {
     default:
       return []
   }
+}
+
+/**
+ * El teclado de la pantalla para una respuesta escrita. Un número puede ser exacto (√3/3, −1/2, π/6): el teclado entero, que
+ * tiene «−», «/», paréntesis e Intro. Un valor medido (química), el de números con signo (`numberKeyboard`: el numérico,
+ * salvo en iOS, cuyo teclado decimal no tiene «−»; lib/device.ts `signedNumberKeyboard`).
+ */
+export function answerInputMode(answer: Answer, numberKeyboard: 'decimal' | 'text'): 'text' | 'decimal' {
+  return answer.kind === 'chem' && answer.mode === 'number' ? numberKeyboard : 'text'
 }

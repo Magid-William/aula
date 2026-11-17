@@ -154,21 +154,23 @@ function EmptyOpening({ busy, onAsk }: { busy: boolean; onAsk: (text: string) =>
   if (opening?.mistakes) pending.push(t('opening.mistakes', { count: opening.mistakes }))
   if (opening?.dueCards) pending.push(t('opening.cards', { count: opening.dueCards }))
   const exam = opening?.exam
-  // el nombre del examen, entero en su línea si es corto (y en español, con su «para»): el título no se parte por la mitad
-  const keep = <span className={exam && keepWhole(exam.title) ? 'whitespace-nowrap' : undefined} />
+  // el nombre del examen, entero en su línea si es corto (y en español, con su «para»): el título no se parte por la mitad.
+  // En el teléfono no: no cabe en la línea y se cortaba en el borde («Exam #2 — Trigonor»)
+  const keep = <span className={exam && keepWhole(exam.title) ? 'whitespace-nowrap phone:whitespace-normal' : undefined} />
   const title = exam ? (
     exam.days === 0
       ? <Trans t={t} i18nKey="opening.examToday" values={{ exam: exam.title }} components={{ keep }} />
       : <Trans t={t} i18nKey="opening.exam" count={exam.days} values={{ exam: exam.title, count: exam.days }} components={{ keep }} />
   ) : t('emptyTitle')
   return (
-    <div data-chat-opening className="mx-auto grid w-full max-w-[700px] grid-cols-[100px_minmax(0,1fr)] gap-x-6 pt-[9vh] text-left">
+    // en el teléfono, una sola columna: el flexo, más pequeño, encima de lo que dice Aula (al lado le dejaba 250 px al título)
+    <div data-chat-opening className="mx-auto grid w-full max-w-[700px] grid-cols-[100px_minmax(0,1fr)] gap-x-6 pt-[9vh] text-left phone:grid-cols-1 phone:gap-y-2 phone:pt-[4vh]">
       {/* el flexo encendido sobre la mesa, pequeño, en el margen de lo que dice Aula (mientras piensa, su marca) */}
       <div className="pt-1">
-        {busy ? <div className="grid h-[84px] w-[100px] place-items-center text-text"><AulaMark size={48} state={mark} hover /></div> : <InkSpot name="lamp" className="h-[84px] w-[100px]" />}
+        {busy ? <div className="grid h-[84px] w-[100px] place-items-center text-text phone:h-[56px] phone:w-[66px]"><AulaMark size={48} state={mark} hover /></div> : <InkSpot name="lamp" className="h-[84px] w-[100px] phone:h-[56px] phone:w-[66px]" />}
       </div>
       <motion.div className="min-w-0" initial={false} animate={{ opacity: ready ? 1 : 0 }} transition={{ duration: 0.25 }} aria-busy={!ready || undefined}>
-        <h1 className="font-serif text-[2rem] leading-[calc(38rem/15)] tracking-[-0.3px] text-text text-balance">{ready ? title : '\u00a0'}</h1>
+        <h1 className="font-serif text-[2rem] leading-[calc(38rem/15)] tracking-[-0.3px] text-text text-balance phone:text-[1.6rem] phone:leading-[1.25]">{ready ? title : '\u00a0'}</h1>
         <p className="mt-2 font-serif text-[calc(18rem/15)] leading-[calc(27rem/15)] text-text2 text-pretty">
           {ready ? (pending.length ? t('opening.pending', { list: pending.join(t('opening.and')) }) : opening ? t('opening.ready') : t('emptyBody')) : '\u00a0'}
         </p>

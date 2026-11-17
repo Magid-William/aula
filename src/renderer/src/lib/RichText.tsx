@@ -1,11 +1,14 @@
 // Texto con Markdown y fórmulas ($…$ y $$…$$, KaTeX con \ce de química). `inline` lo deja en una línea (sin párrafos).
-import { memo } from 'react'
+// Aula no usa emojis: lo que escribe la IA o llega de una plataforma se pinta sin ellos (los símbolos, como texto); lo que
+// escribió el propio estudiante (`own`) se deja tal cual.
+import { memo, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/contrib/mhchem'
 import { AULA_KATEX_MACROS } from '@engine/content/tex'
+import { tameEmoji } from '@engine/base/emoji'
 import { cx } from '@renderer/design'
 import { useContentLang } from './contentLanguage'
 import { PAGE_ANCHOR, safeHref } from './richTextLinks'
@@ -17,6 +20,8 @@ if (typeof document !== 'undefined') void import('katex/contrib/copy-tex').catch
 
 // las mismas macros que acepta el validador del contenido (\\SI, \\qty, \\mbox…)
 const katexOptions = { throwOnError: false, strict: false, trust: false, output: 'htmlAndMathml' as const, macros: { ...AULA_KATEX_MACROS } }
+// la vuelta de una nota al pie: una flecha de texto (la de serie, «↩», se pinta como emoji en iOS)
+const remarkRehypeOptions = { footnoteBackContent: '↑' }
 
 function Link({ href, children }: { href?: string; children?: React.ReactNode }) {
   if (!href) return <span className="text-accent-text">{children}</span>
@@ -31,16 +36,19 @@ function Link({ href, children }: { href?: string; children?: React.ReactNode })
 }
 
 /** En la pantalla de estudio el texto va en el idioma del curso (`lang`, y `dir` si se escribe de derecha a izquierda); `ui`
- *  lo deja en el de la interfaz (un aviso de Aula que se pinta con Markdown). */
-export const RichText = memo(function RichText({ text, inline, className, ui }: { text: string; inline?: boolean; className?: string; ui?: boolean }) {
+ *  lo deja en el de la interfaz (un aviso de Aula que se pinta con Markdown). `own`: lo escribió el estudiante (sus emojis se
+ *  quedan). */
+export const RichText = memo(function RichText({ text, inline, className, ui, own }: { text: string; inline?: boolean; className?: string; ui?: boolean; own?: boolean }) {
   const course = useContentLang()
   const content = ui ? {} : course
+  const shown = useMemo(() => (own ? text : tameEmoji(text)), [text, own])
   if (!text) return null
   return (
     <span lang={content.lang} dir={content.dir} className={cx(inline ? 'aula-rich-inline' : 'aula-rich block', content.className, className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, katexOptions]]}
+        remarkRehypeOptions={remarkRehypeOptions}
         skipHtml
         urlTransform={safeHref}
         components={
@@ -49,7 +57,7 @@ export const RichText = memo(function RichText({ text, inline, className, ui }: 
             : { a: Link }
         }
       >
-        {text}
+        {shown}
       </ReactMarkdown>
     </span>
   )

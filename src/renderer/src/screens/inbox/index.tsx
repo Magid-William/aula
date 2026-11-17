@@ -111,7 +111,7 @@ export default function InboxScreen() {
  * menú con lo que se usa poco (pospuestas, archivadas, ver solo un tipo, agrupar). Si se está viendo otra cosa que lo
  * abierto, una etiqueta lo dice y vuelve con un toque.
  */
-function Toolbar({ entries, unread }: { entries: InboxEntry[]; unread: number; phone?: boolean }) {
+function Toolbar({ entries, unread, phone }: { entries: InboxEntry[]; unread: number; phone?: boolean }) {
   const { t } = useTranslation('inbox')
   const ui = useInboxUI()
   const [searching, setSearching] = useState(false)
@@ -166,10 +166,12 @@ function Toolbar({ entries, unread }: { entries: InboxEntry[]; unread: number; p
       ) : (
         <IconButton size="sm" label={t('actions.searchOpen')} onClick={() => setSearching(true)}><Icon name="search" size={15} /></IconButton>
       )}
-      {unread > 0 && ui.view === 'open' && <Button size="sm" variant="ghost" icon={<Icon name="check" size={14} />} onClick={inboxOps.markAllRead}>{t('actions.markAllRead')}</Button>}
+      {/* en el teléfono no cabe en la fila (y dejaba el «⋯» solo en otra línea): va dentro del «⋯» */}
+      {unread > 0 && ui.view === 'open' && !phone && <Button size="sm" variant="ghost" icon={<Icon name="check" size={14} />} onClick={inboxOps.markAllRead}>{t('actions.markAllRead')}</Button>}
       <Menu align="end" items={[
+        ...(phone && unread > 0 && ui.view === 'open' ? [{ label: t('actions.markAllRead'), icon: <Icon name="check" size={14} />, onSelect: inboxOps.markAllRead }] : []),
         ...(ui.view === 'open'
-          ? [{ label: snoozed ? `${t('actions.showSnoozed')} (${snoozed})` : t('actions.showSnoozed'), icon: <Icon name="clock" size={14} />, onSelect: () => ui.set({ view: 'snoozed' as const, filter: 'all' as const, expanded: null }) }]
+          ? [{ label: snoozed ? `${t('actions.showSnoozed')} (${snoozed})` : t('actions.showSnoozed'), icon: <Icon name="clock" size={14} />, separatorBefore: phone && unread > 0, onSelect: () => ui.set({ view: 'snoozed' as const, filter: 'all' as const, expanded: null }) }]
           : [{ label: t('actions.showOpen'), icon: <Icon name="inbox" size={14} />, onSelect: reset }]),
         ...(ui.view !== 'archived' ? [{ label: t('actions.showArchived'), icon: <Icon name="archive" size={14} />, onSelect: () => ui.set({ view: 'archived' as const, filter: 'all' as const, expanded: null }) }] : []),
         ...kinds.map((k, i) => ({ label: t('actions.only', { kind: t(`kinds.${k}`) }), icon: <Icon name={KIND_ICONS[k]} size={14} />, separatorBefore: i === 0, onSelect: () => ui.set({ filter: k, expanded: null }) })),

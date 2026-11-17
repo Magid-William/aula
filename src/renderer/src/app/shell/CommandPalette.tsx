@@ -8,7 +8,7 @@ import { Command } from 'cmdk'
 import { AnimatePresence, motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import { quoted } from '@renderer/lib/format'
-import { CourseIcon, spring, Kbd, Icon, AulaMark, Spinner, useTabTrap, type IconName } from '@renderer/design'
+import { CourseIcon, spring, Kbd, Icon, IconButton, AulaMark, Spinner, useTabTrap, useTouchOnly, type IconName } from '@renderer/design'
 import { api } from '@renderer/lib/api'
 import type { LibraryHit } from '@shared/ipc/search'
 import { openCourseSource } from '@renderer/screens/documents/lib'
@@ -60,6 +60,8 @@ export function registerCommands(id: string, provider: Provider): () => void {
 
 /** Espera tras la última tecla antes de buscar en los cursos, y cuántos resultados enseñar. */
 const SEARCH_DEBOUNCE_MS = 160
+/** Dónde empieza el buscador: un poco por debajo del borde de arriba, y nunca bajo la hora de un teléfono. */
+const PALETTE_TOP = 'max(12vh, calc(var(--safe-top, 0px) + 8px))'
 const MAX_HITS = 12
 
 /** Busca en todos los cursos (con espera entre teclas); si aún se están indexando cursos, vuelve a preguntar. */
@@ -115,6 +117,7 @@ function openHit(h: LibraryHit): void {
 export function CommandPalette() {
   const { t } = useTranslation(['common', 'palette'])
   const { isOpen, close, query, setQuery, providers } = usePalette()
+  const touch = useTouchOnly()
   const courses = useCourses((s) => s.courses)
   const { hits, searching } = useLibrarySearch(query, isOpen)
   const [selected, setSelected] = useState('')
@@ -176,7 +179,7 @@ export function CommandPalette() {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div ref={layer} role="dialog" aria-modal="true" aria-label={t('search.placeholder')} className="fixed inset-0 z-[85] flex items-start justify-center pt-[12vh]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div ref={layer} role="dialog" aria-modal="true" aria-label={t('search.placeholder')} className="fixed inset-0 z-[85] flex items-start justify-center" style={{ paddingTop: PALETTE_TOP }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <div className="absolute inset-0 bg-black/10 dark:bg-black/35" onClick={close} />
           <motion.div className="relative w-[min(680px,92vw)]" initial={{ y: -16, scale: 0.97, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: -10, scale: 0.98, opacity: 0 }} transition={spring.smooth}>
             <Command
@@ -193,11 +196,19 @@ export function CommandPalette() {
             >
               <div className="flex items-center gap-3 px-4 h-14 border-b-[0.5px] border-line">
                 <Icon name="search" size={18} className="text-text3" />
-                <Command.Input autoFocus value={query} onValueChange={setQuery} placeholder={t('search.placeholder')} className="flex-1 bg-transparent outline-none text-[16px] placeholder:text-text3" />
+                <Command.Input autoFocus value={query} onValueChange={setQuery} placeholder={t('search.placeholder')} autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="search" className="flex-1 bg-transparent outline-none text-[16px] placeholder:text-text3" />
                 {searching && <Spinner size={12} />}
-                <Kbd>esc</Kbd>
+                {/* con el dedo no hay Esc: una × para cerrar */}
+                {touch ? (
+                  <IconButton label={t('common:actions.close')} size="sm" className="-mr-1.5" onClick={close}>
+                    <Icon name="close" size={16} />
+                  </IconButton>
+                ) : (
+                  <Kbd>esc</Kbd>
+                )}
               </div>
-              <Command.List className="max-h-[56vh] overflow-auto p-1.5">
+              {/* la lista no baja de lo que tapa el teclado de la pantalla (`--kb`) */}
+              <Command.List className="overflow-auto overscroll-contain p-1.5" style={{ maxHeight: `min(56vh, calc(100dvh - var(--kb, 0px) - ${PALETTE_TOP} - 4.75rem))` }}>
                 {values.length === 0 && <div className="py-10 text-center text-text3">{searching ? t('palette:searching') : t('search.empty')}</div>}
                 {strong.map(groupView)}
                 {hits.length > 0 && (
@@ -222,13 +233,22 @@ export function CommandPalette() {
   )
 }
 
+/** Intro abre el elegido: la tecla a tinta (no «↩», que iOS pinta como emoji), y solo con teclado. */
+function ReturnHint({ className }: { className?: string }) {
+  return (
+    <span className={`touch:hidden text-text3 opacity-0 group-data-[selected=true]:opacity-100 ${className ?? ''}`} aria-hidden>
+      <Icon name="return" size={13} />
+    </span>
+  )
+}
+
 function Item({ value, icon, label, hint, onSelect }: { value: string; icon?: ReactNode; label: string; hint?: string; onSelect: () => void }) {
   return (
     <Command.Item value={value} onSelect={onSelect} className="group flex items-center gap-3 rounded-[10px] px-2.5 h-10 cursor-default data-[selected=true]:bg-selected">
       <span className="w-6 grid place-items-center text-text2">{icon}</span>
       <span className="flex-1 min-w-0 truncate t-callout">{label}</span>
       {hint && <span className="t-ui text-text3 truncate max-w-[220px]">{hint}</span>}
-      <span className="text-text3 opacity-0 group-data-[selected=true]:opacity-100 t-caption">↩</span>
+      <ReturnHint />
     </Command.Item>
   )
 }
@@ -251,7 +271,7 @@ function HitItem({ hit, onSelect }: { hit: LibraryHit; onSelect: () => void }) {
           <Snippet text={hit.snippet} />
         </span>
       </span>
-      <span className="text-text3 opacity-0 group-data-[selected=true]:opacity-100 t-caption self-center">↩</span>
+      <ReturnHint className="self-center" />
     </Command.Item>
   )
 }

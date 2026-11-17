@@ -10,6 +10,7 @@ import { Chip, Dialog, Icon, IconButton, Button, SegmentedTabs, Menu, toast, ton
 import { useRoute, navigate } from '@renderer/app/router'
 import { useScreenTitle } from '@renderer/app/title'
 import { api, isAulaError } from '@renderer/lib/api'
+import { canFrom } from '@renderer/lib/device'
 import { useCourses } from '@renderer/lib/courses'
 import { capitalize, fmtDate, quoted, relativeDay } from '@renderer/lib/format'
 import { useCalendarEvents } from './data'
@@ -23,6 +24,7 @@ import { SubscriptionsDialog } from './Subscriptions'
 import { openNewEventSheet, useEventSheet } from './sheet'
 import { isAssessment } from './util'
 import { showsAsSample } from '@renderer/lib/sample'
+import { useCompact } from '@renderer/app/shell/CompactTabs'
 
 type View = 'agenda' | 'week' | 'month'
 
@@ -49,7 +51,9 @@ export default function CalendarScreen() {
   const { t } = useTranslation(['calendar', 'common'])
   const route = useRoute()
   const initial = route.name === 'calendar' && route.date ? new Date(route.date) : new Date()
-  const [view, setView] = useState<View>(route.name === 'calendar' && route.view ? route.view : 'month')
+  // en el teléfono abre en la agenda (el mes en 330 px es una rejilla de puntos) y «Semana» son tres días
+  const compact = useCompact()
+  const [view, setView] = useState<View>(route.name === 'calendar' && route.view ? route.view : compact ? 'agenda' : 'month')
   const [anchor, setAnchor] = useState(initial)
   const [selected, setSelected] = useState(initial)
   const [dir, setDir] = useState(0)
@@ -87,7 +91,7 @@ export default function CalendarScreen() {
   const step = (n: number) => {
     setDir(n)
     if (view === 'month') setAnchor((a) => addMonths(a, n))
-    else if (view === 'week') setAnchor((a) => addWeeks(a, n))
+    else if (view === 'week') setAnchor((a) => (compact ? addDays(a, n * 3) : addWeeks(a, n)))
     else setAnchor((a) => addDays(a, n * 14))
   }
   const goTo = (d: Date) => {
@@ -174,7 +178,7 @@ export default function CalendarScreen() {
     <div ref={containerRef} className="@container relative flex min-h-0 flex-1 flex-col px-6 pt-1">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div className="min-w-0">
-          <motion.h1 key={title} className="t-title1 text-[32px] leading-[38px]" initial={{ opacity: 0, y: dir >= 0 ? 8 : -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <motion.h1 key={title} className="t-title1 text-[32px] leading-[38px] phone:text-[26px] phone:leading-[32px]" initial={{ opacity: 0, y: dir >= 0 ? 8 : -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             {title}
           </motion.h1>
           <p className="t-callout text-text2 mt-1">{summary}</p>
@@ -189,9 +193,10 @@ export default function CalendarScreen() {
           <IconButton label={t('next')} onClick={() => step(1)}>
             <Icon name="chevron-right" size={16} />
           </IconButton>
-          <SegmentedTabs value={view} onChange={setView} items={(['agenda', 'week', 'month'] as View[]).map((v) => ({ id: v, label: t(`views.${v}`) }))} className="ml-2" />
-          <Button size="md" variant="secondary" icon={<Icon name="plus" size={14} />} onClick={() => openNewEventSheet(selected)} title={t('newEventHint')}>
-            {t('newEvent')}
+          <SegmentedTabs value={view} onChange={setView} items={(['agenda', 'week', 'month'] as View[]).map((v) => ({ id: v, label: t(compact && v === 'week' ? 'views.days3' : `views.${v}`) }))} className="ml-2 phone:ml-0" />
+          {/* en el teléfono, solo el «+» (con su nombre para el lector de pantalla): la barra cabe en una fila */}
+          <Button size="md" variant="secondary" icon={<Icon name="plus" size={14} />} onClick={() => openNewEventSheet(selected)} title={t('newEventHint')} aria-label={compact ? t('newEvent') : undefined}>
+            {compact ? null : t('newEvent')}
           </Button>
           <Menu
             trigger={(open) => (
@@ -199,11 +204,12 @@ export default function CalendarScreen() {
                 <Icon name="more" size={16} />
               </IconButton>
             )}
+            // suscribirse, importar y exportar .ics, solo donde se puede (un dispositivo los tiene negados: remote/policy.ts)
             items={[
-              { label: t('menu.subscribe'), icon: <Icon name="link" size={15} />, onSelect: () => setSubsOpen(true) },
-              { label: t('menu.import'), icon: <Icon name="upload" size={15} />, onSelect: () => void importICS() },
-              { label: t('export'), icon: <Icon name="download" size={15} />, onSelect: () => void exportICS() },
-              { label: t('refresh'), icon: <Icon name="refresh" size={15} />, onSelect: () => void refreshFeeds(), separatorBefore: true }
+              ...(canFrom(api.role, 'calendar.subscribe') ? [{ label: t('menu.subscribe'), icon: <Icon name="link" size={15} />, onSelect: () => setSubsOpen(true) }] : []),
+              ...(canFrom(api.role, 'calendar.importICS') ? [{ label: t('menu.import'), icon: <Icon name="upload" size={15} />, onSelect: () => void importICS() }] : []),
+              ...(canFrom(api.role, 'calendar.exportICS') ? [{ label: t('export'), icon: <Icon name="download" size={15} />, onSelect: () => void exportICS() }] : []),
+              { label: t('refresh'), icon: <Icon name="refresh" size={15} />, onSelect: () => void refreshFeeds(), separatorBefore: canFrom(api.role, 'calendar.subscribe') }
             ]}
           />
         </div>
@@ -223,7 +229,7 @@ export default function CalendarScreen() {
           <div className="flex flex-wrap gap-1.5">
             {feeds.map((f) =>
               f.subscription ? (
-                <Chip key={f.label} onClick={() => setSubsOpen(true)} icon={<Icon name="link" size={12} />}>
+                <Chip key={f.label} onClick={canFrom(api.role, 'calendar.subscribe') ? () => setSubsOpen(true) : undefined} icon={<Icon name="link" size={12} />}>
                   {f.label}
                 </Chip>
               ) : (
@@ -237,8 +243,8 @@ export default function CalendarScreen() {
       )}
       <div className="mt-4 grid min-h-0 flex-1 grid-cols-1 gap-5 pb-24 @5xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-h-[460px] short:min-h-0">
-          {view === 'month' && <MonthView month={anchor} dir={dir} events={events} selected={selected} onSelect={selectDay} onMore={moreOnDay} />}
-          {view === 'week' && <WeekView anchor={anchor} events={events} selected={selected} onSelect={selectDay} />}
+          {view === 'month' && <MonthView month={anchor} dir={dir} events={events} selected={selected} onSelect={selectDay} onMore={moreOnDay} onStep={step} />}
+          {view === 'week' && <WeekView anchor={anchor} events={events} selected={selected} onSelect={selectDay} span={compact ? 3 : 7} onStep={step} />}
           {view === 'agenda' && (
             <div className="h-full overflow-y-auto pr-1">
               <AgendaView events={events} />

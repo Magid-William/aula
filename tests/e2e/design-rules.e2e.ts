@@ -84,12 +84,9 @@ test('en cada pantalla: un botón ladrillo como mucho, pigmento solo para el exa
   // un ejercicio respondido en un momento (menos de un minuto de estudio): Hoy y Estadísticas siguen sin enseñar «0 min»
   await go(page, { name: 'study', id: C, mode: 'practice' })
   await page.waitForTimeout(900)
-  const field = page.locator('main input:visible').first()
-  if (await field.count()) {
-    await field.click()
-    await page.keyboard.type('12345')
-  } else await page.getByRole('radio').first().click()
-  await page.getByRole('button', { name: /^Check/ }).click()
+  // el primer ejercicio sale al azar (la semilla es la hora) y puede ser de unir, de ordenar…: «No lo sé» vale para todos y
+  // también cuenta como intento
+  await page.getByRole('button', { name: /^I don’t know/ }).click()
   await expect(page.getByRole('button', { name: /^(Try again|Continue|Next)/ }).first()).toBeVisible()
   // el ratón, fuera de la cuadrícula de la constancia: su línea de abajo dice entonces el día de hoy
   await page.mouse.move(130, 640)

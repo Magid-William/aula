@@ -15,6 +15,7 @@ import { api } from '@renderer/lib/api'
 import { useCourses } from '@renderer/lib/courses'
 import { addDays, capitalize, fmtDate, fmtTime, weekdayLetters } from '@renderer/lib/format'
 import { navigate } from '@renderer/app/router'
+import { useCompact } from '@renderer/app/shell/CompactTabs'
 import { fromWire, toggleTask, useEventColor } from './data'
 import { useEventSheet, type EventSheetRequest } from './sheet'
 import { KIND_ICON } from './util'
@@ -116,12 +117,13 @@ function Field({ label, hint, trailing, children, locked }: { label: ReactNode; 
   )
 }
 
+// en el teléfono llenan su columna (el control de fecha de iOS, encogido, se pintaba encima de su propio borde)
 function DateInput({ value, onChange, label, min }: { value: string; onChange: (v: string) => void; label: string; min?: string }) {
-  return <input type="date" aria-label={label} value={value} min={min} onChange={(e) => e.target.value && onChange(e.target.value)} className={cx(INPUT, 'w-[142px]')} />
+  return <input type="date" aria-label={label} value={value} min={min} onChange={(e) => e.target.value && onChange(e.target.value)} className={cx(INPUT, 'w-[142px] phone:w-full phone:min-w-0')} />
 }
 
 function TimeInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  return <input type="time" aria-label={label} value={value} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && onChange(e.target.value)} className={cx(INPUT, 'w-[112px]')} />
+  return <input type="time" aria-label={label} value={value} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && onChange(e.target.value)} className={cx(INPUT, 'w-[112px] phone:w-full phone:min-w-0')} />
 }
 
 /** Casilla de «Hecha» (la de las tarjetas del día). */
@@ -184,6 +186,7 @@ function EventEditor({ view, start, allDay, onClose, onNested }: { view?: Calend
   const { t } = useTranslation(['calendar', 'common'])
   const tz = useMemo(() => localTimeZone(), [])
   const courses = useCourses((s) => s.courses)
+  const phone = useCompact()
   const initial = useMemo(() => (view ? eventFormFromView(view, tz) : emptyEventForm(start ?? new Date(), tz, { allDay })), [view, start, allDay, tz])
   const [form, setForm] = useState<EventForm>(initial)
   const [scope, setScope] = useState<CalendarEditScope>('thisOccurrence')
@@ -310,7 +313,12 @@ function EventEditor({ view, start, allDay, onClose, onNested }: { view?: Calend
         <ErrorNote text={error} />
         {occurrence && (
           <Field label={t('sheet.scope')}>
-            <SegmentedTabs size="sm" fill value={scope} onChange={changeScope} items={SCOPES.map((s) => ({ id: s, label: t(`sheet.scopes.${s}`) }))} />
+            {/* en el teléfono las tres no caben en una cápsula sin cortarse: una lista, como «Se repite» */}
+            {phone ? (
+              <Select value={scope} onChange={changeScope} options={SCOPES.map((s) => ({ value: s, label: t(`sheet.scopes.${s}`) }))} />
+            ) : (
+              <SegmentedTabs size="sm" fill value={scope} onChange={changeScope} items={SCOPES.map((s) => ({ id: s, label: t(`sheet.scopes.${s}`) }))} />
+            )}
           </Field>
         )}
         <Field label={t('sheet.name')}>
@@ -348,16 +356,17 @@ function EventEditor({ view, start, allDay, onClose, onNested }: { view?: Calend
             </span>
           )}
         >
-          <div className="grid grid-cols-[76px_1fr] items-center gap-x-3 gap-y-2">
+          {/* en el teléfono, cada etiqueta encima de su fila y la fecha y la hora a medias: en la columna de 76 px no cabían */}
+          <div className="grid grid-cols-[76px_1fr] items-center gap-x-3 gap-y-2 phone:grid-cols-1 phone:gap-y-1.5">
             <span className="t-ui text-text3">{due ? t('sheet.due') : t('sheet.starts')}</span>
-            <span className="flex flex-wrap items-center gap-1.5">
+            <span className={cx('flex flex-wrap items-center gap-1.5 phone:grid phone:gap-2', form.allDay ? 'phone:grid-cols-1' : 'phone:grid-cols-2')}>
               <DateInput label={due ? t('sheet.due') : t('sheet.starts')} value={form.startDate} onChange={(d) => setStart({ startDate: d })} />
               {!form.allDay && <TimeInput label={t('sheet.startTime')} value={form.startTime} onChange={(v) => setStart({ startTime: v })} />}
             </span>
             {!due && form.hasEnd && (
               <>
-                <span className="t-ui text-text3">{form.allDay ? t('sheet.lastDay') : t('sheet.ends')}</span>
-                <span className="flex flex-wrap items-center gap-1.5">
+                <span className="t-ui text-text3 phone:mt-1.5">{form.allDay ? t('sheet.lastDay') : t('sheet.ends')}</span>
+                <span className={cx('flex flex-wrap items-center gap-1.5 phone:grid phone:gap-2', courseExam ? (form.allDay ? 'phone:grid-cols-1' : 'phone:grid-cols-2') : form.allDay ? 'phone:grid-cols-[minmax(0,1fr)_auto]' : 'phone:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]')}>
                   <DateInput label={form.allDay ? t('sheet.lastDay') : t('sheet.ends')} value={form.endDate} min={form.startDate} onChange={(d) => set({ endDate: d })} />
                   {!form.allDay && <TimeInput label={t('sheet.endTime')} value={form.endTime} onChange={(v) => set({ endTime: v })} />}
                   {!courseExam && (
@@ -370,7 +379,7 @@ function EventEditor({ view, start, allDay, onClose, onNested }: { view?: Calend
             )}
           </div>
           {!due && !form.hasEnd && (
-            <button className="mt-2 ml-[88px] inline-flex items-center gap-1.5 t-ui font-medium text-accent-text hover:underline underline-offset-2"
+            <button className="mt-2 ml-[88px] inline-flex items-center gap-1.5 t-ui font-medium text-accent-text hover:underline underline-offset-2 phone:ml-0"
               onClick={() => (form.allDay ? set({ hasEnd: true, endDate: form.startDate }) : set({ hasEnd: true, ...plusHour(form.startDate, form.startTime) }))}>
               <Icon name="plus" size={13} />
               {form.allDay ? t('sheet.addLastDay') : t('sheet.addEnd')}
@@ -395,8 +404,8 @@ function EventEditor({ view, start, allDay, onClose, onNested }: { view?: Calend
               </div>
             )}
             {(form.repeat === 'daily' || form.repeat === 'weekly') && (
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <Select className="w-[170px]" value={form.until ? 'until' : 'never'} onChange={(v) => set({ until: v === 'until' ? form.until || threeMonths() : '' })}
+              <div className={cx('mt-2.5 flex flex-wrap items-center gap-2', form.until && 'phone:grid phone:grid-cols-2')}>
+                <Select className="w-[170px] phone:w-full phone:min-w-0" value={form.until ? 'until' : 'never'} onChange={(v) => set({ until: v === 'until' ? form.until || threeMonths() : '' })}
                   options={[{ value: 'never', label: t('sheet.repeatForever') }, { value: 'until', label: t('sheet.repeatUntil') }]} />
                 {form.until && <DateInput label={t('sheet.repeatUntil')} value={form.until} min={form.startDate} onChange={(d) => set({ until: d })} />}
               </div>

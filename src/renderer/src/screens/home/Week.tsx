@@ -35,7 +35,7 @@ export function WeekCard({ events, courses }: { events: HomeEvent[]; courses: Ho
         <SectionTitle
           title={t('week')}
           action={
-            <button className="text-accent-text font-medium hover:underline underline-offset-2" onClick={() => navigate({ name: 'calendar' })}>
+            <button className="relative touch-target text-accent-text font-medium hover:underline underline-offset-2" onClick={() => navigate({ name: 'calendar' })}>
               {t('openCalendar')}
             </button>
           }

@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, Dice5, Eraser, Pause, Play, SkipBack, SkipFo
 import { Button, Card, IconButton, cx, focusRing, spring } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { formatNumber } from '../shared/lib/num'
-import { CardTitle, ErrorLine, useComma, useStored } from '../shared/ui'
+import { CardTitle, ErrorLine, mathField, useComma, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { Q, add, cols, determinant, inverse, matrixTex, multiply, opTex, rank, rref, rows, transpose, type Matrix, type RowOp, type Step } from './lib/matrix'
 
@@ -98,11 +98,11 @@ function MatrixEditor({ name, cells, onChange }: { name: string; cells: string[]
   const stepper = (label: string, value: number, onSet: (v: number) => void) => (
     <span className="inline-flex items-center gap-1 t-ui text-text2">
       {label}
-      <button className="w-6 h-6 rounded-[6px] hover:bg-fill2 disabled:opacity-30" disabled={value <= 1} onClick={() => onSet(value - 1)} aria-label={`${label} −`}>
+      <button className="relative touch-target w-6 h-6 rounded-[6px] hover:bg-fill2 disabled:opacity-30" disabled={value <= 1} onClick={() => onSet(value - 1)} aria-label={`${label} −`}>
         −
       </button>
       <span className="w-4 text-center tabular text-text">{value}</span>
-      <button className="w-6 h-6 rounded-[6px] hover:bg-fill2 disabled:opacity-30" disabled={value >= 6} onClick={() => onSet(value + 1)} aria-label={`${label} +`}>
+      <button className="relative touch-target w-6 h-6 rounded-[6px] hover:bg-fill2 disabled:opacity-30" disabled={value >= 6} onClick={() => onSet(value + 1)} aria-label={`${label} +`}>
         +
       </button>
     </span>
@@ -111,7 +111,8 @@ function MatrixEditor({ name, cells, onChange }: { name: string; cells: string[]
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="font-serif text-[22px] italic">{name}</span>
-        <div className="flex items-center gap-3">
+        {/* en una columna estrecha la barra se parte (en un teléfono «Borrar» quedaba fuera de la tarjeta) */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           {stepper(t('matrix.rows'), r, (v) => onChange(resize(cells, v, c)))}
           {stepper(t('matrix.cols'), c, (v) => onChange(resize(cells, r, v)))}
           <IconButton label={t('matrix.identity')} size="sm" onClick={() => onChange(cells.map((row, i) => row.map((_, j) => (i === j ? '1' : '0'))))}>
@@ -134,6 +135,7 @@ function MatrixEditor({ name, cells, onChange }: { name: string; cells: string[]
               const bad = v.trim() !== '' && !Q.parse(v)
               return (
                 <motion.input
+                  {...mathField}
                   key={`${i}-${j}`}
                   layout
                   initial={{ opacity: 0, scale: 0.8 }}

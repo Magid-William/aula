@@ -19,7 +19,8 @@
     "loadErrorBody": "Vuelve a intentarlo en un momento."
   },
   "chrome": {
-    "exit": "Salir (Esc)"
+    "exit": "Salir (Esc)",
+    "exit_touch": "Salir"
   },
   "ex": {
     "level1": "Fácil",
@@ -63,6 +64,7 @@
     },
     "order": {
       "start": "Arrastra los elementos (o usa el teclado: espacio para tomar uno, ↑ ↓ para moverlo) hasta dejarlos en orden.",
+      "start_touch": "Arrastra los elementos hasta dejarlos en orden.",
       "help": "Puedes seguir moviéndolas hasta comprobar.",
       "label": "Elementos para ordenar",
       "handle": "Arrastrar",
@@ -73,12 +75,14 @@
       "moved": "Posición {{pos}} de {{total}}"
     },
     "match": {
-      "help": "Une cada elemento de la izquierda con su pareja: arrastra desde el punto o pulsa uno y luego el otro."
+      "help": "Une cada elemento de la izquierda con su pareja: arrastra desde el punto o pulsa uno y luego el otro.",
+      "help_touch": "Une cada elemento de la izquierda con su pareja: arrastra desde el punto o toca uno y luego el otro."
     },
     "label": {
       "name": "Nombre",
       "choose": "Elige…",
       "dragHelp": "Arrastra cada etiqueta a su número (o pulsa la etiqueta y después el número).",
+      "dragHelp_touch": "Arrastra cada etiqueta a su número (o toca la etiqueta y después el número).",
       "locate": "Señala:"
     },
     "open": {
@@ -149,6 +153,7 @@
     "notUnderstood": "Aún no lo entiendo"
   },
   "keys": {
+    "minus": "Menos (un número negativo)",
     "pi": "Pi",
     "sqrt": "Raíz cuadrada",
     "square": "Al cuadrado",
@@ -375,6 +380,7 @@
     "space": "espacio",
     "recallFirst": "Intenta recordarla antes de girar la tarjeta",
     "comesBack": "Volverá a aparecer en {{interval}} (tecla {{key}})",
+    "comesBack_touch": "Volverá a aparecer en {{interval}}",
     "rating": {
       "again": "Otra vez",
       "hard": "Difícil",
@@ -383,6 +389,7 @@
     },
     "undo": "Deshacer «{{rating}}»",
     "undoHelp": "Deshacer la última calificación (⌘Z)",
+    "undoHelp_touch": "Deshacer la última calificación",
     "nothingTitle": "Nada que repasar hoy",
     "nothingBody": "Las tarjetas vuelven justo antes de que se olviden. Mientras tanto, practica un tema.",
     "practiceInstead": "Practicar",
@@ -427,9 +434,11 @@
     "noLimit": "Sin límite de tiempo",
     "flag": "Marcar",
     "flagHelp": "Marca la pregunta para volver a ella antes de entregar (⇧⌘L)",
+    "flagHelp_touch": "Marca la pregunta para volver a ella antes de entregar",
     "unflag": "Quitar la marca",
     "prev": "Anterior",
     "prevHelp": "Pregunta anterior (⌥←)",
+    "prevHelp_touch": "Pregunta anterior",
     "next": "Siguiente",
     "submit": "Entregar",
     "section": "Sección",
@@ -474,6 +483,7 @@
     "bySkill": "Por temas",
     "questionsTitle": "Pregunta a pregunta",
     "questionsDetail": "Pulsa una para ver tu respuesta, la correcta y su explicación.",
+    "questionsDetail_touch": "Toca una para ver tu respuesta, la correcta y su explicación.",
     "ptsOf": "{{got}} de {{total}} pt",
     "yourAnswer": "Tu respuesta",
     "unanswered": "Sin responder",

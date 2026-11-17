@@ -10,7 +10,11 @@ import { applyEngineLanguage } from '@engine/language'
 import { useSettings, wireSettings } from '@renderer/lib/settings'
 import { wireCourses } from '@renderer/lib/courses'
 import { Sidebar } from './shell/Sidebar'
-import { CompactTabs, useCompact } from './shell/CompactTabs'
+import { CompactTabs } from './shell/CompactTabs'
+import { isCompact, useCompact } from './shell/compact'
+import { installScreenScroll } from './shell/screenScroll'
+import { installDeviceBack } from './shell/deviceBack'
+import { installKeyboardWatch } from './shell/keyboard'
 import { LivePanel } from './shell/LivePanel'
 import { routeFromHash, routeToHash } from './routeHash'
 import { TopBar } from './shell/TopBar'
@@ -33,19 +37,21 @@ export function App() {
   const devTheme = useDev((s) => s.theme)
   const { i18n } = useTranslation()
 
-  // desde un dispositivo (iPad, iPhone): sin ventana que arrastrar; en pantalla estrecha, pestañas abajo en vez de barra lateral
+  // desde un dispositivo (iPad, iPhone, Android): sin ventana que arrastrar; en el teléfono, pestañas abajo en vez de barra lateral
   const remote = api.remote
   const compact = useCompact()
+  // estudiando en el teléfono, la sesión ocupa la pantalla: sin la barra de arriba ni las pestañas (se sale con el «✕» de su
+  // cápsula, o con «atrás» del sistema); quedaba poco sitio para el ejercicio, sobre todo en un iPhone SE
+  const immersive = useNav((s) => compact && s.route.name === 'study')
 
   useEffect(() => {
     if (api.platform === 'darwin') document.documentElement.classList.add('vibrant')
     else if (api.remote) {
       document.documentElement.classList.add('remote')
       // si la página se recargó (un túnel nuevo al volver a la app, un refresco), se vuelve a la pantalla apuntada en la
-      // dirección; si no, en el teléfono Aula es sobre todo su asistente: se abre por lo que hizo y lo que hay pendiente
+      // dirección; si no, se abre en «Hoy» (la ruta de siempre), también en el teléfono
       const saved = routeFromHash(window.location.hash)
       if (saved) navigate(saved, { replace: true })
-      else if (window.matchMedia('(max-width: 700px)').matches) navigate({ name: 'inbox' }, { replace: true })
     }
     // Windows y Linux: los botones de la ventana (titleBarOverlay, 48 px) se dibujan encima; lo flotante empieza debajo
     else if (api.platform !== 'web') document.documentElement.style.setProperty('--titlebar-h', '48px')
@@ -59,9 +65,29 @@ export function App() {
   useEffect(() => {
     if (!api.remote) return
     return useNav.subscribe((s) => {
-      try { window.history.replaceState(null, '', routeToHash(s.route) || window.location.pathname) } catch { /* sin historial: no se apunta */ }
+      // sin ruta que apuntar, la dirección se queda con su consulta («?demo=1»: al recargar, la demostración sigue siéndolo)
+      try { window.history.replaceState(null, '', routeToHash(s.route) || window.location.pathname + window.location.search) } catch { /* sin historial: no se apunta */ }
     })
   }, [])
+
+  // desde un dispositivo: «atrás» del sistema vuelve dentro de Aula, y el teclado de la pantalla se tiene en cuenta
+  useEffect(() => {
+    if (!api.remote) return
+    const offBack = installDeviceBack(isCompact)
+    const offKeyboard = installKeyboardWatch()
+    return () => {
+      offBack()
+      offKeyboard()
+    }
+  }, [])
+
+  // en el teléfono: subir arriba con la pestaña de ahora (o la hora del iPhone) y volver a «Hoy» por donde se iba
+  useEffect(() => installScreenScroll(), [])
+
+  // en el teléfono la hoja de papel es toda la pantalla, también bajo la hora y la batería (styles.css: html.compact)
+  useEffect(() => {
+    document.documentElement.classList.toggle('compact', compact)
+  }, [compact])
 
   useEffect(() => {
     const lang = pickLanguage(settings?.general.language, navigator.language)
@@ -75,16 +101,17 @@ export function App() {
   return (
     <ThemeProvider mode={mode} motion={settings?.general.motion ?? 'system'} textScale={settings?.general.textScale ?? 1}>
       <AppCommands />
-      <Backdrop />
-      <div className={cx('relative flex h-full', compact && 'flex-col')} style={remote ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}>
+      <Backdrop compact={compact} />
+      {/* en la tableta el hueco de la hora queda sobre el lienzo, como la barra lateral; en el teléfono lo pinta la hoja */}
+      <div className={cx('relative flex h-full', compact && 'flex-col')} style={remote && !compact ? { paddingTop: 'var(--safe-top)' } : undefined}>
         {/* el hueco de arriba (sobre la hoja) también arrastra la ventana */}
         {!remote && <div aria-hidden className="drag absolute inset-x-0 top-0 h-2" />}
         {!compact && <Sidebar />}
         <Sheet compact={compact}>
-          <Bar compact={compact} />
+          {!immersive && <Bar compact={compact} />}
           <Screens />
         </Sheet>
-        {compact && <CompactTabs />}
+        {compact && !immersive && <CompactTabs />}
       </div>
       {/* la bienvenida se hace en el Mac (allí se elige la IA); un dispositivo entra directo */}
       <AnimatePresence>{settings && !settings.onboarded && !remote && <Onboarding key="onboarding" />}</AnimatePresence>
@@ -111,8 +138,10 @@ function AppCursor() {
  * brillos ni degradados: la única luz de la interfaz es el ladrillo de lo que se puede pulsar. La barra lateral vive
  * sobre este lienzo, sin panel propio.
  */
-function Backdrop() {
-  return <div aria-hidden className="pointer-events-none fixed inset-0 -z-10" style={{ background: api.platform === 'darwin' ? 'var(--sidebar)' : 'var(--canvas)' }} />
+function Backdrop({ compact }: { compact: boolean }) {
+  // en el teléfono no hay lienzo a la vista: la hoja llega a todos los bordes (y bajo la hora), así que debajo también es papel
+  const background = compact ? 'var(--paper)' : api.platform === 'darwin' ? 'var(--sidebar)' : 'var(--canvas)'
+  return <div aria-hidden className="pointer-events-none fixed inset-0 -z-10" style={{ background }} />
 }
 
 /**
@@ -126,9 +155,10 @@ function Sheet({ children, compact }: { children: ReactNode; compact?: boolean }
     <main
       className={cx(
         'paper-grain relative flex min-w-0 flex-1 flex-col overflow-clip bg-paper',
-        // en el teléfono la hoja es toda la pantalla: sin marco
+        // en el teléfono la hoja es toda la pantalla: sin marco, y empieza bajo la hora y la batería (con su papel detrás)
         compact ? 'min-h-0' : cx('border-[0.5px] border-line shadow-[var(--e1)]', mac ? 'my-2 mr-2 rounded-[16px]' : 'rounded-l-[16px] border-r-0 border-y-0')
       )}
+      style={compact ? { paddingTop: 'var(--safe-top)' } : undefined}
     >
       {children}
     </main>

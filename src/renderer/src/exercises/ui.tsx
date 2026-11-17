@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import katex from 'katex'
 import 'katex/contrib/mhchem'
 import { AULA_KATEX_MACROS } from '@engine/content/tex'
-import { cx, Icon, spring, useTheme, type IconName } from '@renderer/design'
+import { cx, Icon, spring, useTheme, useTouchOnly, type IconName } from '@renderer/design'
 
 const cache = new Map<string, string>()
 
@@ -31,13 +31,16 @@ export const Tex = memo(function Tex({ tex, display = false, className }: { tex:
 
 export type Mark = 'none' | 'right' | 'wrong' | 'dimmed'
 
-/** Tecla de atajo pequeña junto a una opción o un botón. */
+/** Tecla de atajo pequeña junto a una opción o un botón. Con el dedo no hay teclado: no se enseña. */
 export function KeyCap({ children, className, active }: { children: ReactNode; className?: string; active?: boolean }) {
+  const touch = useTouchOnly()
+  if (touch) return null
   return (
     <span
       aria-hidden
+      data-keycap
       className={cx(
-        'inline-grid h-[22px] min-w-[22px] place-items-center rounded-[7px] px-1 text-[12px] font-semibold tabular transition-colors',
+        'inline-flex h-[22px] min-w-[22px] items-center justify-center gap-0.5 rounded-[7px] px-1 text-[12px] font-semibold tabular transition-colors',
         active ? 'bg-accent text-on-accent' : 'bg-fill2 text-text2',
         className
       )}
@@ -45,6 +48,11 @@ export function KeyCap({ children, className, active }: { children: ReactNode; c
       {children}
     </span>
   )
+}
+
+/** La tecla Intro dibujada a tinta (el carácter «↩» se pinta como un emoji azul en iOS y en algunos Android). */
+export function ReturnKey({ size = 12 }: { size?: number }) {
+  return <Icon name="return" size={size} />
 }
 
 /** Tarjeta de opción: se levanta al pasar el ratón, la elegida con el velo de la luz y, tras comprobar, la buena en verde y la
