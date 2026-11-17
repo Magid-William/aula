@@ -2,7 +2,7 @@
 // qué se estudia, progreso) y la barra flotante de abajo con las acciones. Escape sale (si hay texto seleccionado, primero
 // lo suelta). El texto de la columna se puede seleccionar (copiar, consultar, traducir); el idioma del curso no lo declara la
 // columna (también lleva botones y avisos de la interfaz) sino el texto del curso (RichText, lib/contentLanguage.ts).
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { cx, Icon, IconButton, spring, Tooltip, useTheme, type IconName } from '@renderer/design'
@@ -45,6 +45,7 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, s
   useEffect(() => {
     scroller.current?.scrollTo({ top: 0 })
   }, [scrollKey])
+  useKeyboardReveal(scroller)
   const { reducedMotion } = useTheme()
   // Al responder dentro de un bloque (predecir, detectar el error…), lo que contesta Aula aparece debajo: si queda tapado por
   // la barra de abajo, se desplaza lo justo para verlo (sin perder de vista el principio del bloque).
@@ -81,8 +82,10 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, s
           {bottom && (
             <motion.div
               key="bottom"
-              // en el teléfono la sesión llega hasta abajo (sin pestañas): la barra queda por encima de la de inicio
-              className="pointer-events-none sticky bottom-0 z-20 flex shrink-0 justify-center px-6 pt-6 pb-5 phone:px-3 phone:pb-[calc(env(safe-area-inset-bottom,0px)+12px)]"
+              data-study-bottom
+              // en el teléfono la sesión llega hasta abajo (sin pestañas): la barra queda por encima de la de inicio, y siempre
+              // abajo del todo (mt-auto), no flotando a media pantalla bajo un ejercicio corto ni saltando de uno a otro
+              className="pointer-events-none sticky bottom-0 z-20 flex shrink-0 justify-center px-6 pt-6 pb-5 phone:mt-auto phone:px-3 phone:pb-[calc(env(safe-area-inset-bottom,0px)+12px)]"
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
@@ -96,6 +99,50 @@ export function StudyFrame({ capsule, bottom, children, onExit, wide, reading, s
       </div>
     </div>
   )
+}
+
+/**
+ * Con el teclado de la pantalla abierto, lo que se escribe no queda bajo la barra de abajo: el campo con foco y lo suyo de
+ * debajo (la vista previa «Lo leo como…» y la fila de símbolos, `[data-answer-block]`) se desplazan lo justo para verse
+ * encima de ella, también mientras crecen al escribir. Sin teclado (el escritorio) no hace nada.
+ */
+function useKeyboardReveal(scroller: RefObject<HTMLDivElement | null>): void {
+  useEffect(() => {
+    const box = scroller.current
+    if (!box) return
+    const root = document.documentElement
+    let frame = 0
+    const reveal = (): void => {
+      frame = 0
+      const field = document.activeElement
+      if (!root.classList.contains('kb-open') || !(field instanceof HTMLElement) || !box.contains(field)) return
+      const block = field.closest<HTMLElement>('[data-answer-block]') ?? field
+      const bar = box.querySelector<HTMLElement>('[data-study-bottom]')
+      const view = box.getBoundingClientRect()
+      const limit = view.bottom - (bar?.getBoundingClientRect().height ?? 0) - 8
+      const hidden = block.getBoundingClientRect().bottom - limit
+      if (hidden <= 0) return
+      // sin que el campo se vaya bajo la cápsula de arriba
+      const room = field.getBoundingClientRect().top - (view.top + 76)
+      const by = Math.min(hidden, Math.max(0, room))
+      if (by > 2) box.scrollBy({ top: by })
+    }
+    const schedule = (): void => {
+      if (!frame) frame = requestAnimationFrame(reveal)
+    }
+    const classes = new MutationObserver(schedule)
+    classes.observe(root, { attributes: true, attributeFilter: ['class'] })
+    const grows = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    if (box.firstElementChild) grows?.observe(box.firstElementChild)
+    grows?.observe(box)
+    box.addEventListener('focusin', schedule)
+    return () => {
+      classes.disconnect()
+      grows?.disconnect()
+      box.removeEventListener('focusin', schedule)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [scroller])
 }
 
 /** Cápsula de vidrio (arriba: progreso; abajo: acciones). */

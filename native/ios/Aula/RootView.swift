@@ -1,6 +1,9 @@
 // Lo que se ve: la interfaz de Aula cuando hay conexión con el Mac y, mientras no, una hoja de papel que dice qué falta
 // y ofrece el único botón que toca. «Papel y luz»: papel cálido, ladrillo como única luz, serif en los títulos.
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct RootView: View {
     let model: AppModel
@@ -28,8 +31,14 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isReady)
-        // el tema de Aula, si no es el del sistema: la hora y la batería se leen sobre la página
-        .preferredColorScheme(model.pageDark.map { $0 ? .dark : .light })
+        // lo nativo, como la página: la hora y la batería se leen sobre ella y la franja es de su mismo papel. Va en la
+        // ventana y no en la escena (preferredColorScheme): así la escena sigue diciendo el tema del sistema y la vista
+        // web se entera cuando cambia, aunque Aula tenga impuesto el suyo
+        #if canImport(UIKit)
+        .background(WindowStyle(dark: model.chromeDark))
+        #else
+        .preferredColorScheme(model.chromeDark.map { $0 ? .dark : .light })
+        #endif
         .sheet(isPresented: Binding(get: { model.showingLicenses }, set: { model.showingLicenses = $0 })) {
             LicensesView { model.showingLicenses = false }
         }
@@ -435,6 +444,35 @@ private struct DemoBar: View {
         #endif
     }
 }
+
+#if canImport(UIKit)
+/// Pone el tema (claro, oscuro o el del sistema) en la ventana que la contiene: lo nativo y la hora y la batería lo siguen.
+private struct WindowStyle: UIViewRepresentable {
+    let dark: Bool?
+
+    func makeUIView(context: Context) -> Probe { Probe() }
+
+    func updateUIView(_ view: Probe, context: Context) {
+        view.style = dark.map { $0 ? .dark : .light } ?? .unspecified
+    }
+
+    final class Probe: UIView {
+        var style: UIUserInterfaceStyle = .unspecified {
+            didSet { apply() }
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            apply()
+        }
+
+        private func apply() {
+            guard let window, window.overrideUserInterfaceStyle != style else { return }
+            window.overrideUserInterfaceStyle = style
+        }
+    }
+}
+#endif
 
 extension Color {
     /// «#rrggbb» (lo que dice Shell.js) → color; nil si no lo es.

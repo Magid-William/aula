@@ -156,6 +156,8 @@ struct WebView: PlatformViewRepresentable {
                 #if canImport(UIKit)
                 lockScroll = look.app
                 message.webView?.scrollView.isScrollEnabled = !look.app
+                // cada vez que la página cambia de aspecto se vuelve a mirar el del sistema (no solo al volver a la app)
+                (message.webView as? AulaWebView)?.recheckSystem()
                 #endif
                 events.look(look, systemDark(message.webView))
             }
@@ -325,7 +327,7 @@ final class AulaWebView: WKWebView {
             // el teclado, también para la interfaz (html.ime-open: keyboard.ts aparta las pestañas mientras se escribe)
             NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
             NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
-            // un cambio de claro a oscuro con el tema de Aula impuesto no cambia la escena: se mira al volver a la app
+            // y por si acaso, también al volver a la app
             NotificationCenter.default.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
         }
         updateSwipe()
@@ -385,9 +387,9 @@ final class AulaWebView: WKWebView {
     }
 
     private func followSystem(_ scene: UIWindowScene) {
-        // con el tema de Aula impuesto (preferredColorScheme pone un override en la escena) la escena ya no dice el del
-        // sistema: entonces vale el de la pantalla. Leer la escena ahí hacía un bucle (la app seguía a la página, la vista
-        // web a la app, la página a la vista web…) que dejaba la app en blanco y gastando CPU al cambiar a oscuro
+        // el tema de la app va en la ventana (RootView, WindowStyle), así que la escena dice el del sistema; si algo pusiera
+        // uno en la escena, valdría el de la pantalla. Leer un tema impuesto ahí hacía un bucle (la app seguía a la página,
+        // la vista web a la app, la página a la vista web…) que dejaba la app en blanco y gastando CPU al cambiar a oscuro
         let imposed = scene.traitOverrides.contains(UITraitUserInterfaceStyle.self)
         let dark = (imposed ? scene.screen.traitCollection : scene.traitCollection).userInterfaceStyle == .dark
         overrideUserInterfaceStyle = dark ? .dark : .light
@@ -397,6 +399,11 @@ final class AulaWebView: WKWebView {
     }
 
     @objc private func becameActive() {
+        recheckSystem()
+    }
+
+    /// Vuelve a leer el tema del sistema (la app pinta lo nativo en la ventana, así que la escena lo dice siempre).
+    func recheckSystem() {
         if let scene = window?.windowScene { followSystem(scene) }
     }
 

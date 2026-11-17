@@ -42,11 +42,23 @@ export type Route =
 
 export type RouteName = Route['name']
 
+/** Cómo se llega a una ruta: `replace`, en lugar de la entrada de ahora; `root`, como una pestaña de abajo del teléfono: el
+ *  historial vuelve a empezar en «Hoy» (atrás desde otra pestaña va a «Hoy» y desde «Hoy» sale de la app). */
+export interface NavOptions {
+  replace?: boolean
+  root?: boolean
+}
+
+/** La pila de una pestaña que se abre como raíz: «Hoy» sola, o «Hoy» y la pestaña. */
+export function rootStack(r: Route): Route[] {
+  return r.name === 'home' ? [r] : [{ name: 'home' }, r]
+}
+
 interface NavState {
   stack: Route[]
   index: number
   route: Route
-  navigate: (r: Route, opts?: { replace?: boolean }) => void
+  navigate: (r: Route, opts?: NavOptions) => void
   back: () => void
   forward: () => void
   canBack: boolean
@@ -65,6 +77,11 @@ export const useNav = create<NavState>((set, get) => ({
   canForward: false,
   navigate: (r, opts) => {
     const { stack, index } = get()
+    if (opts?.root) {
+      const next = rootStack(r)
+      if (index === stack.length - 1 && JSON.stringify(stack) === JSON.stringify(next)) return
+      return set({ stack: next, index: next.length - 1, route: r, canBack: next.length > 1, canForward: false })
+    }
     if (same(stack[index], r)) return
     const base = opts?.replace ? stack.slice(0, index) : stack.slice(0, index + 1)
     const next = [...base, r].slice(-60)
@@ -82,7 +99,7 @@ export const useNav = create<NavState>((set, get) => ({
   }
 }))
 
-export const navigate = (r: Route, opts?: { replace?: boolean }) => useNav.getState().navigate(r, opts)
+export const navigate = (r: Route, opts?: NavOptions) => useNav.getState().navigate(r, opts)
 
 /** Clave estable de una ruta para las transiciones (cambiar de pestaña dentro de un curso no recarga la pantalla). */
 export function routeKey(r: Route): string {

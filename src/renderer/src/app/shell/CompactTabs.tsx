@@ -45,7 +45,8 @@ export function CompactTabs() {
               <button
                 type="button"
                 aria-current={on ? 'page' : undefined}
-                onClick={() => navigate(tab.route)}
+                // cada pestaña es una raíz, como en una app: atrás desde ella va a «Hoy» (no recorre las pestañas visitadas)
+                onClick={() => navigate(tab.route, { root: true })}
                 className={cx('relative flex h-[56px] w-full flex-col items-center justify-center gap-0.5 outline-none focus-visible:bg-fill1', on ? 'text-accent-text' : 'text-text3')}
               >
                 <span className="relative">

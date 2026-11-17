@@ -136,7 +136,8 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
   const wide = answer.kind === 'equation' || answer.kind === 'expression' || answer.kind === 'interval' || answer.kind === 'set' || (answer.kind === 'chem' && answer.mode !== 'number') || answer.kind === 'short'
 
   return (
-    <div className="flex flex-col gap-2.5">
+    // el campo, su vista previa y la fila de símbolos: con el teclado abierto se ven enteros (study/Chrome.tsx)
+    <div data-answer-block className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {spec.prefix && (
           <span className="t-reading text-text shrink-0">

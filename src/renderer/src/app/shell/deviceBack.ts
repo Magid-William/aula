@@ -41,7 +41,8 @@ export function handleDeviceBack(compact: () => boolean): boolean {
       target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }))
     }
   } else if (action === 'back') useNav.getState().back()
-  else if (action === 'home') navigate({ name: 'home' })
+  // «Hoy» como raíz: el siguiente «atrás» ya sale de la app
+  else if (action === 'home') navigate({ name: 'home' }, { root: true })
   return action !== null
 }
 

@@ -1,5 +1,7 @@
 // Diálogo modal y panel lateral de cristal, con fondo difuminado, Escape para cerrar y foco atrapado. En un teléfono o una
-// tableta respetan la zona de la hora y de la barra de inicio, y lo que tapa el teclado de la pantalla (`--kb`, keyboard.ts).
+// tableta respetan la zona de la hora y de la barra de inicio, y lo que tapa el teclado de la pantalla (`--kb`, keyboard.ts),
+// y se cierran arrastrándolos con el dedo (swipeClose.ts): el diálogo hacia abajo; el panel, hacia su lado o, en el teléfono,
+// donde el de la derecha es una hoja que sube desde abajo, hacia abajo.
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -9,7 +11,18 @@ import { spring } from './tokens'
 import { IconButton } from './Button'
 import i18n from '@renderer/i18n'
 import { useTabTrap } from './focusTrap'
-import { isTouchOnly } from './input'
+import { isTouchOnly, useTouchOnly } from './input'
+import { useSwipeClose } from './swipeClose'
+
+/** ¿Pantalla de teléfono? (App.tsx pone `compact` en <html> con las pestañas abajo). */
+function isPhone(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('compact')
+}
+
+/** El asa de una hoja que se arrastra (solo en el teléfono): dice que se puede bajar para cerrarla. */
+function Grabber() {
+  return <span aria-hidden data-grabber className="pointer-events-none absolute left-1/2 top-[7px] z-[1] h-[5px] w-9 -translate-x-1/2 rounded-full bg-line-strong/70" />
+}
 
 function useEscape(open: boolean, onClose: () => void) {
   useEffect(() => {
@@ -77,6 +90,8 @@ const SAFE_LAYER = { bottom: 'var(--kb, 0px)', paddingTop: 'max(1.5rem, var(--sa
 export function Dialog({ open, onClose, title, description, children, footer, size = 'md', hideClose, className }: DialogProps) {
   useEscape(open, onClose)
   const ref = useFocusTrap(open)
+  const { offset, swiped } = useSwipeClose(ref, { open, axis: 'y', sign: 1, onClose })
+  const grabber = useTouchOnly() && isPhone()
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -88,13 +103,16 @@ export function Dialog({ open, onClose, title, description, children, footer, si
             role="dialog"
             aria-modal="true"
             tabIndex={-1}
-            style={{ maxHeight: 'min(88vh, calc(100dvh - var(--kb, 0px) - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 3rem))' }}
+            style={{ maxHeight: 'min(88vh, calc(100dvh - var(--kb, 0px) - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 3rem))', y: offset }}
             className={cx('relative w-full bg-raised border-[0.5px] border-line shadow-[var(--e4)] rounded-[24px] p-7 overflow-auto overscroll-contain outline-none phone:p-5', widths[size], className)}
             initial={{ opacity: 0, y: 14, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            // cerrado arrastrándolo: sigue hacia abajo desde donde se soltó
+            variants={{ exit: () => (swiped.current ? { opacity: 0, y: offset.get() + 160, transition: { duration: 0.22 } } : { opacity: 0, y: 8, scale: 0.98 }) }}
+            exit="exit"
             transition={spring.bouncy}
           >
+            {grabber && <Grabber />}
             {!hideClose && (
               <IconButton label={i18n.t('common:actions.close')} data-close size="sm" className="absolute right-4 top-4" onClick={onClose}>
                 <X size={16} />
@@ -116,7 +134,12 @@ export function Dialog({ open, onClose, title, description, children, footer, si
 export function Drawer({ open, onClose, children, side = 'right', width = 440, title, className }: { open: boolean; onClose: () => void; children: ReactNode; side?: 'right' | 'left'; width?: number; title?: ReactNode; className?: string }) {
   useEscape(open, onClose)
   const ref = useFocusTrap(open)
+  // en el teléfono, el panel de la derecha ocupa la pantalla: es una hoja que sube desde abajo y se baja para cerrarla
+  const sheet = side === 'right' && isPhone()
   const off = side === 'right' ? width + 40 : -(width + 40)
+  const { offset } = useSwipeClose(ref, { open, axis: sheet ? 'y' : 'x', sign: side === 'left' && !sheet ? -1 : 1, onClose })
+  const touch = useTouchOnly()
+  const grabber = sheet && touch
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -133,13 +156,15 @@ export function Drawer({ open, onClose, children, side = 'right', width = 440, t
               // en un teléfono el panel no cabe entero: ocupa la pantalla menos el margen
               maxWidth: 'calc(100vw - 24px)',
               top: 'calc(var(--titlebar-h, 0px) + 12px + var(--safe-top, 0px))',
-              bottom: 'calc(12px + max(var(--safe-bottom, 0px), var(--kb, 0px)))'
+              bottom: 'calc(12px + max(var(--safe-bottom, 0px), var(--kb, 0px)))',
+              ...(sheet ? { y: offset } : { x: offset })
             }}
-            initial={{ x: off, opacity: 0.6 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: off, opacity: 0.6 }}
+            initial={sheet ? { y: '105%' } : { x: off, opacity: 0.6 }}
+            animate={sheet ? { y: 0 } : { x: 0, opacity: 1 }}
+            exit={sheet ? { y: '105%' } : { x: off, opacity: 0.6 }}
             transition={spring.smooth}
           >
+            {grabber && <Grabber />}
             {title && (
               <div className="flex items-center justify-between px-5 pt-5 pb-2">
                 <h2 className="t-title2">{title}</h2>

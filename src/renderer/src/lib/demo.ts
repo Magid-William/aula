@@ -16,6 +16,12 @@ export function isDemo(): boolean {
   return DEMO
 }
 
+/** La demostración en un dispositivo (`remote`: la página llega por la red, la sirve la app grabada o su grabación): el curso
+ *  viene del servidor, pero lo que se estudia no se guarda allí (el progreso, el simulacro: en memoria, con el motor). */
+export function isDeviceDemo(remote: boolean): boolean {
+  return DEMO && remote
+}
+
 function synthetic(id: string, title: string, subject: string, icon: string, hue: number, units: [string, string[]][]): Pack {
   const now = new Date().toISOString()
   const skills = units.flatMap(([, s], ui) =>

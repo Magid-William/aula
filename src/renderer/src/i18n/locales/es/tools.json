@@ -14,6 +14,8 @@
     "name": "Calculadora",
     "desc": "Exacta: fracciones, raíces, π y notación científica",
     "inputLabel": "Operación",
+    "systemKeys": "Escribir con el teclado",
+    "calcKeys": "Escribir con las teclas de la calculadora",
     "placeholder": "Escribe una operación: 3/4 + 1/6, √8, sin(π/6)…",
     "hint": "Escribe con el teclado o con las teclas. Verás la fórmula mientras escribes y el resultado exacto (fracción, π, raíz) con su decimal. Intro calcula; ↑ recupera la anterior; a = 5 guarda un valor.",
     "hint_touch": "Escribe con las teclas. Verás la fórmula mientras escribes y el resultado exacto (fracción, π, raíz) con su decimal; a = 5 guarda un valor.",

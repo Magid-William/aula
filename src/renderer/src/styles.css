@@ -643,3 +643,15 @@ input[type='date']::-webkit-datetime-edit-text,
 input[type='time']::-webkit-datetime-edit-text {
   color: var(--text3);
 }
+/* Con el dedo (abren el selector del sistema), sin su aspecto nativo: en iOS les daba un ancho propio que no encogía con su
+   sitio (en el teléfono se salían de la fila y se pintaban encima del campo de al lado). El valor, a la izquierda. */
+@media (hover: none), (pointer: coarse) {
+  :where(input[type='date'], input[type='time'], input[type='datetime-local']) {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+  }
+  :where(input[type='date'], input[type='time'], input[type='datetime-local'])::-webkit-date-and-time-value {
+    text-align: left;
+  }
+}

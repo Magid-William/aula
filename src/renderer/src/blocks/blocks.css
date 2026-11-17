@@ -73,6 +73,10 @@
 .blk-formula .katex-display { margin: 0; padding: 2px 0; overflow-x: auto; overflow-y: hidden; }
 .blk-formula .katex { font-size: 1.16em; }
 .blk-inline-math .katex { font-size: 1em; }
+/* Una fórmula en pantalla más ancha que su sitio: el borde por el que sigue se desvanece (shared.tsx, useScrollFade) */
+.katex-display.blk-fade-end { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.katex-display.blk-fade-start { -webkit-mask-image: linear-gradient(to right, transparent, #000 32px); mask-image: linear-gradient(to right, transparent, #000 32px); }
+.katex-display.blk-fade-start.blk-fade-end { -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 
 /* Etiquetas sobre figuras (KaTeX en línea, sin saltos) */
 .blk-fig-label { white-space: nowrap; line-height: 1; }

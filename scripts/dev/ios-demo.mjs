@@ -121,11 +121,6 @@ const go = async (route, wait = 2200) => {
 }
 const snap = async (name) => { if (shots) { mkdirSync(shots, { recursive: true }); await page.screenshot({ path: join(shots, `${name}.png`) }) } }
 const course = (tab) => ({ name: 'course', id: ID, tab })
-// pulsar un botón por su nombre, si está (el recorrido no se para si una pantalla cambia)
-const tap = async (name, wait = 1200) => {
-  await page.getByRole('button', { name }).last().click({ timeout: 4000 }).catch(() => undefined)
-  await page.waitForTimeout(wait)
-}
 const study = (mode, extra = {}) => ({ name: 'study', id: ID, mode, ...extra })
 
 async function tour(tag) {
@@ -147,17 +142,9 @@ async function tour(tag) {
   await snap(`${tag}-cards`)
   await go(study('plan'), 2200)
   await go(study('mistakes'), 2200)
+  // el simulacro no se graba: en la demostración (?demo=1 en un dispositivo) lo arma y lo corrige la interfaz con el motor y
+  // el progreso vive en memoria (study/data.ts), así que la grabación tampoco deja un intento suyo en el historial
   await go(study('exam'), 2200)
-  // el simulacro de verdad (sin grabarlo, «Empezar» fallaba en la demostración): empezar, contestar la primera pregunta y
-  // entregar (el botón de la barra abre la confirmación; el último «Submit» es el suyo)
-  // una sola vez: en la vuelta estrecha (teléfono) «Entregar» está en el mapa de preguntas y quedaba un simulacro a medias
-  if (tag === 'wide') {
-    await tap(/^(Start the mock exam|Resume)$/, 3000)
-    await page.locator('[data-exercise] [role="radio"], [data-exercise] [role="option"]').first().click({ timeout: 4000 }).catch(() => undefined)
-    await page.waitForTimeout(800)
-    await tap(/^Submit$/, 1000)
-    await tap(/^Submit$/, 3500)
-  }
   for (const view of ['agenda', 'week', 'month']) await go({ name: 'calendar', view }, 1800)
   await snap(`${tag}-calendar`)
   await go({ name: 'stats' }, 2500)
@@ -187,6 +174,12 @@ async function tour(tag) {
     await snap(`${tag}-chat`)
   }
   await go({ name: 'home' }, 2500)
+  // los eventos de «Esta semana» (en Hoy) abren su hoja pidiendo el evento entero: también eso, para que en la demostración
+  // no digan «Ya no está»
+  await page.evaluate(async () => {
+    const summary = await window.aula.invoke('home.summary')
+    for (const e of summary.value?.upcoming ?? []) await window.aula.invoke('calendar.get', { id: e.id })
+  })
   // las conversaciones, ya contestadas: la interfaz no las vuelve a pedir (las tiene en memoria), así que se piden aquí
   // para que lo que quede grabado sea su estado final y no «pensando»
   await page.evaluate(async () => {

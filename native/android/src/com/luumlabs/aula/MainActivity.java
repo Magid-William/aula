@@ -11,6 +11,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
@@ -178,6 +179,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        keepPhonePortrait();
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         if (saved != null) restoreURL = saved.getString("url");
         night = systemNight();
@@ -248,6 +250,7 @@ public final class MainActivity extends Activity {
     @Override
     public void onConfigurationChanged(Configuration config) {
         super.onConfigurationChanged(config);
+        keepPhonePortrait();
         boolean wasNight = night;
         night = systemNight();
         rebuildSheet();
@@ -259,6 +262,18 @@ public final class MainActivity extends Activity {
         applyInsets();
         applyLook();
         pushVars();
+    }
+
+    /**
+     * Un teléfono (menos de 600 dp de lado corto) se queda en vertical, como el iPhone: girado, entre la cabecera, las
+     * pestañas y el teclado no quedaba sitio para leer ni para ver lo que se escribe. Una tableta (o un plegable abierto)
+     * gira libre.
+     */
+    private void keepPhonePortrait() {
+        int want = getResources().getConfiguration().smallestScreenWidthDp < 600
+            ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+            : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+        if (getRequestedOrientation() != want) setRequestedOrientation(want);
     }
 
     /** Hasta Android 12, «atrás» llega aquí; desde Android 13, por updateBack. */
@@ -790,7 +805,8 @@ public final class MainActivity extends Activity {
         s.setAllowContentAccess(true);
         s.setSupportMultipleWindows(false);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        web.setLongClickable(false);
+        // mantener pulsado selecciona y copia lo que se lee (lo `.selectable`: una respuesta de Aula, la lección); en los
+        // controles no, porque shell.js les quita la selección con CSS
         web.setHapticFeedbackEnabled(false);
         web.addJavascriptInterface(new AppBridge(), "aulaApp");
         web.setWebViewClient(new WebViewClient() {

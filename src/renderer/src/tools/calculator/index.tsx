@@ -4,8 +4,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Copy, CornerDownLeft, Delete, Trash2, X } from 'lucide-react'
-import { Button, Card, IconButton, SegmentedTabs, Sprite, cx, focusWithinRing, spring, toast, useTheme } from '@renderer/design'
+import { Check, Copy, CornerDownLeft, Delete, Keyboard, Trash2, X } from 'lucide-react'
+import { Button, Card, IconButton, SegmentedTabs, Sprite, cx, focusWithinRing, spring, toast, useTheme, useTouchOnly } from '@renderer/design'
 import { useAmbient } from '@renderer/design/ambient'
 import { Tex } from '../shared/Tex'
 import { localizeTex } from '../shared/lib/num'
@@ -91,6 +91,10 @@ export default function CalculatorTool({ compact }: ToolProps) {
   const sep = comma ? ',' : '.'
   const s = useCalc()
   const inputRef = useRef<HTMLInputElement>(null)
+  // con el dedo, las teclas de la calculadora son su teclado: el del sistema (letras, «a = 5») solo si se pide, porque taparía
+  // las teclas
+  const touch = useTouchOnly()
+  const [systemKeys, setSystemKeys] = useState(false)
   const [lit, setLit] = useState<string | null>(null)
   const [landed, setLanded] = useState(0)
   const ctx = useMemo(() => contextOf(s), [s.vars, s.ans, s.degrees]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -157,9 +161,21 @@ export default function CalculatorTool({ compact }: ToolProps) {
     }
     s.setInput(next)
     requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(caret, caret)
+      // con el dedo, el campo no se enfoca solo al pulsar una tecla (saldría el teclado del sistema encima de las teclas)
+      if (!el || (touch && document.activeElement !== el)) return
+      el.focus()
+      el.setSelectionRange(caret, caret)
     })
+  }
+
+  const toggleSystemKeys = (): void => {
+    const on = !systemKeys
+    setSystemKeys(on)
+    const el = inputRef.current
+    if (!el) return
+    // el teclado del sistema sale al enfocar con el modo nuevo; al quitarlo, se suelta el campo para que se esconda
+    if (on) requestAnimationFrame(() => el.focus())
+    else el.blur()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -185,6 +201,9 @@ export default function CalculatorTool({ compact }: ToolProps) {
     <Display
       compact={compact}
       inputRef={inputRef}
+      touch={touch}
+      systemKeys={systemKeys}
+      onToggleSystemKeys={toggleSystemKeys}
       onKeyDown={onKeyDown}
       previewTex={preview ? localizeTex(preview.tex, comma) : null}
       partial={!!preview?.partial}
@@ -220,9 +239,13 @@ export default function CalculatorTool({ compact }: ToolProps) {
 
 // MARK: Visor
 
-function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, landed, issue, degHint }: {
+function Display({ compact, inputRef, touch, systemKeys, onToggleSystemKeys, onKeyDown, previewTex, partial, shown, landed, issue, degHint }: {
   compact?: boolean
   inputRef: React.RefObject<HTMLInputElement | null>
+  /** Con el dedo: el campo no saca el teclado del sistema (escriben las teclas) salvo con `systemKeys`. */
+  touch: boolean
+  systemKeys: boolean
+  onToggleSystemKeys: () => void
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void
   previewTex: string | null
   partial: boolean
@@ -257,11 +280,25 @@ function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, lan
           onChange={(e) => s.setInput(e.target.value)}
           onKeyDown={onKeyDown}
           {...mathField}
-          autoFocus={!compact}
+          autoFocus={!compact && !touch}
+          inputMode={touch && !systemKeys ? 'none' : undefined}
           aria-label={t('calculator.inputLabel')}
           placeholder={t('calculator.placeholder')}
-          className={cx('w-full bg-transparent outline-none text-text placeholder:text-text3 tracking-[-0.01em]', compact ? 'text-[18px] h-8' : 'text-[24px] h-10')}
+          className={cx('w-full bg-transparent outline-none text-text placeholder:text-text3 tracking-[-0.01em]', compact ? 'text-[18px] h-8' : 'text-[24px] h-10', touch && 'pr-10')}
         />
+        {touch && (
+          <IconButton
+            label={systemKeys ? t('calculator.calcKeys') : t('calculator.systemKeys')}
+            size="sm"
+            aria-pressed={systemKeys}
+            active={systemKeys}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onToggleSystemKeys}
+            className={cx('absolute right-2', compact ? 'top-3' : 'top-[22px]')}
+          >
+            <Keyboard size={16} />
+          </IconButton>
+        )}
         <div className={cx('overflow-x-auto overflow-y-hidden text-text2', compact ? 'min-h-[30px] text-[15px]' : 'min-h-[40px] text-[19px]')}>
           <AnimatePresence mode="popLayout" initial={false}>
             {previewTex && (

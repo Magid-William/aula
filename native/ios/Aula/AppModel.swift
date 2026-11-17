@@ -60,9 +60,17 @@ final class AppModel {
         #endif
     }
     /// El tema de Aula (Ajustes → Apariencia) cuando no es el del sistema: true oscuro, false claro, nil el del sistema.
-    /// La hora y la batería, la franja de la demostración y las pantallas de espera lo siguen. Se recuerda para que la app
-    /// arranque ya con él.
+    /// Las pantallas de espera lo siguen. Se recuerda para que la app arranque ya con él.
     private(set) var pageDark: Bool? = AppModel.savedPageDark
+    /// Lo que dice la página ahora (oscura o clara); nil hasta que lo diga.
+    private(set) var lookDark: Bool?
+    /// Cómo se pinta lo nativo (la hora y la batería, la franja de la demostración, las pantallas de espera): con la
+    /// interfaz a la vista, siempre como ella (nunca «el del sistema» a ciegas: si el sistema cambiaba con el tema de Aula
+    /// impuesto, la franja quedaba con los colores del otro tema sobre la página); si no, el tema guardado de Aula.
+    var chromeDark: Bool? {
+        if case .ready = stage, let lookDark { return lookDark }
+        return pageDark
+    }
     /// El color de arriba de la página («#rrggbb»): la franja de la demostración se pinta igual.
     private(set) var pageTop: String?
     private static let themeKey = "aula.theme"
@@ -279,6 +287,7 @@ final class AppModel {
     /// sistema; si no, al de Aula: así la hora y la batería se leen sobre la página.
     func pageLook(_ look: PageLook, systemDark: Bool) {
         pageTop = look.top
+        if lookDark != look.dark { lookDark = look.dark }
         let next: Bool? = look.dark == systemDark ? nil : look.dark
         guard next != pageDark else { return }
         pageDark = next
@@ -318,6 +327,7 @@ final class AppModel {
         guard inDemo else { return }
         pageShowsDemoNotice = false
         pageTop = nil
+        lookDark = nil
         demo?.stop()
         demo = nil
         inDemo = false

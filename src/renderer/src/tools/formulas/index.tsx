@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Copy, Search, Star, X } from 'lucide-react'
-import { Card, EmptyState, IconButton, cx, focusRing, spring, useTheme } from '@renderer/design'
+import { Card, EmptyState, IconButton, canAutoFocus, cx, focusRing, spring, useTheme } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { toneInk } from '../shared/palette'
 import { mathField, useCopy, useStored } from '../shared/ui'
@@ -51,7 +51,8 @@ export default function FormulasTool(_props: ToolProps) {
             onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
             placeholder={t('formulas.search')}
             aria-label={t('formulas.search')}
-            autoFocus
+            // con el dedo no: sacaría el teclado sin pedirlo
+            autoFocus={canAutoFocus()}
             className={`w-full h-11 rounded-[12px] bg-field border-[0.5px] border-line-strong/40 pl-10 pr-9 text-[15px] outline-none ${focusRing}`}
           />
           {query && (

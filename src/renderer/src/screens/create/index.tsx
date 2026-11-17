@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
-import { Button, Card, Chip, ConfirmDialog, DateField, Icon, InkSpot, Select, Spinner, Switch, TextArea, TextField, cx, spring, toast } from '@renderer/design'
+import { Button, Card, Chip, ConfirmDialog, canAutoFocus, DateField, Icon, InkSpot, Select, Spinner, Switch, TextArea, TextField, cx, spring, toast } from '@renderer/design'
 import type { CreateRequest, GenerationDepth, MaterialView } from '@shared/generation/types'
 import { CourseLanguages } from '@engine/base/language'
 import { resolveCourseLanguage } from '@shared/settings/courseLanguage'
@@ -173,7 +173,7 @@ export default function CreateScreen() {
               <h1 className="t-title1">{t('heading')}</h1>
               <p className="t-callout text-text2 mt-1">{t('subheading')}</p>
               <input
-                autoFocus
+                autoFocus={canAutoFocus()}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t('titlePlaceholder')}
