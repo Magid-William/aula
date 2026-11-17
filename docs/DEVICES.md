@@ -190,8 +190,9 @@ Ready in the project:
   (`DEVELOPMENT_TEAM=<team>`), so the project stays neutral.
 - `Aula/PrivacyInfo.xcprivacy`: no tracking; the "required reason" system functions (file timestamps in the node's own
   folder and the system clock, used by the embedded Tailscale node; `UserDefaults`, which remembers which Aula to
-  open); and what Tailscale keeps to connect the device (User ID and Device ID, linked, not for tracking, App
-  Functionality). Each `TailscaleKit.framework` carries its own manifest too.
+  open); and what Tailscale keeps to connect the device (Email Address, seen by Tailscale's sign-in inside the app,
+  User ID and Device ID; linked, not for tracking, App Functionality). Each `TailscaleKit.framework` carries its own
+  manifest too.
 - TailscaleKit's debug symbols: the xcframework carries a `TailscaleKit.framework.dSYM` for each framework (made
   before stripping, with the binary's UUID), and Xcode copies it into the archive's `dSYMs/` next to the app's, so App
   Store Connect can symbolicate crashes in it (without them it warns that the archive has no dSYM for

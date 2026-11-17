@@ -26,12 +26,14 @@ where Apple counts bytes), the version, both privacy manifests, the license noti
 | Version | **0.2.7** (App Store Connect creates "1.0": change it), build 1. See [Version and build](#version-and-build) |
 | Release | *Manually release this version*: publish it once the notarized Mac 0.2.7 is the latest release, where *Aula for Mac* sends people |
 
-**App privacy** (the questionnaire): *Do you or your third-party partners collect data from this app?* **Yes**. Type
-**Identifiers → User ID** and **Identifiers → Device ID**, each one: purpose *App Functionality*, linked to the user
-**Yes**, used for tracking **No**. Nothing else (no contact info, usage data or diagnostics: the Tailscale component's
-log uploads are off). This is what Tailscale, the third-party component inside the app, keeps to connect the device to
-the student's private network; Luum Labs receives nothing. It matches `native/ios/Aula/PrivacyInfo.xcprivacy` and the
-iPhone and iPad part of [docs/PRIVACY.md](../PRIVACY.md).
+**App privacy** (the questionnaire): *Do you or your third-party partners collect data from this app?* **Yes**. Types
+**Contact Info → Email Address**, **Identifiers → User ID** and **Identifiers → Device ID**, each one: purpose *App
+Functionality*, linked to the user **Yes**, used for tracking **No**. Nothing else (no usage data or diagnostics: the
+Tailscale component's log uploads are off). This is what Tailscale, the third-party component inside the app, keeps
+to connect the device to the student's private network: the email address comes from Tailscale's sign-in, which the
+app shows inside itself (`SFSafariViewController` on login.tailscale.com) and which sees the email of the account the
+student chooses; the user and the device are the node Tailscale registers. Luum Labs receives nothing. It matches
+`native/ios/Aula/PrivacyInfo.xcprivacy` and the iPhone and iPad part of [docs/PRIVACY.md](../PRIVACY.md).
 
 **Export compliance** (asked on each build until `ITSAppUsesNonExemptEncryption` is in the Info.plist):
 

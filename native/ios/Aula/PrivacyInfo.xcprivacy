@@ -8,9 +8,22 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 	<!-- Luum Labs no recibe nada. Lo que se declara lo guarda Tailscale (el componente que lleva la app): la cuenta de
-	     Tailscale del estudiante y este dispositivo en su red privada, solo para conectarlo (docs/PRIVACY.md). -->
+	     Tailscale del estudiante (el correo de la cuenta que elige, que ve el inicio de sesión de Tailscale dentro de
+	     la app, y su usuario) y este dispositivo en su red privada, solo para conectarlo (docs/PRIVACY.md). -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeUserID</string>

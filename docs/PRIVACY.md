@@ -30,17 +30,19 @@ iPhone and iPad app.
 
 The app is a window to the Aula on your own Mac. It has no content of its own except an example course for the demo.
 
-- **No account in the app, and nothing reaches Luum Labs.** The app does not ask for your name or email, has no ads,
-  analytics or tracking, and sends nothing to Luum Labs.
+- **No account in the app, and nothing reaches Luum Labs.** The app itself does not ask for your name or email (only
+  Tailscale's sign-in does, below), has no ads, analytics or tracking, and sends nothing to Luum Labs.
 - **How it reaches your Mac, and what Tailscale keeps.** The app carries Tailscale's open-source component
   (TailscaleKit). You sign in to **your** Tailscale account (a third party, with its own
-  [privacy policy](https://tailscale.com/privacy-policy)), on Tailscale's own page shown inside the app. To connect
-  this device, Tailscale's coordination service adds it to your private network and keeps, while the device is in it,
-  your Tailscale user and this device's identity: its name (`aula-iphone` or `aula-ipad`), its keys, its operating
-  system and version, and its network addresses. This is the *User ID* and *Device ID* of the app's App Store privacy
-  label: linked to you, used only to make the connection work, never for tracking or advertising. What you study
-  travels between your device and your Mac encrypted end to end (WireGuard) and is not readable by Tailscale or by
-  Luum Labs. The component's log uploads to Tailscale are turned off.
+  [privacy policy](https://tailscale.com/privacy-policy)), on Tailscale's own page shown inside the app. Tailscale's
+  sign-in sees the email address of the account you choose (Apple, Google, Microsoft, GitHub…) and keeps it with your
+  Tailscale account; the app does not read it. To connect this device, Tailscale's coordination service adds it to
+  your private network and keeps, while the device is in it, your Tailscale user and this device's identity: its name
+  (`aula-iphone` or `aula-ipad`), its keys, its operating system and version, and its network addresses. This is the
+  *Email Address*, *User ID* and *Device ID* of the app's App Store privacy label: linked to you, used only to make
+  the connection work, never for tracking or advertising. What you study travels between your device and your Mac
+  encrypted end to end (WireGuard) and is not readable by Tailscale or by Luum Labs. The component's log uploads to
+  Tailscale are turned off.
 - **What is stored on the device.** The Tailscale sign-in of this app, which Aula it opens and the link with your Mac
   (made once with a 6-digit code). Your courses stay on the Mac.
 - **Third parties.** Luum Labs shares no data with anyone. Only two third parties receive data, and only for what you
@@ -103,18 +105,19 @@ escritorio ni en la de iPhone y iPad.
 La app es la ventana a la Aula de tu propio Mac. No tiene contenido propio salvo un curso de ejemplo para la
 demostración.
 
-- **Sin cuenta en la app, y nada llega a Luum Labs.** La app no pide tu nombre ni tu correo, no tiene anuncios,
-  analíticas ni rastreo, y no envía nada a Luum Labs.
+- **Sin cuenta en la app, y nada llega a Luum Labs.** La app en sí no pide tu nombre ni tu correo (solo lo pide el
+  inicio de sesión de Tailscale, abajo), no tiene anuncios, analíticas ni rastreo, y no envía nada a Luum Labs.
 - **Cómo llega a tu Mac, y qué guarda Tailscale.** La app lleva el componente de código abierto de Tailscale
   (TailscaleKit). Inicias sesión en **tu** cuenta de Tailscale (un tercero, con su propia
-  [política de privacidad](https://tailscale.com/privacy-policy)), en la página de Tailscale, que se abre dentro de
-  la app. Para conectar este dispositivo, el servicio de coordinación de Tailscale lo añade a tu red privada y guarda,
-  mientras el dispositivo esté en ella, tu usuario de Tailscale y la identidad del dispositivo: su nombre
-  (`aula-iphone` o `aula-ipad`), sus claves, su sistema y versión, y sus direcciones de red. Es el *User ID* y el
-  *Device ID* de la etiqueta de privacidad de la app en el App Store: vinculados a ti, solo para que la conexión
-  funcione, nunca para rastrear ni para publicidad. Lo que estudias viaja entre tu dispositivo y tu Mac cifrado de
-  extremo a extremo (WireGuard) y no lo pueden leer ni Tailscale ni Luum Labs. El envío de registros del componente a
-  Tailscale está desactivado.
+  [política de privacidad](https://tailscale.com/privacy-policy)), en la página de Tailscale, que se abre dentro de la
+  app. El inicio de sesión de Tailscale ve el correo de la cuenta que eliges (Apple, Google, Microsoft, GitHub…) y lo
+  guarda con tu cuenta de Tailscale; la app no lo lee. Para conectar este dispositivo, el servicio de coordinación de
+  Tailscale lo añade a tu red privada y guarda, mientras el dispositivo esté en ella, tu usuario de Tailscale y la
+  identidad del dispositivo: su nombre (`aula-iphone` o `aula-ipad`), sus claves, su sistema y versión, y sus
+  direcciones de red. Es el *Email Address*, el *User ID* y el *Device ID* de la etiqueta de privacidad de la app en
+  el App Store: vinculados a ti, solo para que la conexión funcione, nunca para rastrear ni para publicidad. Lo que
+  estudias viaja entre tu dispositivo y tu Mac cifrado de extremo a extremo (WireGuard) y no lo pueden leer ni
+  Tailscale ni Luum Labs. El envío de registros del componente a Tailscale está desactivado.
 - **Qué se guarda en el dispositivo.** El inicio de sesión de Tailscale de esta app, qué Aula abre y el vínculo con tu
   Mac (hecho una vez con un código de 6 cifras). Tus cursos se quedan en el Mac.
 - **Terceros.** Luum Labs no comparte datos con nadie. Solo dos terceros reciben datos, y solo para lo que tú

@@ -119,15 +119,17 @@ line(app.NSPrivacyTracking === false, 'sin rastreo')
 for (const [category, reason, why] of [['FileTimestamp', 'C617.1', 'el nodo de Tailscale'], ['SystemBootTime', '35F9.1', 'el nodo de Tailscale'], ['UserDefaults', 'CA92.1', 'AppModel.swift']]) {
   line(declares(app, category, reason), `${category} ${reason} (${why})`)
 }
-// lo que guarda Tailscale (docs/PRIVACY.md y la etiqueta de App Store Connect): vinculado, sin rastreo, para que funcione
+// lo que guarda Tailscale (docs/PRIVACY.md y la etiqueta de App Store Connect): vinculado, sin rastreo, para que
+// funcione. El correo lo ve su inicio de sesión, que se abre dentro de la app (SafariView.swift)
+const COLLECTED = ['EmailAddress', 'UserID', 'DeviceID']
 const collected = new Map((app.NSPrivacyCollectedDataTypes ?? []).map((t) => [t.NSPrivacyCollectedDataType, t]))
-for (const type of ['UserID', 'DeviceID']) {
+for (const type of COLLECTED) {
   const t = collected.get(`NSPrivacyCollectedDataType${type}`)
   line(t?.NSPrivacyCollectedDataTypeLinked === true && t.NSPrivacyCollectedDataTypeTracking === false &&
     t.NSPrivacyCollectedDataTypePurposes?.length === 1 && t.NSPrivacyCollectedDataTypePurposes[0] === 'NSPrivacyCollectedDataTypePurposeAppFunctionality',
     `recoge ${type}: vinculado, sin rastreo, App Functionality (lo que guarda Tailscale)`)
 }
-line(collected.size === 2, `no declara más datos que esos dos (${collected.size})`)
+line(collected.size === COLLECTED.length, `no declara más datos que esos ${COLLECTED.length} (${collected.size})`)
 
 console.log('\nTailscaleKit (Frameworks/TailscaleKit.xcframework)')
 const xcf = join(IOS, 'Frameworks/TailscaleKit.xcframework')
