@@ -27,7 +27,7 @@ import { GradedRubric, OpenInput, SelfReviewPanel } from './inputs/OpenInput'
 import { useKeys, type InputProps, type RevealLevel } from './inputs/shared'
 import type { ExerciseController } from './useExercise'
 import type { GradeResult } from './types'
-import { KeyCap } from './ui'
+import { KeyCap, ReturnKey } from './ui'
 
 /** Texto con huecos «[[n]]» cuando el ejercicio de completar los trae en el enunciado. */
 function clozeSource(prompt: Block[]): string {
@@ -280,7 +280,7 @@ export function ExerciseActions({ controller: c, continueLabel, variant = 'inlin
   if (c.finished) {
     if (c.hasContinue)
       primary = (
-        <Button variant="primary" size={variant === 'bar' ? 'md' : 'lg'} onClick={c.continueNow} iconRight={<KeyCap className="bg-white/20! text-on-accent!">↩</KeyCap>}>
+        <Button variant="primary" size={variant === 'bar' ? 'md' : 'lg'} onClick={c.continueNow} iconRight={<KeyCap className="bg-white/20! text-on-accent!"><ReturnKey /></KeyCap>}>
           {continueLabel ?? t('ex.continue')}
         </Button>
       )
@@ -288,13 +288,13 @@ export function ExerciseActions({ controller: c, continueLabel, variant = 'inlin
     primary = null
   } else if (c.checkedWrong) {
     primary = (
-      <Button variant="primary" size={variant === 'bar' ? 'md' : 'lg'} onClick={c.retry} iconRight={<KeyCap className="bg-white/20! text-on-accent!">↩</KeyCap>}>
+      <Button variant="primary" size={variant === 'bar' ? 'md' : 'lg'} onClick={c.retry} iconRight={<KeyCap className="bg-white/20! text-on-accent!"><ReturnKey /></KeyCap>}>
         {t('ex.tryAgain')}
       </Button>
     )
   } else {
     primary = (
-      <Button variant="primary" size={variant === 'bar' ? 'md' : 'lg'} disabled={!c.canCheck} loading={c.run.grading} onClick={c.submit} iconRight={<KeyCap className="bg-white/20! text-on-accent!">{c.multiline ? (mac ? '⌘↩' : 'Ctrl ↩') : '↩'}</KeyCap>}>
+      <Button variant="primary" size={variant === 'bar' ? 'md' : 'lg'} disabled={!c.canCheck} loading={c.run.grading} onClick={c.submit} iconRight={<KeyCap className="bg-white/20! text-on-accent!">{c.multiline && (mac ? '⌘' : 'Ctrl')}<ReturnKey /></KeyCap>}>
         {t('ex.check')}
       </Button>
     )

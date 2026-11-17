@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AnswerOf } from '@shared/schema/exercises'
 import { RichText } from '@renderer/lib/RichText'
-import { cx } from '@renderer/design'
+import { canAutoFocus, cx } from '@renderer/design'
 import { blankWidth } from '../normalize'
 import { partTone, type InputProps } from './shared'
 import { answerField } from './answerField'
@@ -29,7 +29,8 @@ export function ClozeInput({ answer, draft, set, locked, reveal, result, onSubmi
   const segments = clozeSegments(text)
   useEffect(() => {
     // al volver a intentarlo, el primer hueco queda seleccionado: lo que escribas lo sustituye
-    if (autoFocus && !locked) requestAnimationFrame(() => { first.current?.focus({ preventScroll: true }); first.current?.select() })
+    // con el dedo no: sacaría el teclado al llegar a cada pregunta (se escribe al tocar el hueco)
+    if (autoFocus && !locked && canAutoFocus()) requestAnimationFrame(() => { first.current?.focus({ preventScroll: true }); first.current?.select() })
   }, [autoFocus, locked])
   const setBlank = (i: number, v: string): void => set((d) => {
     const blanks = [...d.blanks]

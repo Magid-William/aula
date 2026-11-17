@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Answer } from '@shared/schema/exercises'
 import { RichText } from '@renderer/lib/RichText'
-import { cx, InkStrike, Tooltip } from '@renderer/design'
+import { canAutoFocus, cx, InkStrike, Tooltip } from '@renderer/design'
 import { keysFor, type AnswerKey } from '../keys'
 import { chemTex, insertAt, mathPreview, previewIsUseful, usesDecimalComma } from '../normalize'
 import { Tex } from '../ui'
@@ -83,7 +83,8 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
 
   useEffect(() => {
     // al volver a intentarlo, la respuesta anterior queda seleccionada: lo que escribas la sustituye
-    if (autoFocus && !locked) requestAnimationFrame(() => { ref.current?.focus({ preventScroll: true }); ref.current?.select() })
+    // con el dedo no: sacaría el teclado al llegar a cada pregunta (se escribe al tocar el campo)
+    if (autoFocus && !locked && canAutoFocus()) requestAnimationFrame(() => { ref.current?.focus({ preventScroll: true }); ref.current?.select() })
   }, [autoFocus, locked])
 
   const preview = useMemo(() => {

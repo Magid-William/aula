@@ -12,6 +12,7 @@ import { compileFn, evalNumber, type Params, type RealFn } from './evaluate'
 import { clip, curveFn, LIMITS, panRange, plotRange, trace, zoomRange, type Range } from './compile'
 import { formatNumber, numberTicks, piTicks, type Tick } from './ticks'
 import { boxAt, labelSize, placeLabel, type Box, type Candidate } from './labels'
+import { Fingers, pinchFactor } from './pinch'
 
 const EMPTY: Params = {}
 
@@ -351,15 +352,28 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
     const box = wrap.current!.getBoundingClientRect()
     return { x: e.clientX - box.left, y: e.clientY - box.top }
   }
+  // con dos dedos, pellizco (acerca o aleja) y arrastre por el punto medio; con uno, arrastre (pinch.ts)
+  const fingers = useRef(new Fingers<Range>())
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!interactive || e.button !== 0 || (e.target as HTMLElement).closest('button')) return
     const p = local(e)
     e.currentTarget.setPointerCapture(e.pointerId)
-    setDrag({ x: p.x, y: p.y, r: range })
+    if (fingers.current.down(e.pointerId, p, range)) setDrag(null)
+    else if (fingers.current.count === 1) setDrag({ x: p.x, y: p.y, r: range })
   }
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!interactive) return
     const p = local(e)
+    const two = fingers.current.move(e.pointerId, p)
+    const pinch = fingers.current.pinch
+    if (two && pinch) {
+      // el punto que estaba entre los dedos se queda entre ellos: zoom alrededor de él y luego lo que se movió el punto medio
+      const c = toData(pinch.mid.x, pinch.mid.y, pinch.from)
+      const z = zoomRange(pinch.from, pinchFactor(pinch.spread, two.spread), c.x, c.y)
+      setView(panRange(z, -((two.mid.x - pinch.mid.x) / rect.w) * (z.xMax - z.xMin), ((two.mid.y - pinch.mid.y) / rect.h) * (z.yMax - z.yMin)))
+      setHover(null)
+      return
+    }
     if (drag) {
       const dxData = ((p.x - drag.x) / rect.w) * (drag.r.xMax - drag.r.xMin)
       const dyData = ((p.y - drag.y) / rect.h) * (drag.r.yMax - drag.r.yMin)
@@ -369,7 +383,12 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
     }
     setHover(p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h ? p : null)
   }
-  const endDrag = () => setDrag(null)
+  const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const left = fingers.current.up(e.pointerId)
+    // al soltar uno de los dos dedos, el que queda sigue arrastrando desde donde está
+    if (left) setDrag({ x: left.x, y: left.y, r: range })
+    else if (fingers.current.count === 0) setDrag(null)
+  }
   const zoom = (f: number) => setView((v) => zoomRange(v ?? range, f))
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!interactive) return
@@ -419,7 +438,8 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
     <div
       ref={wrap}
       className={cx('group/plot relative w-full select-none outline-none rounded-[12px] focus-visible:ring-2 focus-visible:ring-accent-line', interactive && (drag ? 'cursor-grabbing' : 'cursor-crosshair'))}
-      style={{ height, touchAction: interactive ? 'none' : undefined }}
+      // con el dedo, deslizar en vertical desplaza la lección (no se queda atrapado en la gráfica); lo demás es de la gráfica
+      style={{ height, touchAction: interactive ? 'pan-y' : undefined }}
       tabIndex={interactive ? 0 : undefined}
       role="img"
       aria-label={summary(spec, range, ctx.language, t)}
@@ -560,7 +580,7 @@ export function PlotCanvas({ spec, ctx, params = EMPTY, baseRange, maxHeight }: 
         </div>
       )}
       {interactive && (
-        <div className={cx('absolute right-[22px] top-[18px] z-10 flex items-center gap-0.5 rounded-[10px] border-[0.5px] border-line bg-raised/95 p-0.5 shadow-[var(--e2)] transition-opacity duration-200', changed ? 'opacity-100' : 'opacity-0 group-hover/plot:opacity-100 group-focus-within/plot:opacity-100')}>
+        <div className={cx('absolute right-[22px] top-[18px] z-10 flex items-center gap-0.5 rounded-[10px] border-[0.5px] border-line bg-raised/95 p-0.5 shadow-[var(--e2)] transition-opacity duration-200', changed ? 'opacity-100' : 'opacity-0 group-hover/plot:opacity-100 group-focus-within/plot:opacity-100 touch:opacity-100')}>
           <IconButton size="sm" label={t('plot.zoomIn')} onClick={() => zoom(0.7)}>
             <Icon name="plus" size={14} />
           </IconButton>

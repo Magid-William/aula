@@ -54,7 +54,8 @@
     "ofSteps_one": "of {{count}}",
     "ofSteps_other": "of {{count}}",
     "scrubber": "Process step",
-    "panHint": "Drag to move · {{mod}} + scroll to zoom"
+    "panHint": "Drag to move · {{mod}} + scroll to zoom",
+    "panHint_touch": "Drag to move around"
   },
   "compare": {
     "key": "Key difference",
@@ -74,7 +75,9 @@
     "hideNames": "Hide names",
     "showNames": "Show names",
     "hint": "Hover over the figure or click a part to see what it is.",
+    "hint_touch": "Tap a part of the figure to see what it is.",
     "hintPractice": "Hover over the figure or click a part. Once you know it, try “Find it”.",
+    "hintPractice_touch": "Tap a part of the figure. Once you know it, try “Find it”.",
     "pointTo": "Point to:",
     "right": "Nice!",
     "thatIs": "That’s “{{name}}”.",
@@ -84,6 +87,7 @@
     "retryMissed": "Review the ones you missed",
     "again": "Again",
     "dragHint": "Drag each name to its spot (or click the name, then the spot).",
+    "dragHint_touch": "Drag each name to its spot (or tap the name, then the spot).",
     "inPlace": "{{right}} of {{total}} in place",
     "placedCount_one": "{{count}} of {{total}} placed",
     "placedCount_other": "{{count}} of {{total}} placed",
@@ -106,6 +110,7 @@
     "startPen": "Circle or underline what you want to ask about",
     "startMarker": "Highlight what you want to ask about",
     "startNote": "Click where you want to leave a note",
+    "startNote_touch": "Tap where you want to leave a note",
     "title": "Mark the figure",
     "pen": "Pen",
     "marker": "Highlighter",
@@ -120,6 +125,7 @@
     "ask": "Ask the tutor",
     "recognized": "You marked:",
     "hint": "With the keyboard: ← → picks a part, Enter circles it, N adds a note and {{mod}}+Z undoes. Esc closes.",
+    "hint_touch": "Mark what you want to ask about with your finger and type your question.",
     "partOf": "{{name}}, {{k}} of {{n}}",
     "markedOne": "Marked: {{name}}",
     "noParts": "This figure has no named parts: mark anywhere with the mouse or your finger.",
@@ -165,7 +171,9 @@
     "traceY": "Vertical position",
     "speed": "Speed ×{{x}}",
     "loopOn": "Looping (click to stop at the end)",
-    "loopOff": "Stops at the end (click to loop)"
+    "loopOn_touch": "Looping (tap to stop at the end)",
+    "loopOff": "Stops at the end (click to loop)",
+    "loopOff_touch": "Stops at the end (tap to loop)"
   },
   "map": {
     "eyebrow": "Map",
@@ -173,6 +181,7 @@
     "close": "Close",
     "attribution": "Map: Natural Earth (public domain)",
     "hint": "Click a marker, a country or a region to read about it.",
+    "hint_touch": "Tap a marker, a country or a region to read about it.",
     "notThere": "Not there.",
     "finish": "Done",
     "thatIs": "Not there — that’s {{name}}.",
@@ -195,6 +204,7 @@
     "stopSpin": "Stop spinning",
     "reset": "Back to the starting view",
     "hint": "Drag to rotate · {{mod}} + scroll to zoom",
+    "hint_touch": "Drag to rotate",
     "broken": "The 3D model couldn’t be opened.",
     "noGL": "This computer can’t display 3D graphics.",
     "empty": "Nothing to show in 3D.",
@@ -239,6 +249,7 @@
     "atomAsk": "{{name}} (atom {{n}})",
     "canvas": "Molecule: use ← → to go through its atoms",
     "keysHint": "Hover an atom to see what it is",
+    "keysHint_touch": "Tap an atom to see what it is",
     "steps": {
       "start": "Walk through",
       "prev": "Previous step",

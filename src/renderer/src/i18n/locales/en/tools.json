@@ -1,6 +1,7 @@
 {
   "title": "Tools",
   "subtitle": "Calculator, grapher, periodic table and more. Pin the calculator, converter or timer to keep it over any screen.",
+  "subtitle_phone": "Calculator, grapher, periodic table and more, full screen.",
   "pinnedGroup": "Pinned",
   "allGroup": "All tools",
   "open": "Open",
@@ -15,6 +16,7 @@
     "inputLabel": "Expression",
     "placeholder": "Type an expression: 3/4 + 1/6, √8, sin(π/6)…",
     "hint": "Type with your keyboard or the keys. You’ll see the formula as you type and the exact result (fraction, π, root) with its decimal. Enter calculates; ↑ recalls the previous one; a = 5 stores a value.",
+    "hint_touch": "Type with the keys. You’ll see the formula as you type and the exact result (fraction, π, root) with its decimal; a = 5 stores a value.",
     "deg": "DEG",
     "rad": "RAD",
     "lastResult": "Last result",
@@ -23,6 +25,7 @@
     "copyDecimal": "Copy decimal",
     "history": "History",
     "historyEmpty": "Your calculations will show up here. Click one to use it again.",
+    "historyEmpty_touch": "Your calculations will show up here. Tap one to use it again.",
     "clear": "Clear all",
     "cleared": "History cleared",
     "undo": "Undo",
@@ -59,8 +62,10 @@
       "sub": "Subtract",
       "add": "Add",
       "clear": "Clear the entry (Esc)",
+      "clear_touch": "Clear the entry",
       "dec": "Decimal separator",
-      "eq": "Calculate (Enter)"
+      "eq": "Calculate (Enter)",
+      "eq_touch": "Calculate"
     },
     "err": {
       "empty": "Type an expression.",
@@ -103,7 +108,7 @@
     "more": "More options",
     "remove": "Remove",
     "params": "Parameters",
-    "paramsHint": "Drag the sliders or press ▶ to animate them.",
+    "paramsHint": "Drag the sliders or press the play button to animate them.",
     "animate": "Animate",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
@@ -111,6 +116,7 @@
     "piTicks": "Ticks at multiples of π",
     "notable": "Key points of {{name}}",
     "notableHint": "Hover to see them on the graph; click to copy.",
+    "notableHint_touch": "Tap one to copy it.",
     "notableNone": "No roots, extrema or intersections in the visible area.",
     "nk": {
       "yIntercept": "y-intercept",
@@ -291,6 +297,7 @@
     "stop": "Stop rotating",
     "lonePair": "Lone pair",
     "dragHint": "Drag to rotate · scroll to zoom",
+    "dragHint_touch": "Drag to rotate · pinch to zoom",
     "formula": "Formula (ABₙ or from the list)",
     "show": "Show: {{shape}}",
     "group": {

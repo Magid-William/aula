@@ -68,7 +68,7 @@ export function SegmentedTabs<T extends string>({ items, value, onChange, size =
             role="tab"
             aria-selected={active}
             onClick={() => onChange(it.id)}
-            className={cx('relative inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors outline-none', h, fill && 'flex-1', active ? 'text-text' : 'text-text2 hover:text-text')}
+            className={cx('relative touch-target inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors outline-none', h, fill && 'flex-1', active ? 'text-text' : 'text-text2 hover:text-text')}
           >
             <span className="relative inline-flex items-center gap-1.5">
               {it.icon}

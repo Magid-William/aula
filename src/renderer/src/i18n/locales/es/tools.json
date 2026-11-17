@@ -1,6 +1,7 @@
 {
   "title": "Herramientas",
   "subtitle": "Calculadora, graficadora, tabla periódica y más. Fija la calculadora, el conversor o el temporizador para tenerlos sobre cualquier pantalla.",
+  "subtitle_phone": "Calculadora, graficadora, tabla periódica y más, a pantalla completa.",
   "pinnedGroup": "Fijadas",
   "allGroup": "Todas las herramientas",
   "open": "Abrir",
@@ -15,6 +16,7 @@
     "inputLabel": "Operación",
     "placeholder": "Escribe una operación: 3/4 + 1/6, √8, sin(π/6)…",
     "hint": "Escribe con el teclado o con las teclas. Verás la fórmula mientras escribes y el resultado exacto (fracción, π, raíz) con su decimal. Intro calcula; ↑ recupera la anterior; a = 5 guarda un valor.",
+    "hint_touch": "Escribe con las teclas. Verás la fórmula mientras escribes y el resultado exacto (fracción, π, raíz) con su decimal; a = 5 guarda un valor.",
     "deg": "DEG",
     "rad": "RAD",
     "lastResult": "Último resultado",
@@ -23,6 +25,7 @@
     "copyDecimal": "Copiar decimal",
     "history": "Historial",
     "historyEmpty": "Aquí aparecerán tus cálculos. Haz clic en uno para volver a usarlo.",
+    "historyEmpty_touch": "Aquí aparecerán tus cálculos. Toca uno para volver a usarlo.",
     "clear": "Borrar todo",
     "cleared": "Historial borrado",
     "undo": "Deshacer",
@@ -59,8 +62,10 @@
       "sub": "Restar",
       "add": "Sumar",
       "clear": "Borrar la entrada (Esc)",
+      "clear_touch": "Borrar la entrada",
       "dec": "Separador decimal",
-      "eq": "Calcular (Intro)"
+      "eq": "Calcular (Intro)",
+      "eq_touch": "Calcular"
     },
     "err": {
       "empty": "Escribe una operación.",
@@ -103,7 +108,7 @@
     "more": "Más opciones",
     "remove": "Quitar",
     "params": "Parámetros",
-    "paramsHint": "Mueve los deslizadores o pulsa ▶ para animarlos.",
+    "paramsHint": "Mueve los deslizadores o pulsa el botón de reproducir para animarlos.",
     "animate": "Animar",
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",
@@ -111,6 +116,7 @@
     "piTicks": "Marcas en múltiplos de π",
     "notable": "Puntos notables de {{name}}",
     "notableHint": "Pasa el ratón para verlos en la gráfica; haz clic para copiar.",
+    "notableHint_touch": "Toca uno para copiarlo.",
     "notableNone": "No hay raíces, extremos ni cortes en la zona visible.",
     "nk": {
       "yIntercept": "Corte con el eje y",
@@ -291,6 +297,7 @@
     "stop": "Parar el giro",
     "lonePair": "Par solitario",
     "dragHint": "Arrastra para girarla · rueda para acercar",
+    "dragHint_touch": "Arrastra para girarla · pellizca para acercar",
     "formula": "Fórmula (ABₙ o de la lista)",
     "show": "Ver: {{shape}}",
     "group": {

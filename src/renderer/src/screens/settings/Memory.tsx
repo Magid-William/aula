@@ -88,7 +88,7 @@ export function MemorySection() {
       {/* buscar, solo cuando hay algo que buscar */}
       {(query || shown.length > 0) && (
         <div className="flex gap-2 mb-3">
-          <TextField value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('memory.search')} icon={<Icon name="search" size={15} />} className="flex-1" />
+          <TextField value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('memory.search')} icon={<Icon name="search" size={15} />} className="flex-1" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="search" />
         </div>
       )}
       <div className="max-h-[420px] overflow-y-auto -mx-2 px-2">

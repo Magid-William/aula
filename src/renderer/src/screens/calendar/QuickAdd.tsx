@@ -51,11 +51,12 @@ export function QuickAdd({ onAdded }: { onAdded: () => void }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void submit()}
+          enterKeyHint="done"
           placeholder={t('quickPlaceholder')}
           className="flex-1 bg-transparent outline-none t-callout placeholder:text-text3"
           aria-label={t('add')}
         />
-        {text && <Kbd>↩</Kbd>}
+        {text && <Kbd><Icon name="return" size={12} /></Kbd>}
       </div>
     </motion.div>
   )

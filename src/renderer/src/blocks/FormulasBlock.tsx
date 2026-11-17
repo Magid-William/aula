@@ -44,7 +44,7 @@ function FormulaCard({ f, ctx }: { f: FormulaItem; ctx: BlockContext }) {
       <div className="flex items-start gap-2">
         <div className="t-headline min-w-0 flex-1 text-text"><Inline text={f.name} /></div>
         {ctx.mode !== 'print' && (
-          <IconButton label={copied ? t('code.copied') : t('formulas.copy')} size="sm" onClick={() => void copy()} className={cx('-mr-1 -mt-1 transition-opacity', copied ? 'opacity-100 text-success' : 'opacity-0 group-hover/formula:opacity-100 focus-visible:opacity-100')}>
+          <IconButton label={copied ? t('code.copied') : t('formulas.copy')} size="sm" onClick={() => void copy()} className={cx('-mr-1 -mt-1 transition-opacity', copied ? 'opacity-100 text-success' : 'opacity-0 group-hover/formula:opacity-100 focus-visible:opacity-100 touch:opacity-100')}>
             <Icon name={copied ? 'check' : 'copy'} size={14} />
           </IconButton>
         )}

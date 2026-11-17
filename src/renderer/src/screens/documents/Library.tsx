@@ -319,7 +319,7 @@ function DocCard({ entry: e, index, progress }: { entry: DocumentEntry; index: n
           {e.origin === 'saved' && <span className="inline-flex items-center gap-1 rounded-full bg-surface/95 px-2 py-0.5 t-caption font-medium text-accent-text shadow-[var(--e1)]"><Icon name="aula" size={11} />{t('library.byAula')}</span>}
           {e.marks > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-surface/95 px-2 py-0.5 t-caption font-medium text-text2 shadow-[var(--e1)]"><span className="h-2 w-2 rounded-full" style={{ background: 'rgb(250 214 89)' }} />{e.marks}</span>}
         </div>
-        <span onClick={(ev) => ev.stopPropagation()} className="absolute right-2 top-2 opacity-0 transition-opacity group-hover/doc:opacity-100 focus-within:opacity-100">
+        <span onClick={(ev) => ev.stopPropagation()} className="absolute right-2 top-2 opacity-0 transition-opacity group-hover/doc:opacity-100 focus-within:opacity-100 touch:opacity-100">
           <Menu items={menu} trigger={(open) => <IconButton label={t('library.options')} size="sm" variant="raised" onClick={open}><Icon name="more" size={14} /></IconButton>} />
         </span>
       </div>

@@ -120,7 +120,7 @@ function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: La
           <div className="t-headline">{f.name[lang]}</div>
           <div className="t-caption mt-0.5">{f.topic[lang]}</div>
         </div>
-        <IconButton label={fav ? t('formulas.unfav') : t('formulas.fav')} size="sm" onClick={onFav} className={cx(fav ? 'text-sun' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}>
+        <IconButton label={fav ? t('formulas.unfav') : t('formulas.fav')} size="sm" onClick={onFav} className={cx(fav ? 'text-sun' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100')}>
           <motion.span animate={{ scale: fav ? [1, 1.35, 1] : 1 }} transition={{ duration: 0.3 }} className="grid place-items-center">
             <Star size={15} fill={fav ? 'currentColor' : 'none'} />
           </motion.span>
@@ -133,7 +133,7 @@ function FormulaCard({ f, lang, index, fav, onFav }: { f: FormulaEntry; lang: La
             setCopied(true)
             window.setTimeout(() => setCopied(false), 1400)
           }}
-          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.span key={copied ? 'ok' : 'copy'} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} className="grid place-items-center">
@@ -192,7 +192,7 @@ function Constants({ list, lang }: { list: Constant[]; lang: Lang }) {
               <Tex tex={localizeDecimal(c.value, lang)} />
             </span>
             <span className="hidden @3xl:block t-ui text-text3">{c.unit}</span>
-            <IconButton label={t('formulas.copyValue')} size="sm" onClick={() => copy(plainValue(c, lang))} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+            <IconButton label={t('formulas.copyValue')} size="sm" onClick={() => copy(plainValue(c, lang))} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100">
               <Copy size={14} />
             </IconButton>
           </motion.div>

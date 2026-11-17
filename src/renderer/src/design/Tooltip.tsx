@@ -1,7 +1,8 @@
 // Pista flotante sencilla (aparece tras una pausa breve).
 // Se mide antes de pintarse y se coloca dentro de la ventana (`placeTooltip`), con su propio ancho (nunca una columna de una
 // palabra por línea). Con el teclado solo aparece si el foco es visible, y se va al pulsar: si el botón abre un menú, la pista
-// no se queda encima (A4-P2-9).
+// no se queda encima (A4-P2-9). Solo con un ratón de verdad: tras un toque el navegador simula un «mouseenter» que la abría
+// después de pulsar y la dejaba encima de lo que el toque acababa de enseñar; con el dedo no hay pistas al pasar.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -40,8 +41,8 @@ export function Tooltip({ label, children, side = 'top', delay = 350 }: { label:
     <span
       ref={ref}
       className="inline-flex"
-      onMouseEnter={show}
-      onMouseLeave={hide}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && show()}
+      onPointerLeave={hide}
       onPointerDown={hide}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') && hide()}
       onFocus={(e) => {

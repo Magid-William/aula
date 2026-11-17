@@ -114,7 +114,7 @@ export function MentionPicker({ query, results, loading, highlighted, onPick, on
       <div className="flex items-center gap-2 px-2.5 pt-1 pb-1.5">
         <span className="flex-1 truncate t-footnote text-text2">{query ? t('mention.resultsFor', { query }) : t('mention.hint')}</span>
         <Kbd>↑↓</Kbd>
-        <Kbd>↩</Kbd>
+        <Kbd><Icon name="return" size={12} /></Kbd>
       </div>
       {results.length === 0 ? (
         <div className="px-2.5 pb-2 t-ui text-text3">{loading ? t('mention.searching') : t('mention.none')}</div>

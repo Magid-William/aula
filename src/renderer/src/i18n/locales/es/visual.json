@@ -54,7 +54,8 @@
     "ofSteps_one": "de {{count}}",
     "ofSteps_other": "de {{count}}",
     "scrubber": "Paso del proceso",
-    "panHint": "Arrastra para moverte · {{mod}} + rueda para ampliar"
+    "panHint": "Arrastra para moverte · {{mod}} + rueda para ampliar",
+    "panHint_touch": "Arrastra para moverte"
   },
   "compare": {
     "key": "Diferencia clave",
@@ -74,7 +75,9 @@
     "hideNames": "Ocultar los nombres",
     "showNames": "Mostrar los nombres",
     "hint": "Pasa el ratón por la figura o pulsa una parte para ver qué es.",
+    "hint_touch": "Toca una parte de la figura para ver qué es.",
     "hintPractice": "Pasa el ratón por la figura o pulsa una parte. Cuando la conozcas, prueba «Señalar».",
+    "hintPractice_touch": "Toca una parte de la figura. Cuando la conozcas, prueba «Señalar».",
     "pointTo": "Señala:",
     "right": "¡Bien!",
     "thatIs": "Eso es «{{name}}».",
@@ -84,6 +87,7 @@
     "retryMissed": "Repasar los fallos",
     "again": "Otra vez",
     "dragHint": "Arrastra cada nombre a su hueco (o pulsa el nombre y después el hueco).",
+    "dragHint_touch": "Arrastra cada nombre a su hueco (o toca el nombre y después el hueco).",
     "inPlace": "{{right}} de {{total}} en su sitio",
     "placedCount_one": "{{count}} de {{total}} colocados",
     "placedCount_other": "{{count}} de {{total}} colocados",
@@ -106,6 +110,7 @@
     "startPen": "Rodea o subraya lo que quieras preguntar",
     "startMarker": "Resalta lo que quieras preguntar",
     "startNote": "Pulsa donde quieras dejar una nota",
+    "startNote_touch": "Toca donde quieras dejar una nota",
     "title": "Marcar la figura",
     "pen": "Pluma",
     "marker": "Marcador",
@@ -120,6 +125,7 @@
     "ask": "Preguntar al tutor",
     "recognized": "Has marcado:",
     "hint": "Con el teclado: ← → elige una parte, Intro la rodea, N le pone una nota y {{mod}}+Z deshace. Esc cierra.",
+    "hint_touch": "Marca con el dedo lo que quieras preguntar y escribe tu pregunta.",
     "partOf": "{{name}}, {{k}} de {{n}}",
     "markedOne": "Marcada: {{name}}",
     "noParts": "Esta figura no tiene partes con nombre: marca donde quieras con el ratón o con el dedo.",
@@ -165,7 +171,9 @@
     "traceY": "Posición vertical",
     "speed": "Velocidad ×{{x}}",
     "loopOn": "En bucle (pulsa para parar al final)",
-    "loopOff": "Para al final (pulsa para repetir en bucle)"
+    "loopOn_touch": "En bucle (toca para parar al final)",
+    "loopOff": "Para al final (pulsa para repetir en bucle)",
+    "loopOff_touch": "Para al final (toca para repetir en bucle)"
   },
   "map": {
     "eyebrow": "Mapa",
@@ -173,6 +181,7 @@
     "close": "Cerrar",
     "attribution": "Mapa: Natural Earth (dominio público)",
     "hint": "Pulsa un marcador, un país o una región para ver su explicación.",
+    "hint_touch": "Toca un marcador, un país o una región para ver su explicación.",
     "notThere": "Ahí no.",
     "finish": "Terminar",
     "thatIs": "Ahí no: eso es {{name}}.",
@@ -195,6 +204,7 @@
     "stopSpin": "Parar el giro",
     "reset": "Volver a la vista inicial",
     "hint": "Arrastra para girar · {{mod}} + rueda para ampliar",
+    "hint_touch": "Arrastra para girar",
     "broken": "No se pudo abrir el modelo 3D.",
     "noGL": "Este ordenador no puede dibujar en 3D.",
     "empty": "No hay nada que mostrar en 3D.",
@@ -239,6 +249,7 @@
     "atomAsk": "{{name}} (átomo {{n}})",
     "canvas": "Molécula: usa ← → para recorrer sus átomos",
     "keysHint": "Pasa por un átomo para ver qué es",
+    "keysHint_touch": "Toca un átomo para ver qué es",
     "steps": {
       "start": "Recorrer",
       "prev": "Paso anterior",

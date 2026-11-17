@@ -126,6 +126,7 @@
     "next": "Next: {{what}} · {{when}}",
     "nothing": "Nothing scheduled",
     "offer": "Every morning it summarizes your day, reminds you before deadlines and exams and checks your platform, even with the window closed. On your platform it only reads.",
+    "offer_device": "Every morning it summarizes your day, reminds you before deadlines and exams and checks your platform, even when Aula isn’t open on your computer. On your platform it only reads.",
     "activate": "Turn on",
     "resume": "Resume",
     "pause": "Pause",
@@ -304,6 +305,7 @@
   },
   "settingsCard": {
     "hint": "Turn it on and Aula keeps working for you even with the window closed. There is nothing else to set up.",
+    "hint_device": "Turn it on and Aula keeps working for you even when it isn’t open on your computer. There is nothing else to set up.",
     "style": "Style",
     "styles": {
       "quiet": "Quiet",
