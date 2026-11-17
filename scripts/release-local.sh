@@ -26,8 +26,10 @@
 # macOS (desde 0.2.6) se firma con Developer ID: la ÚNICA identidad válida «Developer ID Application: … (87BM9KFJZW)»
 # del llavero, fijada por su SHA-1, con hardened runtime y el sello de tiempo de Apple, y se notariza con el perfil de
 # notarytool $AULA_NOTARY_PROFILE (si no, «faro-notary»). La configuración, la identidad y el perfil se comprueban antes
-# de compilar. AULA_MAC_ADHOC=1 compila una app SOLO de prueba (ad hoc, sin hardened runtime ni notarizar; --upload la
-# rechaza). La 0.2.5 y anteriores ya no se compilan: la 0.2.5 publicada es el puente inmutable (--bridge-dir).
+# de compilar. El DMG mismo también se firma, se notariza y se grapa (scripts/release-mac-dmg.mjs, justo después de
+# compilar y antes de firmar las actualizaciones). AULA_MAC_ADHOC=1 compila una app SOLO de prueba (ad hoc, sin hardened
+# runtime ni notarizar; --upload la rechaza). La 0.2.5 y anteriores ya no se compilan: la 0.2.5 publicada es el puente
+# inmutable (--bridge-dir).
 # Android se firma con la clave de publicación de Aula para Android (~/.aula-signing/android, o $AULA_ANDROID_KEYSTORE;
 # native/android/build.sh): solo en este ordenador, nunca en CI. Android solo instala una actualización encima de la app
 # si la firma es de la misma clave, así que su huella (el SHA-256 de su certificado, que es público) está en el
@@ -535,6 +537,11 @@ for p in "${ONLY[@]}"; do
          if [ "${AULA_MAC_ADHOC:-}" = 1 ]; then
            codesign -dv "$OUT/mac-universal/Aula.app" 2>&1 | grep -x 'Signature=adhoc' >/dev/null \
              || die "AULA_MAC_ADHOC=1 no salió ad hoc (electron-builder eligió una identidad del llavero): no la uses."
+         else
+           # el DMG mismo (electron-builder lo deja sin firmar): firmado con la misma identidad, notarizado y grapado, con
+           # su .blockmap y su entrada de latest-mac.yml rehechos ANTES de firmar las actualizaciones (system_done)
+           node scripts/release-mac-dmg.mjs finish "$OUT" "$VERSION" --identity "$MAC_IDENTITY" --keychain-profile "$APPLE_KEYCHAIN_PROFILE" \
+             || die "El DMG de macOS no quedó firmado, notarizado y grapado: no se firman las actualizaciones. Vuelve a compilar Mac (--only mac)."
          fi ;;
     win) npx electron-builder --win --publish never -c.directories.output="$OUT" ;;
     linux)

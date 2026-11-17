@@ -527,7 +527,7 @@ do not recognize the login-item flag and still require a separate test account.
 
 | System | Now | With (more) certificates |
 | --- | --- | --- |
-| macOS | **Developer ID** from 0.2.6: Aula's *Developer ID Application* identity (team `87BM9KFJZW`, pinned by its SHA-1), hardened runtime, Apple's secure timestamp, notarized and stapled; no more *Open Anyway*. `scripts/release-local.sh` checks the configuration, the identity and the notary profile before building, and `scripts/release-mac-verify.mjs` checks the final ZIP and DMG before upload (see [The Developer ID release](#the-developer-id-release-026-and-later)). The 0.2.5 bridge, signed with the retired *Aula Local Signing* certificate, travels unchanged in every later release. `AULA_MAC_ADHOC=1` is for test builds only and never permits upload. | — |
+| macOS | **Developer ID** from 0.2.6: Aula's *Developer ID Application* identity (team `87BM9KFJZW`, pinned by its SHA-1), hardened runtime, Apple's secure timestamp, notarized and stapled (from 0.2.7, the DMG itself too); no more *Open Anyway*. `scripts/release-local.sh` checks the configuration, the identity and the notary profile before building, and `scripts/release-mac-verify.mjs` checks the final ZIP and DMG before upload (see [The Developer ID release](#the-developer-id-release-026-and-later)). The 0.2.5 bridge, signed with the retired *Aula Local Signing* certificate, travels unchanged in every later release. `AULA_MAC_ADHOC=1` is for test builds only and never permits upload. | — |
 | Windows | Unsigned: SmartScreen shows *More info → Run anyway* the first time. Updates work. | `CSC_LINK`/`CSC_KEY_PASSWORD` (or Azure Trusted Signing). electron-updater then requires updates signed by the same publisher. |
 | Linux | AppImage and .deb are not signed (normal for Linux). | — |
 | Android | Signed with Aula's own Android release key (`~/.aula-signing/android/aula-release.keystore`, its password in `aula-release.pass`; made once with `native/android/build.sh --new-key`). Android installs an update over the app only if it's signed with the same key, so **every later APK must be signed with it**: its certificate's SHA-256 is committed in `native/android/release-cert.sha256`, and `release-local.sh` refuses to build with a keystore, or upload an APK, that doesn't match it (see [The Android app](#the-android-app-apk)). | Google Play would need an `.aab` and Play App Signing. |
@@ -595,7 +595,8 @@ is insufficient.
 
 From 0.2.6 every Mac build is signed with Aula's **Developer ID Application** identity (team `87BM9KFJZW`), with the
 hardened runtime and Apple's secure timestamp, notarized, and stapled before electron-builder makes the ZIP and the
-DMG. The Mac part of `electron-builder.yml`:
+DMG. From 0.2.7 the DMG itself is signed, notarized and stapled too ([The DMG itself](#the-dmg-itself-027-and-later)).
+The Mac part of `electron-builder.yml`:
 
 ```yaml
 mac:
@@ -606,7 +607,7 @@ mac:
   entitlements: build/entitlements.mac.plist      # allow-jit: Electron, its helpers and the OCR's WASM need it
   entitlementsInherit: build/entitlements.mac.plist
 dmg:
-  sign: false     # an unsigned DMG holding the stapled app; a signed but un-notarized DMG would be worse
+  sign: false     # electron-builder would sign it without notarizing; release-local.sh signs, notarizes and staples it
 ```
 
 What the Mac that runs `scripts/release-local.sh` needs:
@@ -641,6 +642,35 @@ The script exports only `APPLE_KEYCHAIN_PROFILE` and unsets `APPLE_ID`, `APPLE_A
 electron-builder would prefer them over the profile, or sign from another keychain. Without any notarization
 credential electron-builder only *warns* and skips notarization; the pre-flight and the verifier make that a failure.
 
+#### The DMG itself (0.2.7 and later)
+
+0.2.6 signed and notarized the app inside the DMG, but not the DMG: `spctl -a -t open --context
+context:primary-signature` rejected it (`no usable signature`) and `xcrun stapler validate` found no ticket. Gatekeeper
+evaluates the DMG when someone opens the download, so from 0.2.7 `release-local.sh` finishes it right after
+electron-builder and **before the update feeds are signed**:
+
+```bash
+node scripts/release-mac-dmg.mjs finish release/<v> <v> --identity <sha1> --keychain-profile <profile>
+```
+
+On a copy of `Aula-<v>-mac.dmg`, it:
+
+- signs it with the same pinned identity and Apple's secure timestamp (`codesign --sign <sha1> --timestamp`);
+- notarizes it (`xcrun notarytool submit --wait`) and stops on anything but `Accepted`, printing Apple's log
+  (`xcrun notarytool log <id>`);
+- staples the ticket (`xcrun stapler staple`, retried twice while a fresh ticket propagates) and checks the team
+  requirement, `xcrun stapler validate` and `spctl --assess --type open --context context:primary-signature` reporting
+  `source=Notarized Developer ID`;
+- rebuilds `Aula-<v>-mac.dmg.blockmap` with electron-builder's own block-map builder, and changes only the DMG's
+  `sha512` and `size` in `latest-mac.yml` (every other line stays byte for byte).
+
+Only then does it swap in the DMG, its blockmap and the feed. If anything fails, the three stay exactly as
+electron-builder left them and the release stops before `release-sign.mjs`; build Mac again (`--only mac`). The feed
+signature and `developer-id-mac.yml` (copied from `latest-mac.yml` by `release-mac-bridge.mjs prepare`) therefore
+describe the final DMG. The ZIP, which updates download, is not touched. The step refuses the 0.2.5 bridge and anything
+older, a feed that is already signed, and a DMG that isn't the one the feed describes. `AULA_MAC_ADHOC=1` builds skip
+it.
+
 After the build, and again on `--upload`, `scripts/release-mac-verify.mjs` checks the final ZIP (extracted with `ditto`)
 **and** the final DMG (attached with `hdiutil attach -readonly -nobrowse`, always detached afterwards), because new
 users install from the DMG and updates download the ZIP. On the `Aula.app` inside each:
@@ -654,6 +684,11 @@ users install from the DMG and updates download the ZIP. On the `Aula.app` insid
   secure `Timestamp=`, `TeamIdentifier=87BM9KFJZW` and `Authority=Developer ID Application`; no `get-task-allow`, and
   `allow-jit` on the app and its helpers;
 - `xcrun stapler validate` and `spctl --assess --type execute` reporting `source=Notarized Developer ID`.
+
+From 0.2.7 it checks the DMG itself first, before mounting it: the team requirement, `Authority=Developer ID
+Application`, `TeamIdentifier=87BM9KFJZW` and a secure `Timestamp=`, `xcrun stapler validate`, and `spctl --assess
+--type open --context context:primary-signature` reporting `source=Notarized Developer ID`. Re-verifying 0.2.6, whose
+DMG was published unsigned, keeps the 0.2.6 rules.
 
 The carried `Aula-0.2.5-mac.zip` is re-verified against the old local pin; the other bridge files are checked by hash.
 
@@ -782,7 +817,7 @@ The printed line (SPKI DER in base64) is the public key for `UPDATE_PUBLIC_KEYS`
   bridge (`out/main/aula-mcp.js`) is started by the terminal agents with `ELECTRON_RUN_AS_NODE`.
 - macOS (from 0.2.6): Developer ID signature with the **hardened runtime** on every executable and library
   (entitlements: `allow-jit` and `allow-unsigned-executable-memory`, which Electron needs, and `network.client`; never
-  `get-task-allow`), Apple's secure timestamp, and **notarization** stapled to the app
+  `get-task-allow`), Apple's secure timestamp, and **notarization** stapled to the app and, from 0.2.7, to the DMG
   ([The Developer ID release](#the-developer-id-release-026-and-later)).
 - The renderer runs with `contextIsolation`, `sandbox` and a strict CSP; IPC only answers the app's own page
   (`src/main/electron/rpc.ts`).

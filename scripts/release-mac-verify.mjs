@@ -1,18 +1,18 @@
-// Verifica la app EXTRAÍDA DEL ZIP final y la del DMG final (montado solo lectura). No confía en mac-universal/Aula.app
-// ni usa claves privadas.
+// Verifica la app EXTRAÍDA DEL ZIP final y la del DMG final (montado solo lectura) y, desde 0.2.7, el DMG mismo. No
+// confía en mac-universal/Aula.app ni usa claves privadas.
 // node scripts/release-mac-verify.mjs release/0.2.6 0.2.6
 import { spawnSync } from 'node:child_process'
 import { closeSync, lstatSync, mkdirSync, mkdtempSync, openSync, readSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BUNDLE_ID, BRIDGE_VERSION, DEVELOPER_TEAM, LEGACY_PIN, macMode, regularFile } from './release-common.mjs'
+import { BUNDLE_ID, BRIDGE_VERSION, DEVELOPER_TEAM, LEGACY_PIN, macMode, regularFile, signedDmg } from './release-common.mjs'
 import { verifyMacChannels } from './release-mac-bridge.mjs'
 import { DEBUG_ENTITLEMENT, JIT_ENTITLEMENT, grants, mentions } from './release-mac-config.mjs'
 
 export const LEGACY_REQUIREMENT = `identifier "${BUNDLE_ID}" and certificate root = H"${LEGACY_PIN}"`
 export const DEVELOPER_REQUIREMENT = `identifier "${BUNDLE_ID}" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "${DEVELOPER_TEAM}"`
-const DEVELOPER_CODE_REQUIREMENT = DEVELOPER_REQUIREMENT.replace(`identifier "${BUNDLE_ID}" and `, '')
+export const DEVELOPER_CODE_REQUIREMENT = DEVELOPER_REQUIREMENT.replace(`identifier "${BUNDLE_ID}" and `, '')
 // El vigilante de 0.2.5 (congelado) vuelve a abrir la app por este nombre, y 0.2.5 exige macOS 13 (mac-install.ts).
 export const EXECUTABLE = 'Aula'
 export const MAX_MINIMUM_SYSTEM = '13.0'
@@ -33,9 +33,10 @@ export function checkArchiveEntries(list) {
   }
 }
 
-export function checkDeveloperDetails(details) {
+/** `codesign --display --verbose=4`: Developer ID del equipo con sello de Apple y, en el código (no en el DMG), hardened runtime. */
+export function checkDeveloperDetails(details, { runtime = true } = {}) {
   const flags = /^.*flags=0x([a-f0-9]+)/im.exec(details)
-  if (!flags || !(parseInt(flags[1], 16) & 0x10000)) throw new Error('Falta hardened runtime en el código Developer ID')
+  if (runtime && (!flags || !(parseInt(flags[1], 16) & 0x10000))) throw new Error('Falta hardened runtime en el código Developer ID')
   if (!/^Timestamp=(?!none$|not set$).+/m.test(details)) throw new Error('Falta el sello de tiempo seguro de Apple')
   if (!details.includes(`TeamIdentifier=${DEVELOPER_TEAM}`) || !/^Authority=Developer ID Application:/m.test(details)) throw new Error('No es Developer ID Application del equipo de Aula')
 }
@@ -142,10 +143,28 @@ export async function verifyMacZip(zip, version, { execute = run, platform = pro
   }
 }
 
+/**
+ * El DMG mismo, lo que Gatekeeper evalúa al abrir la descarga: firmado por el equipo con el sello de Apple, con el ticket
+ * de notarización grapado y aceptado al abrirlo (`spctl -t open`) como Notarized Developer ID.
+ */
+export function verifyMacDmgContainer(dmg, { execute = run } = {}) {
+  try {
+    execute('/usr/bin/codesign', ['--verify', '--strict', '--verbose=2', '-R', '=' + DEVELOPER_CODE_REQUIREMENT, dmg])
+    checkDeveloperDetails(execute('/usr/bin/codesign', ['--display', '--verbose=4', dmg]), { runtime: false })
+    execute('/usr/bin/xcrun', ['stapler', 'validate', dmg])
+    const assessment = execute('/usr/sbin/spctl', ['--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=4', dmg])
+    if (!/^source=Notarized Developer ID$/m.test(assessment)) throw new Error('Gatekeeper no lo acepta como Notarized Developer ID')
+  } catch (error) {
+    throw new Error(`El DMG ${basename(dmg)} (el contenedor): ${error.message}`)
+  }
+}
+
 /** Lo que instalan los usuarios nuevos: el DMG, montado solo lectura y sin Finder; siempre se desmonta. */
 export async function verifyMacDmg(dmg, version, { execute = run, platform = process.platform } = {}) {
   if (platform !== 'darwin') throw new Error('La verificación de firma del DMG final requiere macOS')
   regularFile(dmg)
+  // 0.2.6 salió con el DMG sin firmar (y se sigue pudiendo verificar); desde 0.2.7 el DMG también va notarizado
+  if (signedDmg(version)) verifyMacDmgContainer(dmg, { execute })
   const temp = mkdtempSync(join(tmpdir(), 'aula-release-dmg-'))
   const mount = join(temp, 'volume')
   mkdirSync(mount)

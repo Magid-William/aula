@@ -6,8 +6,8 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { ROOT, BUNDLE_ID, DEVELOPER_TEAM } from '../release-common.mjs'
 import {
-  verifyMacZip, verifyMacDmg, checkMacArtifactNames, checkArchiveEntries, checkDeveloperDetails, checkEntitlements,
-  compareSystemVersions, isMachO, LEGACY_REQUIREMENT, DEVELOPER_REQUIREMENT
+  verifyMacZip, verifyMacDmg, verifyMacDmgContainer, checkMacArtifactNames, checkArchiveEntries, checkDeveloperDetails, checkEntitlements,
+  compareSystemVersions, isMachO, LEGACY_REQUIREMENT, DEVELOPER_REQUIREMENT, DEVELOPER_CODE_REQUIREMENT
 } from '../release-mac-verify.mjs'
 
 const details = `CodeDirectory v=20500 size=123 flags=0x10000(runtime) hashes=5\nAuthority=Developer ID Application: Aula (${DEVELOPER_TEAM})\nTimestamp=Nov 15, 2026 at 10:00:00 AM\nTeamIdentifier=${DEVELOPER_TEAM}`
@@ -200,6 +200,41 @@ test('a bad DMG is still detached; a stuck volume is forced and never deleted wh
   await assert.rejects(verifyMacDmg('/tmp/aula-no-such-dmg', '0.2.6', { platform: 'linux' }), /requiere macOS/)
 })
 
+test('from 0.2.7 the DMG itself must be signed by the team, stapled and accepted by Gatekeeper before it is mounted', async (t) => {
+  const f = fixture(t, '0.2.7')
+  await verifyMacDmg(f.dmg, '0.2.7', { ...f, platform: 'darwin' })
+  const onDmg = f.calls.filter(([, args]) => args.at(-1) === f.dmg).map(([cmd, args]) => `${cmd} ${args.slice(0, -1).join(' ')}`)
+  assert.deepEqual(onDmg.slice(0, 4), [
+    `/usr/bin/codesign --verify --strict --verbose=2 -R =${DEVELOPER_CODE_REQUIREMENT}`,
+    '/usr/bin/codesign --display --verbose=4',
+    '/usr/bin/xcrun stapler validate',
+    '/usr/sbin/spctl --assess --type open --context context:primary-signature --verbose=4'
+  ])
+  assert.match(onDmg[4], /^\/usr\/bin\/hdiutil attach -readonly/)
+  // y la app de dentro, como siempre
+  assert.ok(f.calls.some(([cmd, args]) => cmd.endsWith('/spctl') && args.at(-1) === join(f.mount, 'Aula.app')))
+  const isDmg = (args) => args.at(-1).endsWith('final.dmg')
+  for (const [changes, expected] of [
+    [{ fail: (cmd, args) => cmd.endsWith('/spctl') && isDmg(args) }, /final\.dmg \(el contenedor\): native verification/],
+    [{ assessment: 'rejected\nsource=no usable signature' }, /final\.dmg \(el contenedor\): Gatekeeper no lo acepta como Notarized Developer ID/],
+    [{ fail: (cmd, args) => cmd.endsWith('/xcrun') && isDmg(args) }, /el contenedor\): native verification/],
+    [{ fail: (cmd, args) => cmd.endsWith('/codesign') && args.includes('-R') && isDmg(args) }, /el contenedor\): native verification/],
+    [{ details: details.replaceAll(DEVELOPER_TEAM, 'OTHERTEAM1') }, /el contenedor\): No es Developer ID Application del equipo/],
+    [{ details: details.replace(/^Timestamp=.*\n/m, '') }, /el contenedor\): Falta el sello/]
+  ]) {
+    const bad = fixture(t, '0.2.7', changes)
+    await assert.rejects(verifyMacDmg(bad.dmg, '0.2.7', { ...bad, platform: 'darwin' }), expected)
+    assert.equal(bad.calls.some(([cmd]) => cmd.endsWith('/hdiutil')), false, 'a DMG that fails its own checks is never mounted')
+  }
+  // 0.2.6 se publicó con el DMG sin firmar: volver a verificarla no exige nada del contenedor
+  const published = fixture(t, '0.2.6', { fail: (cmd, args) => !cmd.endsWith('/hdiutil') && isDmg(args) })
+  await verifyMacDmg(published.dmg, '0.2.6', { ...published, platform: 'darwin' })
+  assert.deepEqual(published.calls.filter(([, args]) => args.at(-1) === published.dmg).map(([cmd, args]) => `${cmd} ${args[0]}`), ['/usr/bin/hdiutil attach'])
+  // el DMG no lleva hardened runtime (no es código que se ejecute); la app sí
+  assert.doesNotThrow(() => checkDeveloperDetails(details.replace('0x10000(runtime)', '0x0(none)'), { runtime: false }))
+  assert.throws(() => checkDeveloperDetails(details.replace('0x10000(runtime)', '0x0(none)')), /hardened runtime/)
+})
+
 test('archive validation rejects paths escaping the extracted app', () => {
   for (const path of ['/Aula.app/a', 'Aula.app/../a', 'Aula.app/./a', 'Other.app/a', 'Aula.app/\\a']) assert.throws(() => checkArchiveEntries('Aula.app/\n' + path))
   assert.throws(() => checkDeveloperDetails(details.replace('Developer ID Application:', 'Developer ID Installer:')))
@@ -224,12 +259,26 @@ test('entitlements, macOS versions and Mach-O headers are parsed strictly', (t) 
 })
 
 test('real codesign parses each inline requirement instead of treating it as a path', { skip: process.platform !== 'darwin' }, () => {
-  for (const requirement of [LEGACY_REQUIREMENT, DEVELOPER_REQUIREMENT]) {
+  for (const requirement of [LEGACY_REQUIREMENT, DEVELOPER_REQUIREMENT, DEVELOPER_CODE_REQUIREMENT]) {
     const r = spawnSync('/usr/bin/codesign', ['--verify', '--strict', '--all-architectures', '-R', '=' + requirement, '/usr/bin/true'], { encoding: 'utf8' })
     assert.notEqual(r.status, 0, 'system true must never pass an Aula pin')
     assert.doesNotMatch(r.stderr, /invalid requirement|No such file|syntax error/i)
     assert.match(r.stderr, /requirement/i)
   }
+})
+
+test('real tools refuse an unsigned and an ad hoc signed DMG as the container', { skip: process.platform !== 'darwin' }, (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'aula-real-dmg-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  mkdirSync(join(dir, 'src'))
+  writeFileSync(join(dir, 'src/readme.txt'), 'probe')
+  const dmg = join(dir, 'probe.dmg')
+  const create = spawnSync('/usr/bin/hdiutil', ['create', '-quiet', '-srcfolder', join(dir, 'src'), '-volname', 'probe', '-format', 'UDZO', dmg], { encoding: 'utf8' })
+  assert.equal(create.status, 0, create.stderr)
+  assert.throws(() => verifyMacDmgContainer(dmg), /probe\.dmg \(el contenedor\): \/usr\/bin\/codesign: falló[\s\S]*not signed/)
+  const adhoc = spawnSync('/usr/bin/codesign', ['--sign', '-', dmg], { encoding: 'utf8' })
+  assert.equal(adhoc.status, 0, adhoc.stderr)
+  assert.throws(() => verifyMacDmgContainer(dmg), (error) => /el contenedor\): \/usr\/bin\/codesign: falló[\s\S]*requirement/i.test(error.message) && !/invalid requirement|syntax error/i.test(error.message))
 })
 
 test('upload rejects AULA_MAC_ADHOC before opening credentials or contacting GitHub', () => {
