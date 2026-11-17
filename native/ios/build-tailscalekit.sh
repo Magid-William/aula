@@ -14,7 +14,11 @@
 #     (the upstream Makefile's `CC=$(PWD)/...` breaks on spaces),
 #   * the framework's bundle id is com.luumlabs.aula.TailscaleKit (not Tailscale's
 #     io.tailscale.Tailscale), and every framework in the xcframework carries its own
-#     privacy manifest (tailscalekit/PrivacyInfo.xcprivacy), as the App Store asks, and
+#     privacy manifest (tailscalekit/PrivacyInfo.xcprivacy), as the App Store asks,
+#   * each framework's debug symbols (TailscaleKit.framework.dSYM, made with dsymutil
+#     before the binaries are stripped) go inside the xcframework (-debug-symbols), so
+#     Xcode puts them in every archive and App Store Connect can symbolicate crashes;
+#     a copy stays in Frameworks/TailscaleKit.dSYMs/<slice>/, and
 #   * the license notices the app shows (Aula/Licenses.json) are written again from
 #     the Go modules that go into the framework (scripts/licenses.mjs).
 #
@@ -29,6 +33,8 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 TC="${AULA_TOOLCHAIN:-$ROOT/.toolchain}"
 SRC="$TC/src/libtailscale"
 OUT="$HERE/Frameworks/TailscaleKit.xcframework"
+# los dSYM de cada framework, junto al xcframework (git no los guarda, como a él)
+DSYMS="$HERE/Frameworks/TailscaleKit.dSYMs"
 LIBTAILSCALE_REF="${LIBTAILSCALE_REF:-ac7ed43af14e19e1c1810ee9f8319872c6beb412}"
 # el identificador del framework: el de Aula, no el de Tailscale
 BUNDLE_ID="com.luumlabs.aula.TailscaleKit"
@@ -89,16 +95,48 @@ xcodebuild build -scheme "TailscaleKit (Simulator)" \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=NO PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
   CODE_SIGNING_ALLOWED=NO -quiet
 
+PRODUCTS="$SRC/swift/build/Build/Products"
+DEVICE_FW="$PRODUCTS/Release-iphoneos/TailscaleKit.framework"
+SIM_FW="$PRODUCTS/Release-iphonesimulator/TailscaleKit.framework"
+
+# los UUID (con su arquitectura) de un binario o un dSYM
+uuids() { dwarfdump --uuid "$1" | awk '{print $2, $3}'; }
+same_uuids() { # <binario> <dSYM>
+  if [ "$(uuids "$1")" != "$(uuids "$2")" ]; then
+    echo "error: $2 does not match $1 (dwarfdump --uuid)" >&2
+    exit 1
+  fi
+}
+
+# Los símbolos de depuración, ANTES de cualquier strip: dsymutil sigue el mapa de depuración del binario hasta los
+# objetos, que siguen en las carpetas de compilación. El dSYM lleva el UUID del binario: así lo empareja App Store
+# Connect con cada fallo.
+echo "::: Debug symbols (dSYM) for each framework"
+rm -rf "$DSYMS"
+for slice in ios-arm64 ios-arm64-simulator; do
+  fw="$DEVICE_FW"; [ "$slice" = ios-arm64-simulator ] && fw="$SIM_FW"
+  mkdir -p "$DSYMS/$slice"
+  dsymutil "$fw/TailscaleKit" -o "$DSYMS/$slice/TailscaleKit.framework.dSYM"
+  same_uuids "$fw/TailscaleKit" "$DSYMS/$slice/TailscaleKit.framework.dSYM"
+done
+
 echo "::: Creating $OUT"
 rm -rf "$OUT"
 mkdir -p "$(dirname "$OUT")"
+# -debug-symbols (con ruta absoluta) deja cada dSYM en <slice>/dSYMs/ del xcframework: Xcode lo copia junto a los de
+# la app y a cada archivo (xcarchive)
 xcodebuild -create-xcframework \
-  -framework "$SRC/swift/build/Build/Products/Release-iphoneos/TailscaleKit.framework" \
-  -framework "$SRC/swift/build/Build/Products/Release-iphonesimulator/TailscaleKit.framework" \
+  -framework "$DEVICE_FW" -debug-symbols "$DSYMS/ios-arm64/TailscaleKit.framework.dSYM" \
+  -framework "$SIM_FW" -debug-symbols "$DSYMS/ios-arm64-simulator/TailscaleKit.framework.dSYM" \
   -output "$OUT"
-# Debug symbols name the folders it was built in (the builder's home): the shipped framework carries none (the Go
-# part already leaves its paths out with -trimpath).
+# El mapa de depuración del binario nombra las carpetas donde se compiló (la carpeta personal de quien compila): el
+# framework que va en la app no lleva ninguno (la parte de Go ya las quita con -trimpath). strip -S conserva LC_UUID,
+# así que los dSYM siguen valiendo. Los dSYM sí nombran esas carpetas, pero solo llegan a Apple dentro del archivo,
+# nunca a la app.
 for f in "$OUT"/*/TailscaleKit.framework/TailscaleKit; do strip -S "$f"; done
+for slice in ios-arm64 ios-arm64-simulator; do
+  same_uuids "$OUT/$slice/TailscaleKit.framework/TailscaleKit" "$OUT/$slice/dSYMs/TailscaleKit.framework.dSYM"
+done
 # cada framework, con su manifiesto de privacidad (en la raíz del bundle, como en iOS) y el identificador de Aula
 for fw in "$OUT"/*/TailscaleKit.framework; do
   cp "$HERE/tailscalekit/PrivacyInfo.xcprivacy" "$fw/PrivacyInfo.xcprivacy"
@@ -118,3 +156,4 @@ for f in "$OUT"/*/TailscaleKit.framework/TailscaleKit; do
   echo "$f: $(lipo -archs "$f")"
 done
 ls "$OUT"/*/TailscaleKit.framework/PrivacyInfo.xcprivacy
+dwarfdump --uuid "$OUT"/*/dSYMs/TailscaleKit.framework.dSYM

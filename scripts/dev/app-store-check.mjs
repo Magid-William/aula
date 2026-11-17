@@ -2,7 +2,8 @@
 //   - que los textos de docs/app-store/listing.md caben en los límites de Apple (bytes donde Apple cuenta bytes);
 //   - que la versión de native/ios sigue la regla (la del Mac con la que sale: la de package.json o la siguiente);
 //   - los dos manifiestos de privacidad (el de la app y el de cada TailscaleKit.framework), el identificador del
-//     framework y los avisos de licencia (Aula/Licenses.json, al día con el libtailscale fijado y con LICENSE/NOTICE);
+//     framework, sus dSYM (con los UUID de cada binario) y los avisos de licencia (Aula/Licenses.json, al día con
+//     el libtailscale fijado y con LICENSE/NOTICE);
 //   - que está la grabación de la demostración (Demo.aulademo): sin ella la revisión no puede probar la app.
 //   node scripts/dev/app-store-check.mjs            todo (antes de archivar; en macOS, que tiene plutil)
 //   node scripts/dev/app-store-check.mjs --texts    solo los textos
@@ -102,6 +103,15 @@ const plist = (file) => JSON.parse(execFileSync('plutil', ['-convert', 'json', '
 /** Las categorías de funciones «con motivo» que declara un manifiesto, con sus motivos. */
 const reasons = (manifest) => new Map((manifest.NSPrivacyAccessedAPITypes ?? []).map((t) => [t.NSPrivacyAccessedAPIType, t.NSPrivacyAccessedAPITypeReasons ?? []]))
 const declares = (manifest, category, reason) => reasons(manifest).get(`NSPrivacyAccessedAPICategory${category}`)?.includes(reason) ?? false
+/** Los UUID de un binario o un dSYM, con su arquitectura («UUID (arm64)»), según dwarfdump; '' si no se pueden leer. */
+const uuids = (file) => {
+  try {
+    const out = execFileSync('dwarfdump', ['--uuid', file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    return [...out.matchAll(/^UUID: ([0-9A-F-]+) \((\w+)\)/gm)].map((m) => `${m[1]} (${m[2]})`).sort().join(', ')
+  } catch {
+    return ''
+  }
+}
 
 console.log('\nManifiesto de privacidad de la app (Aula/PrivacyInfo.xcprivacy)')
 const app = plist(join(IOS, 'Aula/PrivacyInfo.xcprivacy'))
@@ -136,6 +146,18 @@ else {
     }
     const id = plist(join(fw, 'Info.plist')).CFBundleIdentifier
     line(id === 'com.luumlabs.aula.TailscaleKit', `${name}: identificador ${id}`)
+  }
+  // los símbolos de depuración: Xcode copia al archivo los dSYM que declara el xcframework (DebugSymbolsPath); sin
+  // ellos, o si no son los de ese binario, App Store Connect avisa y no puede simbolizar los fallos de TailscaleKit
+  for (const lib of plist(join(xcf, 'Info.plist')).AvailableLibraries ?? []) {
+    const name = lib.LibraryIdentifier
+    const dsym = lib.DebugSymbolsPath ? join(xcf, name, lib.DebugSymbolsPath, 'TailscaleKit.framework.dSYM') : ''
+    if (!dsym || !existsSync(dsym)) {
+      line(false, `${name}: sin TailscaleKit.framework.dSYM (native/ios/build-tailscalekit.sh lo genera)`)
+      continue
+    }
+    const binary = uuids(join(xcf, name, lib.BinaryPath))
+    line(binary !== '' && uuids(dsym) === binary, `${name}: dSYM con los UUID del binario (${binary || '?'})`)
   }
 }
 

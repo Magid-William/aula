@@ -130,7 +130,7 @@ A small SwiftUI app, no third-party packages:
 | `Aula/Tailnet/LoopbackForwarder.swift` | `127.0.0.1` listener piped through the tailnet. Only connections that present the listener's secret (the `aula_gate` cookie the app sets for the web view, or `_ft` for native requests) are dialed; the port and secret change after a suspension |
 | `Aula/DemoServer.swift` | The demo (*Try it with an example course*): a tiny HTTP server on `127.0.0.1` that plays back a recording of the real app, so Aula can be tried with no Mac. See below |
 | `Aula/Assets.xcassets` | The app icon in its three looks (light, dark and tinted: the system picks one with its mode; `npx electron scripts/dev/icon/build-icons.mjs` writes them) and the drawings of the connect screen (the arch at each hour and the desk lamp, in light and dark), taken from the real app with `node scripts/dev/ios-art.mjs` |
-| `build-tailscalekit.sh` | Builds `Frameworks/TailscaleKit.xcframework` from Tailscale's official `libtailscale`, with log uploads disabled, Aula's bundle id (`com.luumlabs.aula.TailscaleKit`) and its own privacy manifest (`tailscalekit/PrivacyInfo.xcprivacy`) in each framework; then runs `scripts/licenses.mjs` |
+| `build-tailscalekit.sh` | Builds `Frameworks/TailscaleKit.xcframework` from Tailscale's official `libtailscale`, with log uploads disabled, Aula's bundle id (`com.luumlabs.aula.TailscaleKit`) and its own privacy manifest (`tailscalekit/PrivacyInfo.xcprivacy`) in each framework, and each framework's debug symbols (`TailscaleKit.framework.dSYM`, made with `dsymutil` before the binary is stripped) inside the xcframework, so Xcode adds them to every archive; then runs `scripts/licenses.mjs` |
 | `scripts/licenses.mjs` | Writes `Aula/Licenses.json` from the Go modules that `go list -deps` says are linked for iOS, each with its `LICENSE`/`NOTICE`/`PATENTS` files, after Aula's own notice (`scripts/aula-notice.mjs`: `NOTICE.md` as plain text, then `LICENSE.md`) |
 | `Aula.xcodeproj` | The Xcode project (iOS 18.1+, iPhone and iPad) |
 
@@ -192,14 +192,20 @@ Ready in the project:
   folder and the system clock, used by the embedded Tailscale node; `UserDefaults`, which remembers which Aula to
   open); and what Tailscale keeps to connect the device (User ID and Device ID, linked, not for tracking, App
   Functionality). Each `TailscaleKit.framework` carries its own manifest too.
+- TailscaleKit's debug symbols: the xcframework carries a `TailscaleKit.framework.dSYM` for each framework (made
+  before stripping, with the binary's UUID), and Xcode copies it into the archive's `dSYMs/` next to the app's, so App
+  Store Connect can symbolicate crashes in it (without them it warns that the archive has no dSYM for
+  `TailscaleKit.framework`). A copy stays in `Frameworks/TailscaleKit.dSYMs/`; like the framework, git does not keep
+  them. They name the folders the framework was built in, but only reach Apple inside the archive: the framework in
+  the app is stripped.
 - Tailscale's sign-in inside the app, and *Privacy policy · Licenses* on every waiting screen.
 - Permission texts in English and Spanish (camera, microphone, local network), the app icon without transparency, a
   launch screen, all orientations on iPad.
 
 Everything to paste into App Store Connect (texts, review notes, privacy label, export compliance, age rating,
 availability) is in [`docs/app-store/listing.md`](app-store/listing.md); the support page is [`SUPPORT.md`](SUPPORT.md).
-Before archiving, `node scripts/dev/app-store-check.mjs` checks the texts, the version, both manifests, the license
-notices and the demo recording.
+Before archiving, `node scripts/dev/app-store-check.mjs` checks the texts, the version, both manifests, TailscaleKit's
+dSYMs (their UUIDs against each binary, with `dwarfdump --uuid`), the license notices and the demo recording.
 
 **Review.** Apple's reviewers have no Mac with Aula, so they try it through the demo. Record it before archiving
 (`npm run build && node scripts/dev/ios-demo.mjs`): without `Demo.aulademo` the app has no demo button.
@@ -235,6 +241,9 @@ Verified on a Mac, by tests in this repository:
   on a Spanish device). Checked in English (light) and Spanish (dark). On the smallest iPhone (SE, 3rd generation),
   with the demo button, the whole connect screen fits in both languages: the sign-in note is whole and *Privacy policy ·
   Licenses* is at the bottom. The sheet closing by itself after a real sign-in is not tried yet.
+- With the framework rebuilt with its dSYMs (Xcode 27.2): an unsigned `xcodebuild archive` has
+  `TailscaleKit.framework.dSYM` in `dSYMs/` with the same UUID as the `TailscaleKit` inside `Aula.app`, and the app
+  itself carries no dSYM nor the build folders' paths.
 - The demo, in both simulators: it opens on *Today* with the example course, the course and the inbox open, the
   sample quiz in the chat grades answers, a new question gets the demo reply, and *Exit* returns to the connect
   screen. On the iPad also: the day's plan, a flashcard review (flip and rate), the calendar, statistics, tools, and
