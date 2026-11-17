@@ -123,6 +123,8 @@
     if (!w || !h) return
     const dark = isDark()
     const look = {
+      // la interfaz de Aula (no la página de vincular, que es un documento normal y puede desplazarse)
+      app: document.documentElement.classList.contains('remote'),
       dark,
       top: edge(0, dark),
       bottom: edge(h - 1, dark),

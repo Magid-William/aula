@@ -15,6 +15,8 @@ typealias PlatformViewRepresentable = NSViewRepresentable
 /// Cómo se ve la página: si está en oscuro (el tema de Aula, que puede no ser el del sistema) y el color de su borde de
 /// arriba («#rrggbb», con el grano del papel y lo que lo tape, como el velo de un diálogo).
 struct PageLook: Equatable {
+    /// Es la interfaz de Aula (no la página de vincular).
+    var app = false
     let dark: Bool
     let top: String?
 }
@@ -94,8 +96,6 @@ struct WebView: PlatformViewRepresentable {
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.scrollView.bounces = false
         view.scrollView.alwaysBounceVertical = false
-        // la página entera no se mueve: cada pantalla se desplaza en sus propias zonas (Coordinator.scrollViewDidScroll)
-        view.scrollView.isScrollEnabled = false
         // una app, no una página: sin vista previa al mantener pulsado un enlace y sin zoom con los dedos
         view.allowsLinkPreview = false
         view.scrollView.delegate = context.coordinator
@@ -130,6 +130,8 @@ struct WebView: PlatformViewRepresentable {
         private var shown: URL?
         /// Lo último que dijo la página de cómo se ve (se vuelve a contar si el sistema cambia de claro a oscuro).
         private var look: PageLook?
+        /// La interfaz de Aula está a la vista: la página entera no se mueve (cada pantalla se desplaza por dentro).
+        fileprivate var lockScroll = false
 
         init(events: WebEvents) {
             self.events = events
@@ -151,6 +153,10 @@ struct WebView: PlatformViewRepresentable {
             default:
                 guard body.hasPrefix("page:"), let look = Self.parse(String(body.dropFirst(5))) else { return }
                 self.look = look
+                #if canImport(UIKit)
+                lockScroll = look.app
+                message.webView?.scrollView.isScrollEnabled = !look.app
+                #endif
                 events.look(look, systemDark(message.webView))
             }
         }
@@ -160,7 +166,7 @@ struct WebView: PlatformViewRepresentable {
             guard let data = json.data(using: .utf8), let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let dark = o["dark"] as? Bool else { return nil }
             let top = (o["top"] as? [Any]).flatMap { $0.count > 1 ? $0[1] as? String : nil }
-            return PageLook(dark: dark, top: top.flatMap { $0.count == 7 && $0.hasPrefix("#") ? $0 : nil })
+            return PageLook(app: o["app"] as? Bool ?? false, dark: dark, top: top.flatMap { $0.count == 7 && $0.hasPrefix("#") ? $0 : nil })
         }
 
         /// El sistema pasó a claro u oscuro: la app vuelve a decidir si sigue a la página o al sistema.
@@ -225,6 +231,9 @@ struct WebView: PlatformViewRepresentable {
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
             #if canImport(UIKit)
             (webView as? AulaWebView)?.pageCanGoBack = false
+            // hasta que la página diga que es la interfaz de Aula, se desplaza como cualquier página
+            lockScroll = false
+            webView.scrollView.isScrollEnabled = true
             #endif
         }
 
@@ -257,10 +266,11 @@ extension WebView.Coordinator: UIScrollViewDelegate {
         scrollView.pinchGestureRecognizer?.isEnabled = false
     }
 
-    /// La página entera nunca se desplaza: WebKit la movía para enseñar el campo que se escribe (y entonces se podía
-    /// arrastrar toda la app). La vista web ya acaba encima del teclado, así que el campo está a la vista.
+    /// Con la interfaz de Aula, la página entera nunca se desplaza: WebKit la movía para enseñar el campo que se escribe
+    /// (y entonces se podía arrastrar toda la app). La vista web ya acaba encima del teclado, así que el campo está a la
+    /// vista; cada pantalla se desplaza en sus propias zonas. La página de vincular sí puede (un iPhone pequeño con teclado).
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if scrollView.contentOffset != .zero { scrollView.contentOffset = .zero }
+        if lockScroll, scrollView.contentOffset != .zero { scrollView.contentOffset = .zero }
     }
 }
 
