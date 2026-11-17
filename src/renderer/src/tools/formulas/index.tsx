@@ -7,7 +7,7 @@ import { Check, Copy, Search, Star, X } from 'lucide-react'
 import { Card, EmptyState, IconButton, cx, focusRing, spring, useTheme } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { toneInk } from '../shared/palette'
-import { useCopy, useStored } from '../shared/ui'
+import { mathField, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { CONSTANTS, FORMULAS, texOf, type Constant, type FormulaEntry, type Subject } from './lib/data'
 import { groupByTopic, localizeDecimal, searchConstants, searchFormulas, type Lang } from './lib/search'
@@ -45,6 +45,7 @@ export default function FormulasTool(_props: ToolProps) {
         <label className="relative flex items-center">
           <Search size={17} className="absolute left-3.5 text-text3 pointer-events-none" />
           <input
+            {...mathField}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setQuery('')}

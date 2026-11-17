@@ -8,7 +8,7 @@ import { Card, Select, cx, focusWithinRing, spring, useTheme } from '@renderer/d
 import { api } from '@renderer/lib/api'
 import { signedNumberKeyboard } from '@renderer/lib/device'
 import { formatNumber, parseNumber } from '../shared/lib/num'
-import { useComma, useCopy, useStored } from '../shared/ui'
+import { mathField, useComma, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { CATEGORIES, categoryById, convert, ratio, unitIn, type UnitDef } from './lib/catalog'
 
@@ -54,6 +54,7 @@ export default function UnitsTool({ compact }: ToolProps) {
       <Select value={from.id} options={options} onChange={setFrom} label={t('units.from')} />
       <div className={`mt-3 flex items-baseline gap-2 rounded-[16px] bg-sunken border-[0.5px] border-line px-4 py-3 ${focusWithinRing} transition`}>
         <input
+          {...mathField}
           value={saved.value}
           // −5 °C también desde el iPhone (su teclado decimal no tiene «−»)
           inputMode={signedNumberKeyboard(api.platform)}

@@ -10,7 +10,7 @@ import { derivative } from '@engine/math/algebra/derivative'
 import { Tex } from '../shared/Tex'
 import { formatNumber, localizeTex, niceTicks, parseNumber } from '../shared/lib/num'
 import { seriesColor } from '../shared/palette'
-import { CardTitle, NumField, useComma, useCopy, useStored } from '../shared/ui'
+import { CardTitle, NumField, mathField, useComma, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { compileFn, sampleFx, sampleParam, toClosure, type Compiled, type Env, type FnKind, type Pt, type Range } from './lib/compile'
 import { notablePoints, type Notable } from './lib/notable'
@@ -297,9 +297,9 @@ const FnRow = memo(function FnRow({ f, name, color, compiled, selected, comma, o
           {f.kind !== 'fx' && (
             <div className="mt-1.5 flex items-center gap-1.5 t-caption">
               <span>{f.kind === 'polar' ? 'θ' : 't'} ∈</span>
-              <input value={f.t0} onChange={(e) => onChange({ t0: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
+              <input {...mathField} value={f.t0} onChange={(e) => onChange({ t0: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
               <span>…</span>
-              <input value={f.t1} onChange={(e) => onChange({ t1: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
+              <input {...mathField} value={f.t1} onChange={(e) => onChange({ t1: e.target.value })} className={`w-14 h-6 rounded-[6px] bg-field border-[0.5px] border-line px-1.5 text-[12px] text-text tabular outline-none ${focusRing}`} />
             </div>
           )}
           {err ? (
@@ -335,7 +335,7 @@ function FnInput({ label, value, onChange, invalid, className }: { label: string
       <span className="text-[13px] text-text3 shrink-0">
         <Tex tex={label} />
       </span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} spellCheck={false} autoComplete="off" className="flex-1 min-w-0 bg-transparent outline-none text-[14px] font-mono text-text" />
+      <input value={value} onChange={(e) => onChange(e.target.value)} {...mathField} className="flex-1 min-w-0 bg-transparent outline-none text-[14px] font-mono text-text" />
     </label>
   )
 }

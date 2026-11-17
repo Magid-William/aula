@@ -14,7 +14,7 @@ import type { CourseToneName } from '@renderer/design/pixel/tones'
 import { Tex } from '../shared/Tex'
 import { formatNumber } from '../shared/lib/num'
 import { toneFill, toneInk } from '../shared/palette'
-import { useComma, useCopy, useStored } from '../shared/ui'
+import { mathField, useComma, useCopy, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { HEAT_PROPERTIES, HEAT_UNIT, covalentRadius, discovery, propertyScale, propertyValue, scalePosition, type HeatProperty } from './lib/extra'
 
@@ -97,6 +97,7 @@ export default function PeriodicTool(_props: ToolProps) {
           <label className="relative flex items-center w-full @3xl:w-[260px]">
             <Search size={15} className="absolute left-3 text-text3 pointer-events-none" />
             <input
+              {...mathField}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {

@@ -75,6 +75,9 @@ export function Menu({ trigger, items, align = 'end' }: { trigger: (open: () => 
     setSize((s) => (s && s.width === real.width && s.height === real.height ? s : real))
   }, [rect, items.length])
   const place = rect ? placePopover(rect, { width: window.innerWidth, height: window.innerHeight }, size ?? estimate, { align }) : null
+  // alineado a la derecha del botón, pero sin salirse por la izquierda (en un teléfono el menú es más ancho que el sitio)
+  const maxWidth = typeof window === 'undefined' ? undefined : window.innerWidth - 16
+  const endRight = rect ? Math.max(8, Math.min(window.innerWidth - rect.right, window.innerWidth - 8 - Math.min((size ?? estimate).width, maxWidth ?? Infinity))) : 0
   return (
     <span ref={anchor} className="inline-flex" data-aula-menu onKeyDown={(event) => {
       if (!rect && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
@@ -106,7 +109,7 @@ export function Menu({ trigger, items, align = 'end' }: { trigger: (open: () => 
                 options[next]?.focus({ preventScroll: true })
               }}
               className="fixed z-[95] material-menu rounded-[14px] p-1.5 min-w-[220px] overflow-auto overscroll-contain print:hidden"
-              style={{ ...(align === 'end' ? { right: Math.max(8, window.innerWidth - rect.right) } : { left: place!.left }), top: place!.top, bottom: place!.bottom, maxHeight: place!.maxHeight }}
+              style={{ ...(align === 'end' ? { right: endRight } : { left: place!.left }), top: place!.top, bottom: place!.bottom, maxHeight: place!.maxHeight, maxWidth }}
               initial={{ opacity: 0, y: place!.above ? 6 : -6, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: place!.above ? 4 : -4, scale: 0.98 }}

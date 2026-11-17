@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, Dice5, Eraser, Pause, Play, SkipBack, SkipFo
 import { Button, Card, IconButton, cx, focusRing, spring } from '@renderer/design'
 import { Tex } from '../shared/Tex'
 import { formatNumber } from '../shared/lib/num'
-import { CardTitle, ErrorLine, useComma, useStored } from '../shared/ui'
+import { CardTitle, ErrorLine, mathField, useComma, useStored } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { Q, add, cols, determinant, inverse, matrixTex, multiply, opTex, rank, rref, rows, transpose, type Matrix, type RowOp, type Step } from './lib/matrix'
 
@@ -135,6 +135,7 @@ function MatrixEditor({ name, cells, onChange }: { name: string; cells: string[]
               const bad = v.trim() !== '' && !Q.parse(v)
               return (
                 <motion.input
+                  {...mathField}
                   key={`${i}-${j}`}
                   layout
                   initial={{ opacity: 0, scale: 0.8 }}

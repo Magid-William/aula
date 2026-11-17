@@ -8,6 +8,10 @@ import { api } from '@renderer/lib/api'
 import { signedNumberKeyboard } from '@renderer/lib/device'
 import { formatFixed, formatNumber, parseNumber, texNumber, type NumberStyle } from './lib/num'
 
+/** Campos de números, fórmulas y búsquedas de las herramientas: en el teclado de la pantalla, sin mayúscula al empezar ni
+ *  autocorrector (cambiarían «x^2» o «sin» por otra cosa). */
+export const mathField = { autoCapitalize: 'off', autoCorrect: 'off', spellCheck: false, autoComplete: 'off' } as const
+
 /** Coma decimal si la interfaz está en español. */
 export function useComma(): boolean {
   const { i18n } = useTranslation()
@@ -124,6 +128,7 @@ export function NumField({ label, value, onChange, unit, placeholder, className,
       {label && <span className="block t-ui font-medium text-text2 mb-1.5 truncate">{label}</span>}
       <span className="relative flex items-center">
         <input
+          {...mathField}
           // con «−» también en el iPhone (su teclado decimal no lo tiene)
           inputMode={signedNumberKeyboard(api.platform)}
           aria-label={ariaLabel}
@@ -162,8 +167,7 @@ export function TextInput({ value, onChange, placeholder, className, label, onEn
         aria-invalid={invalid || undefined}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        spellCheck={false}
-        autoComplete="off"
+        {...mathField}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && onEnter) {

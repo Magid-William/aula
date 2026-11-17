@@ -9,7 +9,7 @@ import { Button, Card, IconButton, SegmentedTabs, Sprite, cx, focusWithinRing, s
 import { useAmbient } from '@renderer/design/ambient'
 import { Tex } from '../shared/Tex'
 import { localizeTex } from '../shared/lib/num'
-import { useComma, useCopy } from '../shared/ui'
+import { mathField, useComma, useCopy } from '../shared/ui'
 import type { ToolProps } from '../registry'
 import { MV, type MathValue } from '@engine/math/core/types'
 import { displayValue, loadValue, previewCalc, type CalcDisplay, type CalcIssue } from './lib/engine'
@@ -256,8 +256,7 @@ function Display({ compact, inputRef, onKeyDown, previewTex, partial, shown, lan
           value={s.input}
           onChange={(e) => s.setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          spellCheck={false}
-          autoComplete="off"
+          {...mathField}
           autoFocus={!compact}
           aria-label={t('calculator.inputLabel')}
           placeholder={t('calculator.placeholder')}
