@@ -66,7 +66,7 @@ export const CATEGORIES: UnitCategory[] = [
     to: 'ha',
     units: [u('m2', 'm²', 1), u('km2', 'km²', 1e6), u('cm2', 'cm²', 1e-4), u('mm2', 'mm²', 1e-6), u('ha', 'ha', 1e4), u('ac', 'ac', 4046.8564224), u('ft2', 'ft²', 0.09290304), u('in2', 'in²', 0.00064516), u('yd2', 'yd²', 0.83612736), u('mi2', 'mi²', 2589988.110336)]
   },
-  { id: 'speed', from: 'ms', to: 'kmh', units: [u('ms', 'm/s', 1), u('kmh', 'km/h', 1 / 3.6), u('mph', 'mph', 0.44704), u('kn', 'kn', 1852 / 3600), u('c', 'c', 299792458)] },
+  { id: 'speed', from: 'mps', to: 'kmh', units: [u('mps', 'm/s', 1), u('kmh', 'km/h', 1 / 3.6), u('mph', 'mph', 0.44704), u('kn', 'kn', 1852 / 3600), u('c', 'c', 299792458)] },
   {
     id: 'energy',
     from: 'kcal',
