@@ -130,7 +130,7 @@ linux:
   artifactName: Aula-${version}-linux-${arch}.${ext}
 publish:
   provider: github
-  owner: luumlabs
+  owner: Magid-William
   repo: aula
   # borrador: nadie lo ve (ni se ofrece como actualización) hasta que se publica a mano en GitHub tras probarlo
   releaseType: draft

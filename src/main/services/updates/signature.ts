@@ -28,7 +28,9 @@ import { basename } from 'node:path'
  */
 export const UPDATE_PUBLIC_KEYS: readonly string[] = [
   'MCowBQYDK2VwAyEAiBq04gxTBROZgokQ8tRvRcPy5/OjleXFtgsX4jWE7ds=',
-  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA='
+  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA=',
+  // clave de esta compilación personal: firma las actualizaciones publicadas en Magid-William/aula
+  'MCowBQYDK2VwAyEA8+ttFOHF8SZ/5m7aGUoAbS+OwCenIVTQz9plAzNqxxQ='
 ]
 
 /** La principal. */
