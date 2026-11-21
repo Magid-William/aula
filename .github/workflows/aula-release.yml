@@ -50,7 +50,10 @@ jobs:
         shell: pwsh
         run: |
           git checkout -B build FETCH_HEAD
-          git apply --3way "$env:RUNNER_TEMP\aula-patched.patch"
+          $patch = "$env:RUNNER_TEMP\aula-patched.patch"
+          # actions/checkout on Windows writes the file with CRLF: normalize before applying
+          [IO.File]::WriteAllText($patch, [IO.File]::ReadAllText($patch).Replace("`r`n", "`n"))
+          git apply --3way $patch
 
       - uses: actions/setup-node@v4
         if: env.SKIP == '0'
