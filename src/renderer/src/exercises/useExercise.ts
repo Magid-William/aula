@@ -10,6 +10,9 @@ import {
 } from './model'
 import { makeResult, type AnswerInput, type ExerciseMode, type GradeResult } from './types'
 
+/** Respuestas que se escriben en un campo de varias líneas: Intro salta de línea y se comprueba con ⌘/Ctrl+Intro. */
+const MULTILINE_KINDS = new Set(['numeric', 'expression', 'equation', 'set', 'interval', 'point', 'short', 'chem', 'open', 'unknown'])
+
 export interface ExerciseCallbacks {
   /** El primer resultado (el que cuenta para el progreso). Llega una sola vez. */
   onFirstResult?: (result: GradeResult, run: RunState) => void
@@ -217,7 +220,7 @@ export function useExercise(exercise: Exercise, opts: ExerciseOptions = {}): Exe
       selfReview: needsSelfReview(exercise, run), checkedWrong: checkedWrong(exercise, run),
       canHint: mode !== 'exam' && !finished && run.hintsShown < exercise.hints.length,
       canSayDontKnow: mode !== 'exam' && mode !== 'guided' && !finished && !run.result && run.attempts === 0,
-      multiline: exercise.answer.kind === 'open', hasContinue: !!opts.onContinue,
+      multiline: MULTILINE_KINDS.has(exercise.answer.kind), hasContinue: !!opts.onContinue,
       edit, editPart, submit, retry, hint, partHint, reveal, selfGrade, continueNow, primary
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
