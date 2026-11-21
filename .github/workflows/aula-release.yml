@@ -5,6 +5,16 @@ on:
     # 04:00 UTC, every day
     - cron: "0 4 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Apply our patch even if upstream already has the feature"
+        type: choice
+        options: [none, all, multiline, code]
+        default: none
+      dry_run:
+        description: "Only fetch and apply the patches (no install, build or publish)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -20,6 +30,8 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
       AULA_UPDATE_SIGNING_KEY: ${{ secrets.AULA_UPDATE_SIGNING_KEY }}
+      FORCE: ${{ github.event.inputs.force || 'none' }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +43,9 @@ jobs:
           git remote add upstream https://github.com/luumlabs/aula.git
           git fetch --depth=1 upstream main
           $version = (git show FETCH_HEAD:package.json | ConvertFrom-Json).version
-          Copy-Item "patches\*.patch" $env:RUNNER_TEMP
+          # the patch files and the checker live in the fork repo: keep them outside the checkout,
+          # because `git checkout -B build FETCH_HEAD` later replaces the whole working tree
+          Copy-Item "patches\*.patch", "patches\upstream-check.mjs" $env:RUNNER_TEMP
           $tag = "v$version"
           if (git rev-parse -q --verify "refs/tags/$tag") { $tag = "patched-$version" }
           gh release view $tag --json tagName 2>$null | Out-Null
@@ -46,44 +60,92 @@ jobs:
           # gh release view above exits 1 when there is no release: do not leak that into the step
           exit 0
 
-      - name: Apply the personal patch
+      - name: Apply the personal patches
         if: env.SKIP == '0'
         shell: pwsh
         run: |
           git checkout -B build FETCH_HEAD
-          $patch = "$env:RUNNER_TEMP\aula-patched.patch"
-          # actions/checkout on Windows writes the file with CRLF: normalize before applying
-          [IO.File]::WriteAllText($patch, [IO.File]::ReadAllText($patch).Replace("`r`n", "`n"))
-          git apply --3way $patch
+          $features = node "$env:RUNNER_TEMP\upstream-check.mjs" list | ConvertFrom-Json
+          $forced = @()
+          if ("$env:FORCE" -and "$env:FORCE" -ne 'none') { $forced = "$env:FORCE" -split ',' }
+          $applied = @()
+          foreach ($f in $features) {
+            $useOwn = $true
+            if (-not $f.always -and -not ($forced -contains 'all') -and -not ($forced -contains $f.key)) {
+              $closed = $false
+              try {
+                $state = gh issue view $f.issue -R luumlabs/aula --json state -q .state 2>$null
+                if ($LASTEXITCODE -eq 0 -and "$state".Trim() -eq 'CLOSED') { $closed = $true }
+              } catch {
+                Write-Host "::warning::could not read upstream issue #$($f.issue); keeping our patch"
+              }
+              if ($closed) {
+                node "$env:RUNNER_TEMP\upstream-check.mjs" check $f.key --root . | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                  $useOwn = $false
+                  Write-Host "upstream #$($f.issue) is closed and the fix is present: skipping $($f.patch)"
+                } elseif ($LASTEXITCODE -eq 1) {
+                  Write-Host "::warning::upstream #$($f.issue) is closed but the fix was not detected; applying $($f.patch)"
+                } else {
+                  Write-Host "::warning::the feature check failed; applying $($f.patch)"
+                }
+              }
+            }
+            if ($useOwn) {
+              $patch = "$env:RUNNER_TEMP\$($f.patch)"
+              # actions/checkout on Windows may write the file with CRLF: normalize before applying
+              [IO.File]::WriteAllText($patch, [IO.File]::ReadAllText($patch).Replace("`r`n", "`n"))
+              git apply --3way $patch
+              if ($LASTEXITCODE -ne 0) { throw "git apply failed for $($f.patch)" }
+              $applied += $f.patch
+            }
+          }
+          $rows = foreach ($f in $features) {
+            $issue = if ($f.issue) { "#$($f.issue)" } else { '-' }
+            $result = if ($applied -contains $f.patch) { 'applied' } else { 'skipped (upstream fixed it)' }
+            "| $($f.name) | $issue | $($f.patch) | $result |"
+          }
+          (@('### Patches', '', '| feature | upstream issue | patch | result |', '|---|---|---|---|') + $rows) -join "`n" |
+            Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $notes = @($features | Where-Object { -not $_.always } | ForEach-Object {
+            if ($applied -contains $_.patch) { "own patch: $($_.name) (upstream #$($_.issue))" }
+            else { "upstream: $($_.name) (#$($_.issue))" }
+          })
+          "RELEASE_NOTES=$($notes -join '; ')" | Out-File -Append $env:GITHUB_ENV
+          "APPLIED=$($applied -join ',')" | Out-File -Append $env:GITHUB_ENV
+          git diff --stat
+          if ($env:DRY_RUN -eq 'true') { "DRYRUN=1" | Out-File -Append $env:GITHUB_ENV }
 
       - uses: actions/setup-node@v4
-        if: env.SKIP == '0'
+        if: env.SKIP == '0' && env.DRYRUN != '1'
         with:
           node-version: 22
           cache: npm
 
       - name: Install
-        if: env.SKIP == '0'
+        if: env.SKIP == '0' && env.DRYRUN != '1'
         run: npm ci
 
-      - name: Typecheck and exercise tests
-        if: env.SKIP == '0'
+      - name: Typecheck and tests
+        if: env.SKIP == '0' && env.DRYRUN != '1'
         run: |
           npx tsc --noEmit -p tsconfig.web.json
           npx vitest run src/renderer/src/exercises
+          # the highlighted-code tests live in src/renderer/src/lib and only exist while our patch is on
+          if ($env:APPLIED -match '20-code-highlight') { npx vitest run src/renderer/src/lib }
 
       - name: Build and package (x64)
-        if: env.SKIP == '0'
+        if: env.SKIP == '0' && env.DRYRUN != '1'
         run: |
           npm run build
           npx electron-builder --win nsis --x64 --publish never
 
       - name: Sign the update
-        if: env.SKIP == '0'
+        if: env.SKIP == '0' && env.DRYRUN != '1'
         run: node scripts/release-sign.mjs release
 
       - name: Publish the GitHub release
-        if: env.SKIP == '0'
+        if: env.SKIP == '0' && env.DRYRUN != '1'
         shell: pwsh
         run: |
           $sha = git rev-parse HEAD
@@ -92,7 +154,8 @@ jobs:
             "release/latest.yml",
             "release/Aula-Setup-$($env:VERSION).exe.blockmap"
           )
+          $notes = "Personal patched build of Aula $($env:VERSION) from upstream $sha.`n`n$($env:RELEASE_NOTES)"
           gh release create $env:TAG $assets `
             --title "Aula $($env:VERSION) (patched)" `
-            --notes "Personal patched build of Aula $($env:VERSION) from upstream $sha." `
+            --notes $notes `
             --target $sha

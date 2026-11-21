@@ -1,0 +1,28 @@
+diff --git a/electron-builder.yml b/electron-builder.yml
+index 1a08d4c..fe9e29b 100644
+--- a/electron-builder.yml
++++ b/electron-builder.yml
+@@ -130,7 +130,7 @@ linux:
+   artifactName: Aula-${version}-linux-${arch}.${ext}
+ publish:
+   provider: github
+-  owner: luumlabs
++  owner: Magid-William
+   repo: aula
+   # borrador: nadie lo ve (ni se ofrece como actualización) hasta que se publica a mano en GitHub tras probarlo
+   releaseType: draft
+diff --git a/src/main/services/updates/signature.ts b/src/main/services/updates/signature.ts
+index 647d88b..063f6b6 100644
+--- a/src/main/services/updates/signature.ts
++++ b/src/main/services/updates/signature.ts
+@@ -28,7 +28,9 @@ import { basename } from 'node:path'
+  */
+ export const UPDATE_PUBLIC_KEYS: readonly string[] = [
+   'MCowBQYDK2VwAyEAiBq04gxTBROZgokQ8tRvRcPy5/OjleXFtgsX4jWE7ds=',
+-  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA='
++  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA=',
++  // clave de esta compilación personal: firma las actualizaciones publicadas en Magid-William/aula
++  'MCowBQYDK2VwAyEA8+ttFOHF8SZ/5m7aGUoAbS+OwCenIVTQz9plAzNqxxQ='
+ ]
+ 
+ /** La principal. */

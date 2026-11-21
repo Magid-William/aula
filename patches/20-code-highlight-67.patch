@@ -1,0 +1,831 @@
+diff --git a/src/engine/pipeline/codeReference.ts b/src/engine/pipeline/codeReference.ts
+new file mode 100644
+index 0000000..ebe07e7
+--- /dev/null
++++ b/src/engine/pipeline/codeReference.ts
+@@ -0,0 +1,30 @@
++// Referencia del bloque `code` (herramienta `block_reference`): qué lenguajes entiende, cómo se rellena y cuándo usarlo en vez
++// de un ``` dentro de un texto. En inglés: lo lee el modelo. Puro.
++const FENCE = '```'
++
++export const CODE_REFERENCE = String.raw`# code — program listing
++A program listing with syntax highlighting, line numbers (from 3 lines on), a copy button and, optionally, the program's exact output in its own pane. When the lesson is about code (a language course, an algorithms unit, a script the student has to read), this is the block to use: it is the one that carries the language header, the copy button and the output.
++Schema:
++{"type":"code","language":"python","code":"…","output":"…","caption":"md"}
++- language: optional. A highlight.js name or one of the aliases below. Omit it only for pseudocode or when you truly do not know it: the app then guesses and shows the name it found.
++- code: the exact source, with real line breaks inside the JSON string (\n). Never wrap it in ${FENCE} fences and never number the lines yourself: the app numbers them.
++- output: optional. What the program prints (or the compiler error), exactly, one line per line. It is rendered in its own pane, without highlighting, so give it as plain text.
++- caption: optional markdown under the card: the version ("Python 3.12"), what to look at, or the flag that matters.
++Languages: python, javascript, typescript, java, c, cpp, csharp, go, rust, kotlin, swift, ruby, php, scala, dart, r, matlab, julia, fortran, haskell, clojure, elixir, erlang, lua, perl, objectivec, groovy, vbnet, bash, powershell, sql, json, yaml, xml (html, svg), css, scss, less, markdown, latex, ini (toml, cfg), diff, dockerfile, makefile, cmake, gradle, nginx, graphql, protobuf, verilog, vhdl, x86asm, plaintext.
++Aliases: py → python · js/node → javascript · ts/tsx → typescript · sh/shell/console → bash · c++ → cpp · c# → csharp · html/svg → xml · tex → latex · md → markdown · yml → yaml · rb → ruby · rs → rust · kt → kotlin · golang → go · objc → objectivec · asm → x86asm · ps1/pwsh → powershell · toml/cfg/conf → ini · patch → diff · gql → graphql · proto → protobuf · text/pseudocode → plaintext.
++Rules
++- The code must run as written (or compile, when the task is "does it compile"); no "…" elisions unless the caption says they are elided.
++- Keep lines under ~90 characters: a longer line scrolls sideways instead of wrapping, and the student loses the line.
++- Inside the JSON string, double every backslash and escape the double quotes (\n, \t, \\, \").
++- One idea per block: split a long program into the steps you would explain, each with its own caption.
++- A ${FENCE} fence inside an md field is fine for a short example inside prose, but this block is what gives the code its card, its language header, the copy button, the line numbers and the output: use it whenever the code is the content.
++Examples
++1. Predict the output (Python):
++{"type":"code","language":"python","code":"def add(a, b=[]):\n    b.append(a)\n    return b\n\nprint(add(1))\nprint(add(2))","output":"[1]\n[1, 2]","caption":"The default list is created once, not on every call."}
++2. Does it compile? (TypeScript, strict):
++{"type":"code","language":"typescript","code":"interface User { name: string }\n\nconst u: User = { name: \"Ana\", age: 30 };","caption":"Why does tsc reject line 3?"}
++3. Read the query (SQL):
++{"type":"code","language":"sql","code":"SELECT name, AVG(grade) AS avg\nFROM students\nGROUP BY name\nHAVING AVG(grade) < 5\nORDER BY avg;","caption":"Which students are below a 5 average?"}
++4. A terminal session, with the command and what it printed in the same listing:
++{"type":"code","language":"bash","code":"$ npx tsc --noEmit\nsrc/user.ts:3:7 - error TS2322: Type 'string' is not assignable to type 'number'.","caption":"The compiler stops at the first incompatible assignment."}
++`
+diff --git a/src/engine/pipeline/guide.ts b/src/engine/pipeline/guide.ts
+index 2098eef..3f054a9 100644
+--- a/src/engine/pipeline/guide.ts
++++ b/src/engine/pipeline/guide.ts
+@@ -4,6 +4,7 @@
+ import type { LessonLearningMode } from '@shared/schema'
+ import { STRUCTURE_REFERENCE } from './structure-guide'
+ import { DRAWING_REFERENCE } from './drawingReference'
++import { CODE_REFERENCE } from './codeReference'
+ 
+ export const AUTHORING_GUIDE = String.raw`# Aula authoring guide
+ 
+@@ -69,7 +70,7 @@ Do not pad. Quality over length. Use ` + '`quote`' + String.raw` blocks to cite
+ - ` + '`{"type":"spot","intro":"md","lines":["md line 1","md line 2","md line 3","md line 4"],"wrongIndex":2,"explanation":"md"}`' + String.raw` (` + '`wrongIndex`' + String.raw` starts at 0)
+ - ` + '`{"type":"tryit","title":"Try it","exerciseIDs":["skill-e1","skill-e2"]}`' + String.raw`
+ - ` + '`{"type":"recap","title":"optional","points":["md","md"]}`' + String.raw`
+-- ` + '`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}`' + String.raw`
++- ` + '`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}`' + String.raw` — a program listing with syntax highlighting (python, javascript, typescript, java, c, cpp, csharp, go, rust, kotlin, swift, ruby, php, scala, r, matlab, bash, powershell, sql, json, yaml, html, css, diff, dockerfile, plaintext and aliases like py, js, ts, sh, c++, c#), line numbers and a copy button. ` + '`output`' + String.raw` is what it prints, in its own pane. When the code is the content, use this block (a fenced code block written inside an md field is highlighted too, but only this block has the language header, the copy button, the line numbers and the output). Exact schema and examples: block_reference("code").
+ - ` + '`{"type":"quote","md":"…","source":{"source":"id","page":12},"author":"optional"}`' + String.raw`
+ - **Interactive visuals** (native, offline; call ` + '`block_reference`' + String.raw` with the type for the exact schema and examples before the first use):
+   - ` + '`labeled`' + String.raw` — interactive labeled diagram: an image from ` + '`add_image`' + String.raw` (prefer images *without* printed labels) or a vector ` + '`drawing`' + String.raw`, with ` + '`parts`' + String.raw` [{id, name, x, y (fractions 0–1), r|rect|polygon zone, layer, detail}] and optional ` + '`layers`' + String.raw` (bones/muscles/organs; chambers/valves/vessels). The student explores (hover/click → name + explanation), zooms, toggles layers and practises «point at the part» and «drag the label» with exact grading; optional ` + '`steps`' + String.raw` make a guided tour that circles parts one idea at a time. Use it for anatomy, cells, organs, maps, machines, circuits, artworks.
+@@ -187,7 +188,7 @@ export function authoringGuide(mode: LessonLearningMode): string {
+ 
+ // MARK: Referencia de los bloques visuales (herramienta `block_reference`)
+ 
+-export const BLOCK_REFERENCE_TYPES = ['labeled', 'locate', 'draglabel', 'model3d', 'simulation', 'map', 'timeline', 'process', 'slides', 'image', 'cardfigure', 'structure', 'drawing'] as const
++export const BLOCK_REFERENCE_TYPES = ['labeled', 'locate', 'draglabel', 'model3d', 'simulation', 'map', 'timeline', 'process', 'slides', 'image', 'cardfigure', 'structure', 'drawing', 'code'] as const
+ 
+ /** Los bloques básicos ya están en la guía: la herramienta dice dónde, sin contarlo como fallo. */
+ export const BASIC_BLOCK_TYPES = ['text', 'math', 'callout', 'example', 'plot', 'explore', 'table', 'chart', 'numberline', 'diagram', 'drawing', 'steps', 'compare', 'formulas', 'predict', 'spot', 'tryit', 'recap', 'code', 'quote'] as const
+@@ -198,7 +199,8 @@ const REFERENCE_ALIASES: Record<string, string> = {
+   shapes: 'process', form: 'process', pyramid: 'process', funnel: 'process', venn: 'process', mindmap: 'process', 'mind-map': 'process', mapamental: 'process', piramide: 'process', embudo: 'process',
+   sim: 'simulation', interactive: 'simulation', geo: 'map', maps: 'map', chronology: 'timeline', deck: 'slides', slide: 'slides', 'image-occlusion': 'cardfigure', figure: 'cardfigure',
+   smiles: 'structure', skeletal: 'structure', structural: 'structure', chemfig: 'structure', 'structural-formula': 'structure', reaction: 'structure',
+-  draw: 'drawing', sketch: 'drawing', picture: 'drawing', geometry: 'drawing', animation: 'drawing'
++  draw: 'drawing', sketch: 'drawing', picture: 'drawing', geometry: 'drawing', animation: 'drawing',
++  snippet: 'code', program: 'code', listing: 'code', source: 'code', 'source-code': 'code', pseudo: 'code', pseudocode: 'code'
+ }
+ 
+ export function blockReferenceKey(raw: string): string {
+@@ -208,6 +210,7 @@ export function blockReferenceKey(raw: string): string {
+ 
+ export const BLOCK_REFERENCE: Readonly<Record<string, string>> = {
+   drawing: DRAWING_REFERENCE,
++  code: CODE_REFERENCE,
+   labeled: String.raw`# labeled — interactive labeled diagram
+ A figure (an image from add_image, a vector ` + '`drawing`' + String.raw`, or a page of the student's material via ` + '`source`' + String.raw`) with marked PARTS. Hovering/clicking shows the name and ` + '`detail`; `layers`' + String.raw` can be switched on/off; zoom and pan; and built-in practice: «Señala» (the app asks for a part, the student clicks it — graded exactly) and «Arrastra» (drag each name to its place).
+ Schema:
+diff --git a/src/main/services/assistant/blockCatalog.ts b/src/main/services/assistant/blockCatalog.ts
+index 0f6c772..711fc8f 100644
+--- a/src/main/services/assistant/blockCatalog.ts
++++ b/src/main/services/assistant/blockCatalog.ts
+@@ -22,7 +22,7 @@ export const BLOCK_CATALOG = `## 5. Block catalog (JSON; \`id\` optional)
+ - \`{"type":"spot","intro":"md","lines":["md line 1","md line 2","md line 3","md line 4"],"wrongIndex":2,"explanation":"md"}\` (\`wrongIndex\` starts at 0)
+ - \`{"type":"tryit","title":"Try it","exerciseIDs":["skill-e1","skill-e2"]}\`
+ - \`{"type":"recap","title":"optional","points":["md","md"]}\`
+-- \`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}\`
++- \`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}\` — program listing: highlighted (python, javascript, typescript, java, c, cpp, csharp, go, rust, kotlin, swift, ruby, php, scala, r, matlab, bash, powershell, sql, json, yaml, html, css, diff, dockerfile, plaintext, and aliases such as py, js, ts, sh, c++, c#), line numbers from 3 lines, copy button; \`output\` is what it prints, in its own pane. When the code is the content, use this block: a fenced code block in an \`md\` field is highlighted too, but only this one has the language header, the numbers and the output. Exact schema: block_reference("code").
+ - \`{"type":"quote","md":"…","source":{"source":"id","page":12},"author":"optional"}\`
+ - Credits: every picture or model from the web carries its author and license (\`credit\`); \`add_image\` fills it for Wikimedia Commons.
+ `
+diff --git a/src/main/services/assistant/tools/figureTools.test.ts b/src/main/services/assistant/tools/figureTools.test.ts
+index b001deb..d978a53 100644
+--- a/src/main/services/assistant/tools/figureTools.test.ts
++++ b/src/main/services/assistant/tools/figureTools.test.ts
+@@ -83,6 +83,18 @@ describe('block_reference del chat y del tutor', () => {
+     expect(blockReferenceFor('map')!.reference).toMatch(/countries/i)
+   })
+ 
++  it('code trae la lista de lenguajes, los alias y cuándo usarlo en vez de un texto', async () => {
++    const ref = blockReferenceFor('code')!
++    expect(ref.schema[0]).toContain('"type":"code"')
++    expect(ref.reference).toContain('"output"')
++    expect(ref.reference).toMatch(/Languages:.*python/)
++    expect(ref.reference).toContain('py → python')
++    expect(blockReferenceFor('snippet')!.reference).toContain('# code')
++    const out = JSON.parse(textOf(await blockReferenceTool().run({ type: 'code' } as never, call)))
++    expect(out.ok).toBe(true)
++    expect(out.reference).toContain('# code — program listing')
++  })
++
+   it('el catálogo del chat cuenta los campos nuevos: formas y construcción del diagrama, tono de compare, gráfica horizontal y resaltada', () => {
+     expect(blockReferenceFor('diagram')!.schema[0]).toContain('"build"')
+     expect(blockReferenceFor('compare')!.schema[0]).toContain('"tone":"key|same"')
+diff --git a/src/main/services/assistant/tools/study.ts b/src/main/services/assistant/tools/study.ts
+index e92d75c..579dfe9 100644
+--- a/src/main/services/assistant/tools/study.ts
++++ b/src/main/services/assistant/tools/study.ts
+@@ -224,8 +224,8 @@ export function blockReferenceFor(raw: string): { type: string; schema: string[]
+ /** El detalle de un tipo de bloque (lo que dicen de él el catálogo y la guía de las lecciones), bajo demanda. */
+ export function blockReferenceTool(): AgentTool {
+   return tool('block_reference',
+-    'The exact JSON shape of one Aula block type (as in the lessons): its schema line from the catalog and, for the visual blocks, the full reference with rules and examples. Call it before writing a block you are not sure about: labeled, model3d, structure, simulation, map (countries, values per country, journeys), timeline, process (animated diagram steps and the ready-made diagram shapes: pyramid, funnel, venn, mindmap), drawing (pictures that move or build up step by step)…',
+-    Schema.object([['type', Schema.string('block type, e.g. plot, table, diagram, process, venn, timeline, labeled, model3d, simulation, map, drawing, structure')]], ['type']),
++    'The exact JSON shape of one Aula block type (as in the lessons): its schema line from the catalog and, for the visual blocks and code, the full reference with rules and examples. Call it before writing a block you are not sure about: code (program listings: languages, aliases, output), labeled, model3d, structure, simulation, map (countries, values per country, journeys), timeline, process (animated diagram steps and the ready-made diagram shapes: pyramid, funnel, venn, mindmap), drawing (pictures that move or build up step by step)…',
++    Schema.object([['type', Schema.string('block type, e.g. plot, table, diagram, process, venn, timeline, labeled, model3d, simulation, map, drawing, structure, code')]], ['type']),
+     (a) => {
+       const type = (a.string('type') ?? '').trim()
+       if (!type) return outError("Missing 'type'.")
+diff --git a/src/main/services/tools/platform.ts b/src/main/services/tools/platform.ts
+index 068ddf7..f05dc7d 100644
+--- a/src/main/services/tools/platform.ts
++++ b/src/main/services/tools/platform.ts
+@@ -313,7 +313,7 @@ export function recordFindings(ctx: ToolContext): AgentTool {
+ // MARK: Referencia de los bloques visuales
+ 
+ export function blockReferenceTool(ctx: ToolContext): AgentTool {
+-  return defineTool(ctx, 'block_reference', 'Exact JSON schema, validation rules and worked examples (medicine, chemistry, physics, history, geography, economics, art…) for Aula\'s visual/interactive blocks: labeled (interactive labeled diagram: anatomy, cell, maps, machines, artworks; optional guided tour), locate/draglabel (point-at-the-part and drag-the-label exercises), model3d (molecules, solids, 3D models), structure (2D structural formula from SMILES: functional groups, isomers, reactions), simulation (sliders + animated model: projectile, pendulum, RC, supply-demand, pharmacokinetics…), map (countries by name, a value per country, journeys with arrows, named frames), timeline (to scale), process (animated diagram steps: Krebs cycle, mitosis; and the ready-made diagram shapes: pyramid, funnel, Venn, mind map), slides (themes and layouts), image, cardfigure (image-occlusion flashcards), drawing (ready-made objects, geometry marks, pictures that move with sliders or a clock, and step-by-step constructions). Call it before writing one of these for the first time.',
++  return defineTool(ctx, 'block_reference', 'Exact JSON schema, validation rules and worked examples (medicine, chemistry, physics, history, geography, economics, art…) for Aula\'s visual/interactive blocks: labeled (interactive labeled diagram: anatomy, cell, maps, machines, artworks; optional guided tour), locate/draglabel (point-at-the-part and drag-the-label exercises), model3d (molecules, solids, 3D models), structure (2D structural formula from SMILES: functional groups, isomers, reactions), simulation (sliders + animated model: projectile, pendulum, RC, supply-demand, pharmacokinetics…), map (countries by name, a value per country, journeys with arrows, named frames), timeline (to scale), process (animated diagram steps: Krebs cycle, mitosis; and the ready-made diagram shapes: pyramid, funnel, Venn, mind map), slides (themes and layouts), image, cardfigure (image-occlusion flashcards), drawing (ready-made objects, geometry marks, pictures that move with sliders or a clock, and step-by-step constructions), code (program listings: the languages and aliases the app highlights, the output pane, and when to use the block instead of a fence). Call it before writing one of these for the first time.',
+     Schema.object([['type', Schema.string('Block or exercise type', [...BLOCK_REFERENCE_TYPES])]], { required: ['type'] }),
+     (a) => {
+       const t = (a.string('type') ?? '').toLowerCase()
+@@ -321,7 +321,7 @@ export function blockReferenceTool(ctx: ToolContext): AgentTool {
+       if (text) return ToolOut.json({ ok: true, type: t, reference: text })
+       // los bloques básicos ya están en la guía: se dice dónde, sin contarlo como fallo
+       if ((BASIC_BLOCK_TYPES as readonly string[]).includes(t)) {
+-        return ToolOut.json({ ok: true, type: t, reference: `\`${t}\` is a basic block: its exact JSON is in the authoring guide, section 5 (Block catalog) of your instructions. This tool only details the visual/interactive blocks: ${BLOCK_REFERENCE_TYPES.join(', ')}.` })
++        return ToolOut.json({ ok: true, type: t, reference: `\`${t}\` is a basic block: its exact JSON is in the authoring guide, section 5 (Block catalog) of your instructions. This tool details the visual/interactive blocks and the code block: ${BLOCK_REFERENCE_TYPES.join(', ')}.` })
+       }
+       return ToolOut.error(`Unknown type '${t}'. Types: ${BLOCK_REFERENCE_TYPES.join(', ')}.`)
+     })
+diff --git a/src/renderer/src/blocks/CodeBlock.tsx b/src/renderer/src/blocks/CodeBlock.tsx
+index 7962735..01baa6b 100644
+--- a/src/renderer/src/blocks/CodeBlock.tsx
++++ b/src/renderer/src/blocks/CodeBlock.tsx
+@@ -1,120 +1,21 @@
+-// Código con resaltado (highlight.js con los lenguajes de clase), botón de copiar, números de línea y la salida del programa.
+-import { useMemo, useState } from 'react'
+-import hljs from 'highlight.js/lib/core'
+-import bash from 'highlight.js/lib/languages/bash'
+-import c from 'highlight.js/lib/languages/c'
+-import cpp from 'highlight.js/lib/languages/cpp'
+-import csharp from 'highlight.js/lib/languages/csharp'
+-import css from 'highlight.js/lib/languages/css'
+-import go from 'highlight.js/lib/languages/go'
+-import java from 'highlight.js/lib/languages/java'
+-import javascript from 'highlight.js/lib/languages/javascript'
+-import json from 'highlight.js/lib/languages/json'
+-import kotlin from 'highlight.js/lib/languages/kotlin'
+-import latex from 'highlight.js/lib/languages/latex'
+-import markdown from 'highlight.js/lib/languages/markdown'
+-import matlab from 'highlight.js/lib/languages/matlab'
+-import php from 'highlight.js/lib/languages/php'
+-import plaintext from 'highlight.js/lib/languages/plaintext'
+-import python from 'highlight.js/lib/languages/python'
+-import r from 'highlight.js/lib/languages/r'
+-import ruby from 'highlight.js/lib/languages/ruby'
+-import rust from 'highlight.js/lib/languages/rust'
+-import sql from 'highlight.js/lib/languages/sql'
+-import swift from 'highlight.js/lib/languages/swift'
+-import typescript from 'highlight.js/lib/languages/typescript'
+-import xml from 'highlight.js/lib/languages/xml'
+-import yaml from 'highlight.js/lib/languages/yaml'
+-import { cx, Icon, IconButton, toast } from '@renderer/design'
++// Bloque `code` de la lección: la superficie común de código (resaltado, copiar, números de línea y salida) más su pie.
+ import type { BlockOf } from '@shared/schema/blocks'
++import { CodeSurface } from '@renderer/lib/CodeSurface'
+ import type { BlockProps } from './types'
+-import { Caption, useBlocksT } from './shared'
+-
+-const LANGS = { bash, c, cpp, csharp, css, go, java, javascript, json, kotlin, latex, markdown, matlab, php, plaintext, python, r, ruby, rust, sql, swift, typescript, xml, yaml }
+-for (const [name, def] of Object.entries(LANGS)) if (!hljs.getLanguage(name)) hljs.registerLanguage(name, def)
+-
+-/** Nombre del lenguaje que entiende highlight.js («py» → python, «html» → xml, «c++» → cpp…); undefined si no se conoce. */
+-export function codeLanguage(raw: string | undefined): string | undefined {
+-  const s = (raw ?? '').trim().toLowerCase()
+-  if (!s) return undefined
+-  const alias: Record<string, string> = {
+-    py: 'python', python3: 'python', js: 'javascript', node: 'javascript', ts: 'typescript', sh: 'bash', shell: 'bash', zsh: 'bash', console: 'bash',
+-    'c++': 'cpp', cc: 'cpp', 'c#': 'csharp', cs: 'csharp', html: 'xml', svg: 'xml', tex: 'latex', md: 'markdown', yml: 'yaml', octave: 'matlab', rb: 'ruby', rs: 'rust', kt: 'kotlin', text: 'plaintext', txt: 'plaintext', pseudocode: 'plaintext', pseudocódigo: 'plaintext'
+-  }
+-  const name = alias[s] ?? s
+-  return hljs.getLanguage(name) ? name : undefined
+-}
+-
+-/** HTML resaltado (highlight.js escapa el texto). Sin lenguaje conocido, se intenta adivinar entre los de clase. */
+-function highlight(code: string, lang: string | undefined): { html: string; lang?: string } {
+-  try {
+-    if (lang) return { html: hljs.highlight(code, { language: lang, ignoreIllegals: true }).value, lang }
+-    if (code.length > 20_000) return { html: escapeHtml(code) }
+-    const auto = hljs.highlightAuto(code, ['python', 'javascript', 'java', 'cpp', 'c', 'sql', 'bash', 'r', 'matlab', 'typescript'])
+-    return auto.relevance >= 5 ? { html: auto.value, lang: auto.language } : { html: escapeHtml(code) }
+-  } catch {
+-    return { html: escapeHtml(code) }
+-  }
+-}
+-
+-const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`)
+-
+-const LABELS: Record<string, string> = { cpp: 'C++', csharp: 'C#', javascript: 'JavaScript', typescript: 'TypeScript', xml: 'HTML', latex: 'LaTeX', matlab: 'MATLAB', sql: 'SQL', php: 'PHP', json: 'JSON', yaml: 'YAML', css: 'CSS', plaintext: '' }
+-const langLabel = (lang: string | undefined, raw: string | undefined): string => (lang ? (LABELS[lang] ?? lang.charAt(0).toUpperCase() + lang.slice(1)) : (raw ?? '').trim())
++import { Caption } from './shared'
+ 
+ export function CodeBlockView({ block, ctx }: BlockProps<BlockOf<'code'>>) {
+-  const t = useBlocksT()
+-  const [copied, setCopied] = useState(false)
+-  const code = block.code.replace(/\s+$/, '')
+-  const { html, lang } = useMemo(() => highlight(code, codeLanguage(block.language)), [code, block.language])
+-  const lines = useMemo(() => code.split('\n').length, [code])
+-  const numbered = lines > 3 && ctx.mode !== 'chat'
+-  const label = langLabel(lang, block.language)
+   const chat = ctx.mode === 'chat'
+-  const copy = async () => {
+-    try {
+-      await navigator.clipboard.writeText(block.code)
+-      setCopied(true)
+-      ctx.onInteract?.(block.id, 'code.copy')
+-      setTimeout(() => setCopied(false), 1400)
+-    } catch {
+-      toast.error(t('code.copyFailed'))
+-    }
+-  }
+   return (
+     <div>
+-      <div className={cx('overflow-hidden border-[0.5px] border-line bg-sunken', chat ? 'rounded-[12px]' : 'rounded-[16px]')}>
+-        <div className="flex h-9 items-center gap-2 border-b-[0.5px] border-line-soft pl-4 pr-1.5">
+-          <Icon name="code" size={14} className="text-text3" />
+-          <span className="t-caption uppercase tracking-[0.6px] text-text3">{label || t('code.code')}</span>
+-          {ctx.mode !== 'print' && (
+-            <IconButton label={copied ? t('code.copied') : t('code.copy')} size="sm" onClick={() => void copy()} className={cx('ml-auto', copied && 'text-success')}>
+-              <Icon name={copied ? 'check' : 'copy'} size={14} />
+-            </IconButton>
+-          )}
+-        </div>
+-        <div className="overflow-x-auto">
+-          <pre className={cx('blk-code m-0 flex t-mono text-text', chat ? 'px-3 py-2.5 text-[12.5px] leading-[19px]' : 'px-4 py-3.5 text-[13px] leading-[21px]')}>
+-            {numbered && (
+-              <span aria-hidden className="mr-4 select-none text-right text-text3/70 tabular">
+-                {Array.from({ length: lines }, (_, i) => (
+-                  <span key={i} className="block">{i + 1}</span>
+-                ))}
+-              </span>
+-            )}
+-            <code className="block min-w-0 flex-1 whitespace-pre" dangerouslySetInnerHTML={{ __html: html }} />
+-          </pre>
+-        </div>
+-        {block.output?.trim() && (
+-          <div className="border-t-[0.5px] border-line-soft bg-surface/60 px-4 py-3">
+-            <div className="t-caption mb-1 flex items-center gap-1.5 uppercase tracking-[0.6px] text-text3">
+-              <Icon name="terminal" size={12} />
+-              {t('code.output')}
+-            </div>
+-            <pre className="m-0 whitespace-pre-wrap t-mono text-[12.5px] leading-[19px] text-text2">{block.output.replace(/\s+$/, '')}</pre>
+-          </div>
+-        )}
+-      </div>
++      <CodeSurface
++        code={block.code}
++        language={block.language}
++        output={block.output}
++        compact={chat}
++        copyable={ctx.mode !== 'print'}
++        onCopy={() => ctx.onInteract?.(block.id, 'code.copy')}
++      />
+       <Caption text={block.caption} className="mt-2 px-1" />
+     </div>
+   )
+diff --git a/src/renderer/src/blocks/blocks.css b/src/renderer/src/blocks/blocks.css
+index b885a3d..ce6c46a 100644
+--- a/src/renderer/src/blocks/blocks.css
++++ b/src/renderer/src/blocks/blocks.css
+@@ -14,13 +14,6 @@
+   --viz-neutral: #8a847c;
+   --viz-plum: var(--viz-rose);
+   --viz-indigo: var(--viz-blue);
+-  /* código: tonos de los cursos, sobrios */
+-  --code-keyword: #9c4527;
+-  --code-string: #5d6825;
+-  --code-number: #395d88;
+-  --code-title: #1f6a6e;
+-  --code-builtin: #7d613c;
+-  --code-comment: #8f8c87;
+ }
+ .dark {
+   --viz-blue: #4b7ccd;
+@@ -33,12 +26,6 @@
+   --viz-rose: #c66177;
+   --viz-red: #e0726b;
+   --viz-neutral: #a39c93;
+-  --code-keyword: #ef9c7b;
+-  --code-string: #b7c46e;
+-  --code-number: #93b5e0;
+-  --code-title: #74c6c6;
+-  --code-builtin: #d4b88e;
+-  --code-comment: #8a857f;
+ }
+ 
+ /* Figuras de la lección sobre el papel (sin tarjeta): los halos de los números y etiquetas son del color del papel, y el pie
+@@ -82,18 +69,6 @@
+ .blk-fig-label { white-space: nowrap; line-height: 1; }
+ .blk-fig-label .katex { font-size: 1em; }
+ 
+-/* Código */
+-.blk-code { tab-size: 2; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'calt' 0; }
+-.blk-code .hljs-keyword, .blk-code .hljs-selector-tag, .blk-code .hljs-literal, .blk-code .hljs-meta .hljs-keyword { color: var(--code-keyword); font-weight: 500; }
+-.blk-code .hljs-string, .blk-code .hljs-regexp, .blk-code .hljs-template-string, .blk-code .hljs-attr-value, .blk-code .hljs-symbol { color: var(--code-string); }
+-.blk-code .hljs-number, .blk-code .hljs-variable.constant_ { color: var(--code-number); }
+-.blk-code .hljs-title, .blk-code .hljs-title.function_, .blk-code .hljs-section, .blk-code .hljs-selector-class { color: var(--code-title); }
+-.blk-code .hljs-built_in, .blk-code .hljs-type, .blk-code .hljs-attr, .blk-code .hljs-attribute, .blk-code .hljs-tag .hljs-name, .blk-code .hljs-name { color: var(--code-builtin); }
+-.blk-code .hljs-comment, .blk-code .hljs-quote { color: var(--code-comment); font-style: italic; }
+-.blk-code .hljs-meta, .blk-code .hljs-params { color: var(--text2); }
+-.blk-code .hljs-deletion { color: var(--danger); }
+-.blk-code .hljs-addition { color: var(--success); }
+-
+ /* Puntos de interés de una imagen: laten despacio */
+ @keyframes blk-pulse {
+   0% { transform: scale(1); opacity: 0.55; }
+diff --git a/src/renderer/src/lib/CodeSurface.tsx b/src/renderer/src/lib/CodeSurface.tsx
+new file mode 100644
+index 0000000..e0ac64b
+--- /dev/null
++++ b/src/renderer/src/lib/CodeSurface.tsx
+@@ -0,0 +1,75 @@
++// La superficie única del código: cabecera con el lenguaje y el botón de copiar, el texto resaltado, los números de línea y la
++// salida del programa. La usan el bloque `code` de las lecciones y el código escrito dentro de Markdown (chat, enunciados,
++// soluciones, documentos), para que un listado se vea igual en todas partes.
++import { memo, useMemo, useState } from 'react'
++import { useTranslation } from 'react-i18next'
++import { cx, Icon, IconButton, toast } from '@renderer/design'
++import { highlightCode } from './code'
++
++export interface CodeSurfaceProps {
++  code: string
++  language?: string
++  /** Lo que imprime el programa, tal cual. */
++  output?: string
++  /** Texto corrido y chat: 12,5 px, sin números de línea. */
++  compact?: boolean
++  /** Sin botón de copiar (impresión y exportación). */
++  copyable?: boolean
++  /** Mientras el texto llega en vivo: sin resaltar (se reharía en cada carácter). */
++  streaming?: boolean
++  onCopy?: () => void
++  className?: string
++}
++
++export const CodeSurface = memo(function CodeSurface({ code, language, output, compact = false, copyable = true, streaming = false, onCopy, className }: CodeSurfaceProps) {
++  const { t } = useTranslation('blocks')
++  const [copied, setCopied] = useState(false)
++  const clean = code.replace(/\s+$/, '')
++  const { html, label } = useMemo(() => highlightCode(clean, language, streaming), [clean, language, streaming])
++  const lines = useMemo(() => clean.split('\n').length, [clean])
++  const numbered = lines > 3 && !compact
++  const copy = async () => {
++    try {
++      await navigator.clipboard.writeText(code)
++      setCopied(true)
++      onCopy?.()
++      setTimeout(() => setCopied(false), 1400)
++    } catch {
++      toast.error(t('code.copyFailed'))
++    }
++  }
++  return (
++    <div className={cx('overflow-hidden border-[0.5px] border-line bg-sunken', compact ? 'rounded-[12px]' : 'rounded-[16px]', className)}>
++      <div className="flex h-9 items-center gap-2 border-b-[0.5px] border-line-soft pl-4 pr-1.5">
++        <Icon name="code" size={14} className="text-text3" />
++        <span className="t-caption uppercase tracking-[0.6px] text-text3">{label || t('code.code')}</span>
++        {copyable && (
++          <IconButton label={copied ? t('code.copied') : t('code.copy')} size="sm" onClick={() => void copy()} className={cx('ml-auto print:hidden', copied && 'text-success')}>
++            <Icon name={copied ? 'check' : 'copy'} size={14} />
++          </IconButton>
++        )}
++      </div>
++      <div className="overflow-x-auto">
++        <pre className={cx('blk-code m-0 flex t-mono text-text', compact ? 'px-3 py-2.5 text-[12.5px] leading-[19px]' : 'px-4 py-3.5 text-[13px] leading-[21px]')}>
++          {numbered && (
++            <span aria-hidden className="mr-4 select-none text-right text-text3/70 tabular">
++              {Array.from({ length: lines }, (_, i) => (
++                <span key={i} className="block">{i + 1}</span>
++              ))}
++            </span>
++          )}
++          <code className="block min-w-0 flex-1 whitespace-pre" dangerouslySetInnerHTML={{ __html: html }} />
++        </pre>
++      </div>
++      {output?.trim() && (
++        <div className="border-t-[0.5px] border-line-soft bg-surface/60 px-4 py-3">
++          <div className="t-caption mb-1 flex items-center gap-1.5 uppercase tracking-[0.6px] text-text3">
++            <Icon name="terminal" size={12} />
++            {t('code.output')}
++          </div>
++          <pre className="m-0 whitespace-pre-wrap t-mono text-[12.5px] leading-[19px] text-text2">{output.replace(/\s+$/, '')}</pre>
++        </div>
++      )}
++    </div>
++  )
++})
+diff --git a/src/renderer/src/lib/RichText.code.test.tsx b/src/renderer/src/lib/RichText.code.test.tsx
+new file mode 100644
+index 0000000..42d904f
+--- /dev/null
++++ b/src/renderer/src/lib/RichText.code.test.tsx
+@@ -0,0 +1,51 @@
++// Código escrito dentro de Markdown: el bloque ``` se pinta con la misma tarjeta que el bloque `code`; el `código` en línea no.
++import { describe, expect, it } from 'vitest'
++import { renderToStaticMarkup } from 'react-dom/server'
++import { RichText } from './RichText'
++import '@renderer/i18n'
++
++describe('código en Markdown', () => {
++  it('un bloque ``` se pinta como tarjeta de código, resaltado y con su lenguaje', () => {
++    const html = renderToStaticMarkup(<RichText text={'```ts\nconst x: number = 1;\n```'} />)
++    expect(html).toContain('blk-code')
++    expect(html).toContain('hljs-keyword')
++    expect(html).toContain('TypeScript')
++  })
++
++  it('sin lenguaje lo adivina', () => {
++    const html = renderToStaticMarkup(<RichText text={'```\ndef add(a, b):\n    return a + b\n```'} />)
++    expect(html).toContain('hljs-title')
++    expect(html).toContain('Python')
++  })
++
++  it('el código en línea sigue siendo una píldora', () => {
++    const html = renderToStaticMarkup(<RichText text={'Usa `const` aquí'} />)
++    expect(html).toContain('<code>const</code>')
++    expect(html).not.toContain('blk-code')
++  })
++
++  it('una opción de test con un bloque ``` también lleva su tarjeta (inline)', () => {
++    const html = renderToStaticMarkup(<RichText text={'```ts\nconst x = 1;\n```'} inline />)
++    expect(html).toContain('blk-code')
++    expect(html).toContain('hljs-keyword')
++  })
++
++  it('un trozo de bloque ``` partido por un hueco de cloze no monta una tarjeta a medias', () => {
++    const html = renderToStaticMarkup(<RichText text={'const x = 1;\n```'} inline />)
++    expect(html).not.toContain('blk-code')
++  })
++
++  it('en vivo (streaming) no resalta, pero deja la tarjeta', () => {
++    const html = renderToStaticMarkup(<RichText text={'```ts\nconst x = 1;\n```'} streaming />)
++    expect(html).toContain('blk-code')
++    expect(html).not.toContain('hljs-keyword')
++    expect(html).toContain('TypeScript')
++  })
++
++  it('no deja HTML del código sin escapar', () => {
++    const html = renderToStaticMarkup(<RichText text={'```html\n<script>alert(1)</script>\n```'} />)
++    expect(html).not.toContain('<script>alert(1)</script>')
++    expect(html).toContain('&lt;')
++    expect(html).toContain('hljs-name')
++  })
++})
+diff --git a/src/renderer/src/lib/RichText.tsx b/src/renderer/src/lib/RichText.tsx
+index 52953c9..bb022a0 100644
+--- a/src/renderer/src/lib/RichText.tsx
++++ b/src/renderer/src/lib/RichText.tsx
+@@ -7,9 +7,11 @@ import remarkGfm from 'remark-gfm'
+ import remarkMath from 'remark-math'
+ import rehypeKatex from 'rehype-katex'
+ import 'katex/contrib/mhchem'
++import type { Element, ElementContent } from 'hast'
+ import { AULA_KATEX_MACROS } from '@engine/content/tex'
+ import { tameEmoji } from '@engine/base/emoji'
+ import { cx } from '@renderer/design'
++import { CodeSurface } from './CodeSurface'
+ import { useContentLang } from './contentLanguage'
+ import { PAGE_ANCHOR, safeHref } from './richTextLinks'
+ export { safeHref } from './richTextLinks'
+@@ -35,13 +37,44 @@ function Link({ href, children }: { href?: string; children?: React.ReactNode })
+   )
+ }
+ 
++/** El texto de un nodo de Markdown (el código llega como nodos de texto sueltos). */
++const textOf = (nodes: ElementContent[]): string =>
++  nodes.map((n) => (n.type === 'text' ? n.value : n.type === 'element' ? textOf(n.children) : '')).join('')
++
++const classNames = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : typeof value === 'string' ? value.split(/\s+/) : [])
++
++/** Un bloque ``` de Markdown: la misma superficie que el bloque `code`, en su tamaño de texto corrido. */
++function MarkdownCode({ node, streaming }: { node?: Element; streaming: boolean }) {
++  const codeEl = node?.children.find((c): c is Element => c.type === 'element' && c.tagName === 'code')
++  const language = classNames(codeEl?.properties?.className).find((c) => c.startsWith('language-'))?.slice('language-'.length)
++  return <CodeSurface code={codeEl ? textOf(codeEl.children) : ''} language={language} compact streaming={streaming} />
++}
++
+ /** En la pantalla de estudio el texto va en el idioma del curso (`lang`, y `dir` si se escribe de derecha a izquierda); `ui`
+  *  lo deja en el de la interfaz (un aviso de Aula que se pinta con Markdown). `own`: lo escribió el estudiante (sus emojis se
+- *  quedan). */
+-export const RichText = memo(function RichText({ text, inline, className, ui, own }: { text: string; inline?: boolean; className?: string; ui?: boolean; own?: boolean }) {
++ *  quedan). `streaming`: la respuesta se está escribiendo (el código se resalta cuando termina). */
++export const RichText = memo(function RichText({ text, inline, className, ui, own, streaming = false }: { text: string; inline?: boolean; className?: string; ui?: boolean; own?: boolean; streaming?: boolean }) {
+   const course = useContentLang()
+   const content = ui ? {} : course
+   const shown = useMemo(() => (own ? text : tameEmoji(text)), [text, own])
++  // Un trozo suelto de un bloque ``` (un cloze partido por un hueco, por ejemplo) no monta tarjeta: se quedaría a medias.
++  const fences = useMemo(() => (shown.match(/^```/gm) ?? []).length, [shown])
++  const codeBlocks = !inline || (fences > 1 && fences % 2 === 0)
++  const components = useMemo(
++    () => ({
++      a: Link,
++      ...(codeBlocks ? { pre: ({ node }: { node?: Element }) => <MarkdownCode node={node} streaming={streaming} /> } : {}),
++      ...(inline
++        ? {
++            p: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
++            h1: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
++            h2: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
++            h3: ({ children }: { children?: React.ReactNode }) => <>{children}</>
++          }
++        : {})
++    }),
++    [inline, streaming, codeBlocks]
++  )
+   if (!text) return null
+   return (
+     <span lang={content.lang} dir={content.dir} className={cx(inline ? 'aula-rich-inline' : 'aula-rich block', content.className, className)}>
+@@ -51,11 +84,7 @@ export const RichText = memo(function RichText({ text, inline, className, ui, ow
+         remarkRehypeOptions={remarkRehypeOptions}
+         skipHtml
+         urlTransform={safeHref}
+-        components={
+-          inline
+-            ? { a: Link, p: ({ children }) => <>{children}</>, h1: ({ children }) => <>{children}</>, h2: ({ children }) => <>{children}</>, h3: ({ children }) => <>{children}</> }
+-            : { a: Link }
+-        }
++        components={components}
+       >
+         {shown}
+       </ReactMarkdown>
+diff --git a/src/renderer/src/lib/code.test.ts b/src/renderer/src/lib/code.test.ts
+new file mode 100644
+index 0000000..c86998d
+--- /dev/null
++++ b/src/renderer/src/lib/code.test.ts
+@@ -0,0 +1,48 @@
++// Resaltado de código: alias, escapado y lenguaje adivinado (la misma lógica para el bloque y para el Markdown).
++import { describe, expect, it } from 'vitest'
++import { CODE_LANGUAGE_NAMES, codeLanguage, escapeHtml, highlightCode, languageLabel } from './code'
++
++describe('lenguajes del código', () => {
++  it('entiende el nombre y los alias que escriben los cursos', () => {
++    expect(codeLanguage('py')).toBe('python')
++    expect(codeLanguage('Python')).toBe('python')
++    expect(codeLanguage('ts')).toBe('typescript')
++    expect(codeLanguage('html')).toBe('xml')
++    expect(codeLanguage('c++')).toBe('cpp')
++    expect(codeLanguage('pseudocódigo')).toBe('plaintext')
++    expect(codeLanguage('??')).toBeUndefined()
++    expect(codeLanguage('')).toBeUndefined()
++  })
++  it('la lista que se le da al agente son nombres registrados', () => {
++    for (const name of CODE_LANGUAGE_NAMES) expect(codeLanguage(name), name).toBe(name)
++  })
++})
++
++describe('resaltado', () => {
++  it('colorea las palabras clave', () => {
++    const r = highlightCode('const x = 1', 'ts')
++    expect(r.lang).toBe('typescript')
++    expect(r.label).toBe('TypeScript')
++    expect(r.html).toContain('hljs-keyword')
++  })
++  it('escapa el HTML del código (también sin lenguaje)', () => {
++    const r = highlightCode('<script>alert(1)</script>', 'plaintext')
++    expect(r.html).not.toContain('<script>')
++    expect(r.html).toContain('&lt;script&gt;')
++  })
++  it('sin lenguaje adivina, y con uno inventado no rompe', () => {
++    expect(highlightCode('print(1)', 'python').lang).toBe('python')
++    expect(highlightCode('SELECT 1 FROM t', 'nope').html).toBeTruthy()
++  })
++  it('el texto en prosa no se inventa un lenguaje', () => {
++    expect(highlightCode('hola que tal', undefined).html).toBe('hola que tal')
++  })
++  it('en vivo deja el texto sin colores pero escapado', () => {
++    expect(highlightCode('a < b', 'python', true)).toEqual({ html: 'a &#60; b', label: 'Python' })
++  })
++  it('la etiqueta es la del lenguaje, o lo que escribió el curso', () => {
++    expect(languageLabel('cpp')).toBe('C++')
++    expect(languageLabel(undefined, 'Brainfuck')).toBe('Brainfuck')
++    expect(escapeHtml('"x"')).toBe('&#34;x&#34;')
++  })
++})
+diff --git a/src/renderer/src/lib/code.ts b/src/renderer/src/lib/code.ts
+new file mode 100644
+index 0000000..d1c70ba
+--- /dev/null
++++ b/src/renderer/src/lib/code.ts
+@@ -0,0 +1,140 @@
++// Resaltado de código con highlight.js: los lenguajes que entiende Aula, sus alias y el HTML ya resaltado.
++// Puro (sin React ni DOM): lo usan el bloque `code`, el código escrito en Markdown y sus pruebas.
++import hljs from 'highlight.js/lib/core'
++import bash from 'highlight.js/lib/languages/bash'
++import c from 'highlight.js/lib/languages/c'
++import clojure from 'highlight.js/lib/languages/clojure'
++import cmake from 'highlight.js/lib/languages/cmake'
++import cpp from 'highlight.js/lib/languages/cpp'
++import csharp from 'highlight.js/lib/languages/csharp'
++import css from 'highlight.js/lib/languages/css'
++import dart from 'highlight.js/lib/languages/dart'
++import diff from 'highlight.js/lib/languages/diff'
++import dockerfile from 'highlight.js/lib/languages/dockerfile'
++import elixir from 'highlight.js/lib/languages/elixir'
++import erlang from 'highlight.js/lib/languages/erlang'
++import fortran from 'highlight.js/lib/languages/fortran'
++import go from 'highlight.js/lib/languages/go'
++import gradle from 'highlight.js/lib/languages/gradle'
++import graphql from 'highlight.js/lib/languages/graphql'
++import groovy from 'highlight.js/lib/languages/groovy'
++import haskell from 'highlight.js/lib/languages/haskell'
++import ini from 'highlight.js/lib/languages/ini'
++import java from 'highlight.js/lib/languages/java'
++import javascript from 'highlight.js/lib/languages/javascript'
++import json from 'highlight.js/lib/languages/json'
++import julia from 'highlight.js/lib/languages/julia'
++import kotlin from 'highlight.js/lib/languages/kotlin'
++import latex from 'highlight.js/lib/languages/latex'
++import less from 'highlight.js/lib/languages/less'
++import lua from 'highlight.js/lib/languages/lua'
++import makefile from 'highlight.js/lib/languages/makefile'
++import markdown from 'highlight.js/lib/languages/markdown'
++import matlab from 'highlight.js/lib/languages/matlab'
++import nginx from 'highlight.js/lib/languages/nginx'
++import objectivec from 'highlight.js/lib/languages/objectivec'
++import perl from 'highlight.js/lib/languages/perl'
++import php from 'highlight.js/lib/languages/php'
++import plaintext from 'highlight.js/lib/languages/plaintext'
++import powershell from 'highlight.js/lib/languages/powershell'
++import protobuf from 'highlight.js/lib/languages/protobuf'
++import python from 'highlight.js/lib/languages/python'
++import r from 'highlight.js/lib/languages/r'
++import ruby from 'highlight.js/lib/languages/ruby'
++import rust from 'highlight.js/lib/languages/rust'
++import scala from 'highlight.js/lib/languages/scala'
++import scss from 'highlight.js/lib/languages/scss'
++import sql from 'highlight.js/lib/languages/sql'
++import swift from 'highlight.js/lib/languages/swift'
++import typescript from 'highlight.js/lib/languages/typescript'
++import vbnet from 'highlight.js/lib/languages/vbnet'
++import verilog from 'highlight.js/lib/languages/verilog'
++import vhdl from 'highlight.js/lib/languages/vhdl'
++import x86asm from 'highlight.js/lib/languages/x86asm'
++import xml from 'highlight.js/lib/languages/xml'
++import yaml from 'highlight.js/lib/languages/yaml'
++
++/** Gramáticas registradas: se importan de una en una para que el paquete no traiga las ~190 de highlight.js. */
++const LANGUAGES = {
++  bash, c, clojure, cmake, cpp, csharp, css, dart, diff, dockerfile, elixir, erlang, fortran, go, gradle, graphql, groovy, haskell,
++  ini, java, javascript, json, julia, kotlin, latex, less, lua, makefile, markdown, matlab, nginx, objectivec, perl, php, plaintext,
++  powershell, protobuf, python, r, ruby, rust, scala, scss, sql, swift, typescript, vbnet, verilog, vhdl, x86asm, xml, yaml
++}
++for (const [name, def] of Object.entries(LANGUAGES)) if (!hljs.getLanguage(name)) hljs.registerLanguage(name, def)
++
++/** Nombres de lenguaje que acepta Aula, para la documentación del agente y el catálogo de bloques. */
++export const CODE_LANGUAGE_NAMES = Object.keys(LANGUAGES).sort((a, b) => a.localeCompare(b))
++
++/** Lo que un curso escribe de verdad: `language` acepta el nombre de highlight.js o cualquiera de sus alias. */
++const ALIASES: Record<string, string> = {
++  py: 'python', python3: 'python', py3: 'python',
++  js: 'javascript', node: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript',
++  ts: 'typescript', tsx: 'typescript', typescriptreact: 'typescript',
++  sh: 'bash', shell: 'bash', zsh: 'bash', console: 'bash', terminal: 'bash', shellscript: 'bash',
++  'c++': 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
++  'c#': 'csharp', cs: 'csharp', dotnet: 'csharp',
++  html: 'xml', htm: 'xml', svg: 'xml', vue: 'xml',
++  tex: 'latex', md: 'markdown', mdx: 'markdown',
++  yml: 'yaml', octave: 'matlab', rb: 'ruby', rs: 'rust', kt: 'kotlin', kts: 'kotlin',
++  text: 'plaintext', txt: 'plaintext', pseudocode: 'plaintext', 'pseudocódigo': 'plaintext', pseudocodigo: 'plaintext', plain: 'plaintext',
++  golang: 'go', ps1: 'powershell', pwsh: 'powershell',
++  objc: 'objectivec', 'obj-c': 'objectivec', asm: 'x86asm', nasm: 'x86asm',
++  docker: 'dockerfile', toml: 'ini', cfg: 'ini', conf: 'ini', properties: 'ini', patch: 'diff', make: 'makefile',
++  gql: 'graphql', sass: 'scss', proto: 'protobuf', 'visual basic': 'vbnet'
++}
++
++/** Nombre del lenguaje que entiende highlight.js («py» → python, «html» → xml, «c++» → cpp…); undefined si no se conoce. */
++export function codeLanguage(raw: string | undefined): string | undefined {
++  const s = (raw ?? '').trim().toLowerCase()
++  if (!s) return undefined
++  const name = ALIASES[s] ?? s
++  return hljs.getLanguage(name) ? name : undefined
++}
++
++/** Cómo se llama el lenguaje en la cabecera del bloque. */
++const LABELS: Record<string, string> = {
++  cpp: 'C++', csharp: 'C#', javascript: 'JavaScript', typescript: 'TypeScript', xml: 'HTML', latex: 'LaTeX', matlab: 'MATLAB',
++  sql: 'SQL', php: 'PHP', json: 'JSON', yaml: 'YAML', css: 'CSS', scss: 'SCSS', plaintext: '', objectivec: 'Objective-C',
++  x86asm: 'Assembly', dockerfile: 'Dockerfile', makefile: 'Makefile', graphql: 'GraphQL', protobuf: 'Protobuf', vbnet: 'VB.NET',
++  nginx: 'nginx', cmake: 'CMake', gradle: 'Gradle', ini: 'INI/TOML', julia: 'Julia', fortran: 'Fortran', haskell: 'Haskell',
++  powershell: 'PowerShell', clojure: 'Clojure', elixir: 'Elixir', erlang: 'Erlang', groovy: 'Groovy', kotlin: 'Kotlin',
++  lua: 'Lua', perl: 'Perl', r: 'R', ruby: 'Ruby', rust: 'Rust', scala: 'Scala', swift: 'Swift', go: 'Go', java: 'Java',
++  python: 'Python', bash: 'Bash', diff: 'Diff', less: 'Less', dart: 'Dart', verilog: 'Verilog', vhdl: 'VHDL'
++}
++
++export const languageLabel = (lang: string | undefined, raw?: string): string =>
++  lang ? (LABELS[lang] ?? lang.charAt(0).toUpperCase() + lang.slice(1)) : (raw ?? '').trim()
++
++/** Los lenguajes entre los que se adivina cuando el bloque no dice cuál es. */
++const AUTO_LANGUAGES = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'sql', 'bash', 'r', 'matlab', 'json', 'yaml', 'xml', 'css', 'go', 'rust']
++
++/** HTML seguro: highlight.js envuelve el código en <span> pero el texto se escapa aquí (también sin lenguaje). */
++export const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`)
++
++export interface Highlighted {
++  /** HTML ya escapado, con los <span class="hljs-…"> del resaltado. */
++  html: string
++  /** Lenguaje con el que se ha resaltado (el pedido o el adivinado). */
++  lang?: string
++  /** Nombre que se enseña en la cabecera. */
++  label: string
++}
++
++/**
++ * Resalta `code`. `plain` lo deja sin colores (mientras el texto llega en vivo: resaltar en cada carácter es tirar trabajo);
++ * sin lenguaje conocido se adivina entre los de clase y, si no hay confianza, se deja tal cual.
++ */
++export function highlightCode(code: string, raw?: string, plain = false): Highlighted {
++  const lang = codeLanguage(raw)
++  const label = languageLabel(lang, raw)
++  try {
++    if (plain) return { html: escapeHtml(code), label }
++    if (lang) return { html: hljs.highlight(code, { language: lang, ignoreIllegals: true }).value, lang, label }
++    if (code.length > 20_000) return { html: escapeHtml(code), label }
++    const auto = hljs.highlightAuto(code, AUTO_LANGUAGES)
++    // un listado corto (dos líneas) da poca relevancia: con 2 ya se acepta, porque el texto ya viene dentro de un bloque de código
++    return auto.relevance >= 2 ? { html: auto.value, lang: auto.language, label: languageLabel(auto.language, raw) } : { html: escapeHtml(code), label }
++  } catch {
++    return { html: escapeHtml(code), label }
++  }
++}
+diff --git a/src/renderer/src/screens/chat/Message.tsx b/src/renderer/src/screens/chat/Message.tsx
+index d9690a4..dd8b0e5 100644
+--- a/src/renderer/src/screens/chat/Message.tsx
++++ b/src/renderer/src/screens/chat/Message.tsx
+@@ -227,7 +227,7 @@ const StreamText = memo(function StreamText({ text, live, packId, language }: {
+         s.kind === 'text' ? (
+           splitParagraphs(s.text).map((p, k) => (
+             <div key={`${i}-${k}`} className="chat-para">
+-              <RichText text={p} />
++              <RichText text={p} streaming={revealing} />
+             </div>
+           ))
+         ) : (
+diff --git a/src/renderer/src/styles.css b/src/renderer/src/styles.css
+index eedbda2..d7f24f2 100644
+--- a/src/renderer/src/styles.css
++++ b/src/renderer/src/styles.css
+@@ -29,6 +29,14 @@
+   --bubble: #efebe4;
+   --tile: #ebe7e0;
+ 
++  /* código: los tonos de los cursos, sobrios (los usa el resaltado de highlight.js) */
++  --code-keyword: #9c4527;
++  --code-string: #5d6825;
++  --code-number: #395d88;
++  --code-title: #1f6a6e;
++  --code-builtin: #7d613c;
++  --code-comment: #8f8c87;
++
+   --text: #201e1a;
+   --text2: #585550;
+   --text3: #6c6862; /* más claro que text2 para que se distingan (≥ 4,5:1 sobre papel, pozos y burbujas) */
+@@ -110,6 +118,13 @@
+   --bubble: #282623;
+   --tile: #2b2826;
+ 
++  --code-keyword: #ef9c7b;
++  --code-string: #b7c46e;
++  --code-number: #93b5e0;
++  --code-title: #74c6c6;
++  --code-builtin: #d4b88e;
++  --code-comment: #8a857f;
++
+   --text: #f0eae3;
+   --text2: #c2bdb7;
+   --text3: #a7a29c;
+@@ -590,7 +605,26 @@ html.kb-open [data-compact-tabs] {
+ .aula-rich ol { list-style: decimal; }
+ .aula-rich li { margin: 0.15em 0; }
+ .aula-rich strong { font-weight: 600; }
+-.aula-rich code { font-family: var(--font-mono); font-size: 0.92em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
++:is(.aula-rich, .aula-rich-inline) code { font-family: var(--font-mono); font-size: 0.92em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
++/* Un bloque ``` ya lo pinta CodeSurface (tarjeta con cabecera): el <code> de dentro no lleva el fondo de «código en línea» */
++:is(.aula-rich, .aula-rich-inline) pre { margin: 0.75em 0; }
++:is(.aula-rich, .aula-rich-inline) pre:last-child { margin-bottom: 0; }
++:is(.aula-rich, .aula-rich-inline) pre code { background: none; padding: 0; border-radius: 0; font-size: inherit; }
++/* Un <pre> que no pasa por CodeSurface (un trozo de bloque ``` partido por un hueco de un cloze, o el modo inline): al menos
++   que se lea como código y no como un párrafo con una píldora detrás. */
++:is(.aula-rich, .aula-rich-inline) pre:not(.blk-code) { padding: 10px 12px; background: var(--sunken); border: 0.5px solid var(--line); border-radius: 10px; overflow-x: auto; }
++:is(.aula-rich, .aula-rich-inline) pre:not(.blk-code) code { font-size: 0.82em; line-height: 1.5; }
++/* Código: lenguajes de highlight.js con los tonos del curso (la tarjeta la pone CodeSurface, aquí solo el color) */
++.blk-code { tab-size: 2; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'calt' 0; }
++.blk-code .hljs-keyword, .blk-code .hljs-selector-tag, .blk-code .hljs-literal, .blk-code .hljs-meta .hljs-keyword { color: var(--code-keyword); font-weight: 500; }
++.blk-code .hljs-string, .blk-code .hljs-regexp, .blk-code .hljs-template-string, .blk-code .hljs-attr-value, .blk-code .hljs-symbol { color: var(--code-string); }
++.blk-code .hljs-number, .blk-code .hljs-variable.constant_ { color: var(--code-number); }
++.blk-code .hljs-title, .blk-code .hljs-title.function_, .blk-code .hljs-section, .blk-code .hljs-selector-class { color: var(--code-title); }
++.blk-code .hljs-built_in, .blk-code .hljs-type, .blk-code .hljs-attr, .blk-code .hljs-attribute, .blk-code .hljs-tag .hljs-name, .blk-code .hljs-name { color: var(--code-builtin); }
++.blk-code .hljs-comment, .blk-code .hljs-quote { color: var(--code-comment); font-style: italic; }
++.blk-code .hljs-meta, .blk-code .hljs-params { color: var(--text2); }
++.blk-code .hljs-deletion { color: var(--danger); }
++.blk-code .hljs-addition { color: var(--success); }
+ .aula-rich table { border-collapse: collapse; margin: 0.6em 0; }
+ .aula-rich th, .aula-rich td { border-bottom: 0.5px solid var(--line); padding: 6px 10px; text-align: start; }
+ .aula-rich-inline .katex { font-size: 1em; }

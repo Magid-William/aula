@@ -1,31 +1,17 @@
-diff --git a/electron-builder.yml b/electron-builder.yml
-index 1a08d4c..fe9e29b 100644
---- a/electron-builder.yml
-+++ b/electron-builder.yml
-@@ -130,7 +130,7 @@ linux:
-   artifactName: Aula-${version}-linux-${arch}.${ext}
- publish:
-   provider: github
--  owner: luumlabs
-+  owner: Magid-William
-   repo: aula
-   # borrador: nadie lo ve (ni se ofrece como actualización) hasta que se publica a mano en GitHub tras probarlo
-   releaseType: draft
-diff --git a/src/main/services/updates/signature.ts b/src/main/services/updates/signature.ts
-index 647d88b..063f6b6 100644
---- a/src/main/services/updates/signature.ts
-+++ b/src/main/services/updates/signature.ts
-@@ -28,7 +28,9 @@ import { basename } from 'node:path'
-  */
- export const UPDATE_PUBLIC_KEYS: readonly string[] = [
-   'MCowBQYDK2VwAyEAiBq04gxTBROZgokQ8tRvRcPy5/OjleXFtgsX4jWE7ds=',
--  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA='
-+  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA=',
-+  // clave de esta compilación personal: firma las actualizaciones publicadas en Magid-William/aula
-+  'MCowBQYDK2VwAyEA8+ttFOHF8SZ/5m7aGUoAbS+OwCenIVTQz9plAzNqxxQ='
- ]
- 
- /** La principal. */
+From 65b3c93fa2dcebec5faaf6a7bcd88ebdb21fb04b Mon Sep 17 00:00:00 2001
+From: OpenCode <opencode@local>
+Date: Sat, 21 Nov 2026 18:49:13 +0200
+Subject: [PATCH] feat(exercises): multiline typed answers
+
+Enter inserts a line break; Ctrl/Cmd+Enter checks. The field grows with
+its content (48-200px) and the shortcut hint follows every typed answer.
+---
+ .../exercises/inputs/TextAnswerInput.test.tsx | 58 +++++++++++++++++++
+ .../src/exercises/inputs/TextAnswerInput.tsx  | 35 ++++++++---
+ src/renderer/src/exercises/useExercise.ts     |  5 +-
+ 3 files changed, 90 insertions(+), 8 deletions(-)
+ create mode 100644 src/renderer/src/exercises/inputs/TextAnswerInput.test.tsx
+
 diff --git a/src/renderer/src/exercises/inputs/TextAnswerInput.test.tsx b/src/renderer/src/exercises/inputs/TextAnswerInput.test.tsx
 new file mode 100644
 index 0000000..60d950c
@@ -201,3 +187,6 @@ index 49c6def..bcdedf2 100644
        edit, editPart, submit, retry, hint, partHint, reveal, selfGrade, continueNow, primary
      }
      // eslint-disable-next-line react-hooks/exhaustive-deps
+-- 
+2.56.1.windows.1
+
