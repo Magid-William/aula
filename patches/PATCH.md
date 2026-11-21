@@ -44,7 +44,8 @@ Both the decision table and the result go to the run summary; the release notes 
 - `force`: `none | all | multiline | code` — apply our patch even when upstream has the feature
   (for when their fix is incomplete or the markers are a false positive).
 - `dry_run`: stop after the patches are applied and `git diff --stat` is printed. No install,
-  build or publish. Use it to test the patch set against a new upstream commit.
+  build or publish. It ignores the existing-release guard, so it also works for a version whose
+  release is already published.
 
 ## Signing
 
