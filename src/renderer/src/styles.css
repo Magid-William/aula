@@ -29,6 +29,14 @@
   --bubble: #efebe4;
   --tile: #ebe7e0;
 
+  /* código: los tonos de los cursos, sobrios (los usa el resaltado de highlight.js) */
+  --code-keyword: #9c4527;
+  --code-string: #5d6825;
+  --code-number: #395d88;
+  --code-title: #1f6a6e;
+  --code-builtin: #7d613c;
+  --code-comment: #8f8c87;
+
   --text: #201e1a;
   --text2: #585550;
   --text3: #6c6862; /* más claro que text2 para que se distingan (≥ 4,5:1 sobre papel, pozos y burbujas) */
@@ -109,6 +117,13 @@
   --field: #13110e;
   --bubble: #282623;
   --tile: #2b2826;
+
+  --code-keyword: #ef9c7b;
+  --code-string: #b7c46e;
+  --code-number: #93b5e0;
+  --code-title: #74c6c6;
+  --code-builtin: #d4b88e;
+  --code-comment: #8a857f;
 
   --text: #f0eae3;
   --text2: #c2bdb7;
@@ -590,7 +605,26 @@ html.kb-open [data-compact-tabs] {
 .aula-rich ol { list-style: decimal; }
 .aula-rich li { margin: 0.15em 0; }
 .aula-rich strong { font-weight: 600; }
-.aula-rich code { font-family: var(--font-mono); font-size: 0.92em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
+:is(.aula-rich, .aula-rich-inline) code { font-family: var(--font-mono); font-size: 0.92em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
+/* Un bloque ``` ya lo pinta CodeSurface (tarjeta con cabecera): el <code> de dentro no lleva el fondo de «código en línea» */
+:is(.aula-rich, .aula-rich-inline) pre { margin: 0.75em 0; }
+:is(.aula-rich, .aula-rich-inline) pre:last-child { margin-bottom: 0; }
+:is(.aula-rich, .aula-rich-inline) pre code { background: none; padding: 0; border-radius: 0; font-size: inherit; }
+/* Un <pre> que no pasa por CodeSurface (un trozo de bloque ``` partido por un hueco de un cloze, o el modo inline): al menos
+   que se lea como código y no como un párrafo con una píldora detrás. */
+:is(.aula-rich, .aula-rich-inline) pre:not(.blk-code) { padding: 10px 12px; background: var(--sunken); border: 0.5px solid var(--line); border-radius: 10px; overflow-x: auto; }
+:is(.aula-rich, .aula-rich-inline) pre:not(.blk-code) code { font-size: 0.82em; line-height: 1.5; }
+/* Código: lenguajes de highlight.js con los tonos del curso (la tarjeta la pone CodeSurface, aquí solo el color) */
+.blk-code { tab-size: 2; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'calt' 0; }
+.blk-code .hljs-keyword, .blk-code .hljs-selector-tag, .blk-code .hljs-literal, .blk-code .hljs-meta .hljs-keyword { color: var(--code-keyword); font-weight: 500; }
+.blk-code .hljs-string, .blk-code .hljs-regexp, .blk-code .hljs-template-string, .blk-code .hljs-attr-value, .blk-code .hljs-symbol { color: var(--code-string); }
+.blk-code .hljs-number, .blk-code .hljs-variable.constant_ { color: var(--code-number); }
+.blk-code .hljs-title, .blk-code .hljs-title.function_, .blk-code .hljs-section, .blk-code .hljs-selector-class { color: var(--code-title); }
+.blk-code .hljs-built_in, .blk-code .hljs-type, .blk-code .hljs-attr, .blk-code .hljs-attribute, .blk-code .hljs-tag .hljs-name, .blk-code .hljs-name { color: var(--code-builtin); }
+.blk-code .hljs-comment, .blk-code .hljs-quote { color: var(--code-comment); font-style: italic; }
+.blk-code .hljs-meta, .blk-code .hljs-params { color: var(--text2); }
+.blk-code .hljs-deletion { color: var(--danger); }
+.blk-code .hljs-addition { color: var(--success); }
 .aula-rich table { border-collapse: collapse; margin: 0.6em 0; }
 .aula-rich th, .aula-rich td { border-bottom: 0.5px solid var(--line); padding: 6px 10px; text-align: start; }
 .aula-rich-inline .katex { font-size: 1em; }

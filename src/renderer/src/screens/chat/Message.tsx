@@ -227,7 +227,7 @@ const StreamText = memo(function StreamText({ text, live, packId, language }: { 
         s.kind === 'text' ? (
           splitParagraphs(s.text).map((p, k) => (
             <div key={`${i}-${k}`} className="chat-para">
-              <RichText text={p} />
+              <RichText text={p} streaming={revealing} />
             </div>
           ))
         ) : (

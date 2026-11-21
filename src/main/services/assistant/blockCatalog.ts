@@ -22,7 +22,7 @@ export const BLOCK_CATALOG = `## 5. Block catalog (JSON; \`id\` optional)
 - \`{"type":"spot","intro":"md","lines":["md line 1","md line 2","md line 3","md line 4"],"wrongIndex":2,"explanation":"md"}\` (\`wrongIndex\` starts at 0)
 - \`{"type":"tryit","title":"Try it","exerciseIDs":["skill-e1","skill-e2"]}\`
 - \`{"type":"recap","title":"optional","points":["md","md"]}\`
-- \`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}\`
+- \`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}\` — program listing: highlighted (python, javascript, typescript, java, c, cpp, csharp, go, rust, kotlin, swift, ruby, php, scala, r, matlab, bash, powershell, sql, json, yaml, html, css, diff, dockerfile, plaintext, and aliases such as py, js, ts, sh, c++, c#), line numbers from 3 lines, copy button; \`output\` is what it prints, in its own pane. When the code is the content, use this block: a fenced code block in an \`md\` field is highlighted too, but only this one has the language header, the numbers and the output. Exact schema: block_reference("code").
 - \`{"type":"quote","md":"…","source":{"source":"id","page":12},"author":"optional"}\`
 - Credits: every picture or model from the web carries its author and license (\`credit\`); \`add_image\` fills it for Wikimedia Commons.
 `

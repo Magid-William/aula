@@ -4,6 +4,7 @@
 import type { LessonLearningMode } from '@shared/schema'
 import { STRUCTURE_REFERENCE } from './structure-guide'
 import { DRAWING_REFERENCE } from './drawingReference'
+import { CODE_REFERENCE } from './codeReference'
 
 export const AUTHORING_GUIDE = String.raw`# Aula authoring guide
 
@@ -69,7 +70,7 @@ Do not pad. Quality over length. Use ` + '`quote`' + String.raw` blocks to cite 
 - ` + '`{"type":"spot","intro":"md","lines":["md line 1","md line 2","md line 3","md line 4"],"wrongIndex":2,"explanation":"md"}`' + String.raw` (` + '`wrongIndex`' + String.raw` starts at 0)
 - ` + '`{"type":"tryit","title":"Try it","exerciseIDs":["skill-e1","skill-e2"]}`' + String.raw`
 - ` + '`{"type":"recap","title":"optional","points":["md","md"]}`' + String.raw`
-- ` + '`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}`' + String.raw`
+- ` + '`{"type":"code","language":"python","code":"…","output":"…","caption":"…"}`' + String.raw` — a program listing with syntax highlighting (python, javascript, typescript, java, c, cpp, csharp, go, rust, kotlin, swift, ruby, php, scala, r, matlab, bash, powershell, sql, json, yaml, html, css, diff, dockerfile, plaintext and aliases like py, js, ts, sh, c++, c#), line numbers and a copy button. ` + '`output`' + String.raw` is what it prints, in its own pane. When the code is the content, use this block (a fenced code block written inside an md field is highlighted too, but only this block has the language header, the copy button, the line numbers and the output). Exact schema and examples: block_reference("code").
 - ` + '`{"type":"quote","md":"…","source":{"source":"id","page":12},"author":"optional"}`' + String.raw`
 - **Interactive visuals** (native, offline; call ` + '`block_reference`' + String.raw` with the type for the exact schema and examples before the first use):
   - ` + '`labeled`' + String.raw` — interactive labeled diagram: an image from ` + '`add_image`' + String.raw` (prefer images *without* printed labels) or a vector ` + '`drawing`' + String.raw`, with ` + '`parts`' + String.raw` [{id, name, x, y (fractions 0–1), r|rect|polygon zone, layer, detail}] and optional ` + '`layers`' + String.raw` (bones/muscles/organs; chambers/valves/vessels). The student explores (hover/click → name + explanation), zooms, toggles layers and practises «point at the part» and «drag the label» with exact grading; optional ` + '`steps`' + String.raw` make a guided tour that circles parts one idea at a time. Use it for anatomy, cells, organs, maps, machines, circuits, artworks.
@@ -187,7 +188,7 @@ export function authoringGuide(mode: LessonLearningMode): string {
 
 // MARK: Referencia de los bloques visuales (herramienta `block_reference`)
 
-export const BLOCK_REFERENCE_TYPES = ['labeled', 'locate', 'draglabel', 'model3d', 'simulation', 'map', 'timeline', 'process', 'slides', 'image', 'cardfigure', 'structure', 'drawing'] as const
+export const BLOCK_REFERENCE_TYPES = ['labeled', 'locate', 'draglabel', 'model3d', 'simulation', 'map', 'timeline', 'process', 'slides', 'image', 'cardfigure', 'structure', 'drawing', 'code'] as const
 
 /** Los bloques básicos ya están en la guía: la herramienta dice dónde, sin contarlo como fallo. */
 export const BASIC_BLOCK_TYPES = ['text', 'math', 'callout', 'example', 'plot', 'explore', 'table', 'chart', 'numberline', 'diagram', 'drawing', 'steps', 'compare', 'formulas', 'predict', 'spot', 'tryit', 'recap', 'code', 'quote'] as const
@@ -198,7 +199,8 @@ const REFERENCE_ALIASES: Record<string, string> = {
   shapes: 'process', form: 'process', pyramid: 'process', funnel: 'process', venn: 'process', mindmap: 'process', 'mind-map': 'process', mapamental: 'process', piramide: 'process', embudo: 'process',
   sim: 'simulation', interactive: 'simulation', geo: 'map', maps: 'map', chronology: 'timeline', deck: 'slides', slide: 'slides', 'image-occlusion': 'cardfigure', figure: 'cardfigure',
   smiles: 'structure', skeletal: 'structure', structural: 'structure', chemfig: 'structure', 'structural-formula': 'structure', reaction: 'structure',
-  draw: 'drawing', sketch: 'drawing', picture: 'drawing', geometry: 'drawing', animation: 'drawing'
+  draw: 'drawing', sketch: 'drawing', picture: 'drawing', geometry: 'drawing', animation: 'drawing',
+  snippet: 'code', program: 'code', listing: 'code', source: 'code', 'source-code': 'code', pseudo: 'code', pseudocode: 'code'
 }
 
 export function blockReferenceKey(raw: string): string {
@@ -208,6 +210,7 @@ export function blockReferenceKey(raw: string): string {
 
 export const BLOCK_REFERENCE: Readonly<Record<string, string>> = {
   drawing: DRAWING_REFERENCE,
+  code: CODE_REFERENCE,
   labeled: String.raw`# labeled — interactive labeled diagram
 A figure (an image from add_image, a vector ` + '`drawing`' + String.raw`, or a page of the student's material via ` + '`source`' + String.raw`) with marked PARTS. Hovering/clicking shows the name and ` + '`detail`; `layers`' + String.raw` can be switched on/off; zoom and pan; and built-in practice: «Señala» (the app asks for a part, the student clicks it — graded exactly) and «Arrastra» (drag each name to its place).
 Schema:

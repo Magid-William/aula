@@ -7,9 +7,11 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/contrib/mhchem'
+import type { Element, ElementContent } from 'hast'
 import { AULA_KATEX_MACROS } from '@engine/content/tex'
 import { tameEmoji } from '@engine/base/emoji'
 import { cx } from '@renderer/design'
+import { CodeSurface } from './CodeSurface'
 import { useContentLang } from './contentLanguage'
 import { PAGE_ANCHOR, safeHref } from './richTextLinks'
 export { safeHref } from './richTextLinks'
@@ -35,13 +37,44 @@ function Link({ href, children }: { href?: string; children?: React.ReactNode })
   )
 }
 
+/** El texto de un nodo de Markdown (el código llega como nodos de texto sueltos). */
+const textOf = (nodes: ElementContent[]): string =>
+  nodes.map((n) => (n.type === 'text' ? n.value : n.type === 'element' ? textOf(n.children) : '')).join('')
+
+const classNames = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : typeof value === 'string' ? value.split(/\s+/) : [])
+
+/** Un bloque ``` de Markdown: la misma superficie que el bloque `code`, en su tamaño de texto corrido. */
+function MarkdownCode({ node, streaming }: { node?: Element; streaming: boolean }) {
+  const codeEl = node?.children.find((c): c is Element => c.type === 'element' && c.tagName === 'code')
+  const language = classNames(codeEl?.properties?.className).find((c) => c.startsWith('language-'))?.slice('language-'.length)
+  return <CodeSurface code={codeEl ? textOf(codeEl.children) : ''} language={language} compact streaming={streaming} />
+}
+
 /** En la pantalla de estudio el texto va en el idioma del curso (`lang`, y `dir` si se escribe de derecha a izquierda); `ui`
  *  lo deja en el de la interfaz (un aviso de Aula que se pinta con Markdown). `own`: lo escribió el estudiante (sus emojis se
- *  quedan). */
-export const RichText = memo(function RichText({ text, inline, className, ui, own }: { text: string; inline?: boolean; className?: string; ui?: boolean; own?: boolean }) {
+ *  quedan). `streaming`: la respuesta se está escribiendo (el código se resalta cuando termina). */
+export const RichText = memo(function RichText({ text, inline, className, ui, own, streaming = false }: { text: string; inline?: boolean; className?: string; ui?: boolean; own?: boolean; streaming?: boolean }) {
   const course = useContentLang()
   const content = ui ? {} : course
   const shown = useMemo(() => (own ? text : tameEmoji(text)), [text, own])
+  // Un trozo suelto de un bloque ``` (un cloze partido por un hueco, por ejemplo) no monta tarjeta: se quedaría a medias.
+  const fences = useMemo(() => (shown.match(/^```/gm) ?? []).length, [shown])
+  const codeBlocks = !inline || (fences > 1 && fences % 2 === 0)
+  const components = useMemo(
+    () => ({
+      a: Link,
+      ...(codeBlocks ? { pre: ({ node }: { node?: Element }) => <MarkdownCode node={node} streaming={streaming} /> } : {}),
+      ...(inline
+        ? {
+            p: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+            h1: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+            h2: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+            h3: ({ children }: { children?: React.ReactNode }) => <>{children}</>
+          }
+        : {})
+    }),
+    [inline, streaming, codeBlocks]
+  )
   if (!text) return null
   return (
     <span lang={content.lang} dir={content.dir} className={cx(inline ? 'aula-rich-inline' : 'aula-rich block', content.className, className)}>
@@ -51,11 +84,7 @@ export const RichText = memo(function RichText({ text, inline, className, ui, ow
         remarkRehypeOptions={remarkRehypeOptions}
         skipHtml
         urlTransform={safeHref}
-        components={
-          inline
-            ? { a: Link, p: ({ children }) => <>{children}</>, h1: ({ children }) => <>{children}</>, h2: ({ children }) => <>{children}</>, h3: ({ children }) => <>{children}</> }
-            : { a: Link }
-        }
+        components={components}
       >
         {shown}
       </ReactMarkdown>

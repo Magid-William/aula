@@ -83,6 +83,18 @@ describe('block_reference del chat y del tutor', () => {
     expect(blockReferenceFor('map')!.reference).toMatch(/countries/i)
   })
 
+  it('code trae la lista de lenguajes, los alias y cuándo usarlo en vez de un texto', async () => {
+    const ref = blockReferenceFor('code')!
+    expect(ref.schema[0]).toContain('"type":"code"')
+    expect(ref.reference).toContain('"output"')
+    expect(ref.reference).toMatch(/Languages:.*python/)
+    expect(ref.reference).toContain('py → python')
+    expect(blockReferenceFor('snippet')!.reference).toContain('# code')
+    const out = JSON.parse(textOf(await blockReferenceTool().run({ type: 'code' } as never, call)))
+    expect(out.ok).toBe(true)
+    expect(out.reference).toContain('# code — program listing')
+  })
+
   it('el catálogo del chat cuenta los campos nuevos: formas y construcción del diagrama, tono de compare, gráfica horizontal y resaltada', () => {
     expect(blockReferenceFor('diagram')!.schema[0]).toContain('"build"')
     expect(blockReferenceFor('compare')!.schema[0]).toContain('"tone":"key|same"')
