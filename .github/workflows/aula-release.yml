@@ -42,6 +42,8 @@ jobs:
           "VERSION=$version" | Out-File -Append $env:GITHUB_ENV
           "TAG=$tag" | Out-File -Append $env:GITHUB_ENV
           Write-Host "upstream version: $version; release tag: $tag"
+          # gh release view above exits 1 when there is no release: do not leak that into the step
+          exit 0
 
       - name: Apply the personal patch
         if: env.SKIP == '0'
