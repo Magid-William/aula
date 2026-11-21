@@ -76,11 +76,29 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
   // los mensajes del analizador matemático están en español (aún sin catálogo en inglés)
   const spanish = i18n.language.startsWith('es')
   const spec = useSpec(answer)
-  const ref = useRef<HTMLInputElement>(null)
+  const ref = useRef<HTMLTextAreaElement>(null)
   const keys = useMemo(() => keysFor(answer), [answer])
   const [keysOpen, setKeysOpen] = useState(() => readKeysPref() ?? spec.keysOpen)
   const comma = usesDecimalComma(lang)
   const text = draft.text
+
+  // el campo crece con lo escrito (una respuesta de varias líneas), hasta un tope: después desplaza
+  const [grown, setGrown] = useState(false)
+  const grownRef = useRef(false)
+  const grow = (): void => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 48), 200)}px`
+    // más de una línea (un salto escrito o un texto largo que se parte): el tachado a mano no encaja
+    const g = el.scrollHeight > 49
+    if (g !== grownRef.current) {
+      grownRef.current = g
+      setGrown(g)
+    }
+  }
+  useEffect(grow, [text])
+  const multiline = grown || text.includes('\n')
 
   useEffect(() => {
     // al volver a intentarlo, la respuesta anterior queda seleccionada: lo que escribas la sustituye
@@ -145,34 +163,37 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
           </span>
         )}
         <div className={cx('relative flex items-center', wide ? 'min-w-[240px] flex-1' : 'w-[260px] max-w-full')}>
-          <input
+          <textarea
             {...answerField}
             ref={ref}
+            rows={1}
             value={text}
             readOnly={locked}
             spellCheck={answer.kind === 'short' || (answer.kind === 'chem' && answer.mode === 'name')}
             autoComplete="off"
+            // Intro hace un salto de línea; ⌘/Ctrl+Intro comprueba (como en la respuesta abierta)
+            enterKeyHint="enter"
             // un número exacto (√3/3, −1/2) se escribe con el teclado entero: el decimal no tiene «−» ni «/» (keys.ts)
             inputMode={answerInputMode(answer, signedNumberKeyboard(api.platform))}
             aria-label={t('ex.yourAnswer')}
             placeholder={spec.placeholder}
             onChange={(e) => set((d) => ({ ...d, text: e.target.value }))}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing && !locked) {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing && !locked) {
                 e.preventDefault()
                 onSubmit()
               }
             }}
             className={cx(
-              'h-12 w-full rounded-[14px] border bg-field px-4 text-[17px] text-text tabular outline-none transition placeholder:text-text3',
+              'min-h-12 w-full resize-none overflow-y-auto rounded-[14px] border bg-field px-4 py-3 text-[17px] leading-6 text-text tabular outline-none transition placeholder:text-text3',
               'focus:shadow-[0_0_0_3px_var(--accent-wash)]',
               keys.length > 0 && 'pr-12',
               locked && 'cursor-default'
             )}
             aria-invalid={struck || undefined}
-            style={{ borderColor: fieldTone ? `color-mix(in oklab, ${fieldTone} 60%, transparent)` : 'color-mix(in oklab, var(--line-strong) 40%, transparent)', background: fieldTone ? `color-mix(in oklab, ${fieldTone} 6%, var(--field))` : undefined, color: struck ? 'var(--text2)' : undefined }}
+            style={{ borderColor: fieldTone ? `color-mix(in oklab, ${fieldTone} 60%, transparent)` : 'color-mix(in oklab, var(--line-strong) 40%, transparent)', background: fieldTone ? `color-mix(in oklab, ${fieldTone} 6%, var(--field))` : undefined, color: struck ? 'var(--text2)' : undefined, textDecoration: struck && multiline ? 'line-through' : undefined }}
           />
-          {struck && (
+          {struck && !multiline && (
             // el mismo texto, invisible y en la misma letra, para que el tachado mida lo escrito
             <span aria-hidden className={cx('pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden whitespace-pre px-4 text-[17px] tabular text-transparent', keys.length > 0 ? 'right-12' : 'right-0')}>
               <InkStrike seed={`respuesta:${exerciseId}:${text}`} alpha={0.9}>{text}</InkStrike>
@@ -186,7 +207,7 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
                 onClick={toggleKeys}
                 aria-pressed={keysOpen}
                 aria-label={keysOpen ? t('ex.hideKeys') : t('ex.showKeys')}
-                className={cx('absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[9px] font-serif text-[14px] transition-colors', keysOpen ? 'bg-accent-wash text-accent-text' : 'text-text3 hover:bg-fill1 hover:text-text')}
+                className={cx('absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-[9px] font-serif text-[14px] transition-colors', keysOpen ? 'bg-accent-wash text-accent-text' : 'text-text3 hover:bg-fill1 hover:text-text')}
               >
                 √π
               </button>
