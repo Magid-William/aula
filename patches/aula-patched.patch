@@ -1,0 +1,203 @@
+diff --git a/electron-builder.yml b/electron-builder.yml
+index 1a08d4c..fe9e29b 100644
+--- a/electron-builder.yml
++++ b/electron-builder.yml
+@@ -130,7 +130,7 @@ linux:
+   artifactName: Aula-${version}-linux-${arch}.${ext}
+ publish:
+   provider: github
+-  owner: luumlabs
++  owner: Magid-William
+   repo: aula
+   # borrador: nadie lo ve (ni se ofrece como actualización) hasta que se publica a mano en GitHub tras probarlo
+   releaseType: draft
+diff --git a/src/main/services/updates/signature.ts b/src/main/services/updates/signature.ts
+index 647d88b..063f6b6 100644
+--- a/src/main/services/updates/signature.ts
++++ b/src/main/services/updates/signature.ts
+@@ -28,7 +28,9 @@ import { basename } from 'node:path'
+  */
+ export const UPDATE_PUBLIC_KEYS: readonly string[] = [
+   'MCowBQYDK2VwAyEAiBq04gxTBROZgokQ8tRvRcPy5/OjleXFtgsX4jWE7ds=',
+-  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA='
++  'MCowBQYDK2VwAyEAPrUlbRbiqC2VFtFMsTp7iacXNrG8gvxJdrezd2AtCqA=',
++  // clave de esta compilación personal: firma las actualizaciones publicadas en Magid-William/aula
++  'MCowBQYDK2VwAyEA8+ttFOHF8SZ/5m7aGUoAbS+OwCenIVTQz9plAzNqxxQ='
+ ]
+ 
+ /** La principal. */
+diff --git a/src/renderer/src/exercises/inputs/TextAnswerInput.test.tsx b/src/renderer/src/exercises/inputs/TextAnswerInput.test.tsx
+new file mode 100644
+index 0000000..60d950c
+--- /dev/null
++++ b/src/renderer/src/exercises/inputs/TextAnswerInput.test.tsx
+@@ -0,0 +1,58 @@
++import { describe, expect, it, vi } from 'vitest'
++import { renderToStaticMarkup } from 'react-dom/server'
++import type { ReactNode } from 'react'
++import type { AnswerOf } from '@shared/schema/exercises'
++import '@renderer/i18n'
++import { initialDraft } from '../model'
++
++// El tooltip abre un portal en `document` (no hay DOM en esta prueba): se deja el botón tal cual.
++vi.mock('@renderer/design', async (importOriginal) => {
++  const mod = await importOriginal<typeof import('@renderer/design')>()
++  return { ...mod, Tooltip: ({ children }: { children: ReactNode }) => children }
++})
++
++import { TextAnswerInput } from './TextAnswerInput'
++
++const CTX = { packId: null, language: 'en', assetUrl: (p: string) => p, mode: 'lesson' as const }
++
++const SHORT: AnswerOf<'short'> = { kind: 'short', accepted: ['osmosis'], keywords: [], typoTolerance: true, aiGrade: false }
++const NUMERIC: AnswerOf<'numeric'> = {
++  kind: 'numeric', value: '2', alternatives: [], absTol: 1e-6, relTol: 1e-6, form: 'any', unitMode: 'ignore', angle: 'radians'
++}
++
++function render(answer: AnswerOf<'short'> | AnswerOf<'numeric'>): string {
++  return renderToStaticMarkup(
++    <TextAnswerInput
++      answer={answer}
++      draft={initialDraft({ id: 'x1', answer })}
++      set={() => undefined}
++      locked={false}
++      reveal="none"
++      exerciseId="x1"
++      lang="en"
++      ctx={CTX}
++      onSubmit={() => undefined}
++      autoFocus={false}
++      active={false}
++      exam={false}
++    />
++  )
++}
++
++describe('respuesta escrita de varias líneas', () => {
++  it('la respuesta corta es un campo de texto que crece (textarea), no un input de una línea', () => {
++    const html = render(SHORT)
++    expect(html).toContain('<textarea')
++    expect(html).not.toContain('<input')
++    expect(html).toContain('rows="1"')
++    // Intro salta de línea; la comprobación es ⌘/Ctrl+Intro
++    expect(html).toContain('enterKeyHint="enter"')
++    expect(html).toContain('data-answer-field')
++  })
++
++  it('las respuestas numéricas también admiten varias líneas', () => {
++    const html = render(NUMERIC)
++    expect(html).toContain('<textarea')
++    expect(html).toContain('enterKeyHint="enter"')
++  })
++})
+diff --git a/src/renderer/src/exercises/inputs/TextAnswerInput.tsx b/src/renderer/src/exercises/inputs/TextAnswerInput.tsx
+index 8c76122..fcf195b 100644
+--- a/src/renderer/src/exercises/inputs/TextAnswerInput.tsx
++++ b/src/renderer/src/exercises/inputs/TextAnswerInput.tsx
+@@ -76,12 +76,30 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
+   // los mensajes del analizador matemático están en español (aún sin catálogo en inglés)
+   const spanish = i18n.language.startsWith('es')
+   const spec = useSpec(answer)
+-  const ref = useRef<HTMLInputElement>(null)
++  const ref = useRef<HTMLTextAreaElement>(null)
+   const keys = useMemo(() => keysFor(answer), [answer])
+   const [keysOpen, setKeysOpen] = useState(() => readKeysPref() ?? spec.keysOpen)
+   const comma = usesDecimalComma(lang)
+   const text = draft.text
+ 
++  // el campo crece con lo escrito (una respuesta de varias líneas), hasta un tope: después desplaza
++  const [grown, setGrown] = useState(false)
++  const grownRef = useRef(false)
++  const grow = (): void => {
++    const el = ref.current
++    if (!el) return
++    el.style.height = 'auto'
++    el.style.height = `${Math.min(Math.max(el.scrollHeight, 48), 200)}px`
++    // más de una línea (un salto escrito o un texto largo que se parte): el tachado a mano no encaja
++    const g = el.scrollHeight > 49
++    if (g !== grownRef.current) {
++      grownRef.current = g
++      setGrown(g)
++    }
++  }
++  useEffect(grow, [text])
++  const multiline = grown || text.includes('\n')
++
+   useEffect(() => {
+     // al volver a intentarlo, la respuesta anterior queda seleccionada: lo que escribas la sustituye
+     // con el dedo no: sacaría el teclado al llegar a cada pregunta (se escribe al tocar el campo)
+@@ -145,34 +163,37 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
+           </span>
+         )}
+         <div className={cx('relative flex items-center', wide ? 'min-w-[240px] flex-1' : 'w-[260px] max-w-full')}>
+-          <input
++          <textarea
+             {...answerField}
+             ref={ref}
++            rows={1}
+             value={text}
+             readOnly={locked}
+             spellCheck={answer.kind === 'short' || (answer.kind === 'chem' && answer.mode === 'name')}
+             autoComplete="off"
++            // Intro hace un salto de línea; ⌘/Ctrl+Intro comprueba (como en la respuesta abierta)
++            enterKeyHint="enter"
+             // un número exacto (√3/3, −1/2) se escribe con el teclado entero: el decimal no tiene «−» ni «/» (keys.ts)
+             inputMode={answerInputMode(answer, signedNumberKeyboard(api.platform))}
+             aria-label={t('ex.yourAnswer')}
+             placeholder={spec.placeholder}
+             onChange={(e) => set((d) => ({ ...d, text: e.target.value }))}
+             onKeyDown={(e) => {
+-              if (e.key === 'Enter' && !e.nativeEvent.isComposing && !locked) {
++              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing && !locked) {
+                 e.preventDefault()
+                 onSubmit()
+               }
+             }}
+             className={cx(
+-              'h-12 w-full rounded-[14px] border bg-field px-4 text-[17px] text-text tabular outline-none transition placeholder:text-text3',
++              'min-h-12 w-full resize-none overflow-y-auto rounded-[14px] border bg-field px-4 py-3 text-[17px] leading-6 text-text tabular outline-none transition placeholder:text-text3',
+               'focus:shadow-[0_0_0_3px_var(--accent-wash)]',
+               keys.length > 0 && 'pr-12',
+               locked && 'cursor-default'
+             )}
+             aria-invalid={struck || undefined}
+-            style={{ borderColor: fieldTone ? `color-mix(in oklab, ${fieldTone} 60%, transparent)` : 'color-mix(in oklab, var(--line-strong) 40%, transparent)', background: fieldTone ? `color-mix(in oklab, ${fieldTone} 6%, var(--field))` : undefined, color: struck ? 'var(--text2)' : undefined }}
++            style={{ borderColor: fieldTone ? `color-mix(in oklab, ${fieldTone} 60%, transparent)` : 'color-mix(in oklab, var(--line-strong) 40%, transparent)', background: fieldTone ? `color-mix(in oklab, ${fieldTone} 6%, var(--field))` : undefined, color: struck ? 'var(--text2)' : undefined, textDecoration: struck && multiline ? 'line-through' : undefined }}
+           />
+-          {struck && (
++          {struck && !multiline && (
+             // el mismo texto, invisible y en la misma letra, para que el tachado mida lo escrito
+             <span aria-hidden className={cx('pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden whitespace-pre px-4 text-[17px] tabular text-transparent', keys.length > 0 ? 'right-12' : 'right-0')}>
+               <InkStrike seed={`respuesta:${exerciseId}:${text}`} alpha={0.9}>{text}</InkStrike>
+@@ -186,7 +207,7 @@ export function TextAnswerInput(props: InputProps<Extract<Answer, { kind: TextKi
+                 onClick={toggleKeys}
+                 aria-pressed={keysOpen}
+                 aria-label={keysOpen ? t('ex.hideKeys') : t('ex.showKeys')}
+-                className={cx('absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[9px] font-serif text-[14px] transition-colors', keysOpen ? 'bg-accent-wash text-accent-text' : 'text-text3 hover:bg-fill1 hover:text-text')}
++                className={cx('absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-[9px] font-serif text-[14px] transition-colors', keysOpen ? 'bg-accent-wash text-accent-text' : 'text-text3 hover:bg-fill1 hover:text-text')}
+               >
+                 √π
+               </button>
+diff --git a/src/renderer/src/exercises/useExercise.ts b/src/renderer/src/exercises/useExercise.ts
+index 49c6def..bcdedf2 100644
+--- a/src/renderer/src/exercises/useExercise.ts
++++ b/src/renderer/src/exercises/useExercise.ts
+@@ -10,6 +10,9 @@ import {
+ } from './model'
+ import { makeResult, type AnswerInput, type ExerciseMode, type GradeResult } from './types'
+ 
++/** Respuestas que se escriben en un campo de varias líneas: Intro salta de línea y se comprueba con ⌘/Ctrl+Intro. */
++const MULTILINE_KINDS = new Set(['numeric', 'expression', 'equation', 'set', 'interval', 'point', 'short', 'chem', 'open', 'unknown'])
++
+ export interface ExerciseCallbacks {
+   /** El primer resultado (el que cuenta para el progreso). Llega una sola vez. */
+   onFirstResult?: (result: GradeResult, run: RunState) => void
+@@ -217,7 +220,7 @@ export function useExercise(exercise: Exercise, opts: ExerciseOptions = {}): Exe
+       selfReview: needsSelfReview(exercise, run), checkedWrong: checkedWrong(exercise, run),
+       canHint: mode !== 'exam' && !finished && run.hintsShown < exercise.hints.length,
+       canSayDontKnow: mode !== 'exam' && mode !== 'guided' && !finished && !run.result && run.attempts === 0,
+-      multiline: exercise.answer.kind === 'open', hasContinue: !!opts.onContinue,
++      multiline: MULTILINE_KINDS.has(exercise.answer.kind), hasContinue: !!opts.onContinue,
+       edit, editPart, submit, retry, hint, partHint, reveal, selfGrade, continueNow, primary
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
