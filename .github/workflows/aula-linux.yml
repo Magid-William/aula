@@ -1,0 +1,116 @@
+name: Aula patched Linux arm64
+
+# Manual only: builds the patched Linux arm64 app that the postmarketOS server
+# mounts at /opt/aula. No schedule; the Windows pipeline stays independent.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aula-linux-arm64
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      AULA_UPDATE_SIGNING_KEY: ${{ secrets.AULA_UPDATE_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the version
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          test "$version" = "0.2.6" || { echo "Expected 0.2.6, got $version" >&2; exit 1; }
+          echo "Building Aula $version for linux/arm64"
+
+      - name: Apply the personal patches
+        run: |
+          set -euo pipefail
+          for p in \
+            patches/10-multiline-69.patch \
+            patches/20-code-highlight-67.patch \
+            patches/90-fork-channel.patch; do
+            echo "Applying $p"
+            git apply --3way "$p"
+          done
+          grep -q 'MULTILINE_KINDS' src/renderer/src/exercises/useExercise.ts
+          grep -q 'CodeSurface' src/renderer/src/lib/RichText.tsx
+          grep -q 'owner: Magid-William' electron-builder.yml
+          git diff --stat
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and test
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit -p tsconfig.web.json
+          npx vitest run src/renderer/src/exercises
+          npx vitest run src/renderer/src/lib
+
+      - name: Build the Tailscale sidecar
+        run: native/tsnet/build.sh linux
+
+      - name: Build the app
+        run: |
+          set -euo pipefail
+          npm run build
+          npx electron-builder --linux AppImage --arm64 --publish never -c.directories.output=release-ci
+
+      - name: Verify and package the app tree
+        run: |
+          set -euo pipefail
+          app=release-ci/linux-arm64-unpacked
+          test -x "$app/aula"
+          test -x "$app/resources/bin/aula-tsnet"
+          test -f "$app/resources/app.asar"
+          grep -q 'owner: Magid-William' "$app/resources/app-update.yml"
+          tar -C "$app" -czf "release-ci/aula-$VERSION-linux-arm64-app.tar.gz" .
+          ( cd release-ci && sha256sum Aula-*-linux-*.AppImage "aula-$VERSION-linux-arm64-app.tar.gz" > SHA256SUMS )
+          ls -lh release-ci/Aula-*-linux-*.AppImage "release-ci/aula-$VERSION-linux-arm64-app.tar.gz"
+          cat release-ci/SHA256SUMS
+
+      - name: Upload the server app tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: aula-linux-arm64-app
+          path: |
+            release-ci/aula-*-linux-arm64-app.tar.gz
+            release-ci/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Sign the update feed
+        if: env.AULA_UPDATE_SIGNING_KEY != ''
+        run: node scripts/release-sign.mjs release-ci
+
+      - name: Upload the installer assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: aula-linux-arm64-installer
+          path: |
+            release-ci/Aula-*-linux-*.AppImage
+            release-ci/latest-linux-arm64.yml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Add the Linux assets to the patched release
+        continue-on-error: true
+        run: |
+          gh release upload "patched-$VERSION" \
+            release-ci/Aula-*-linux-*.AppImage \
+            release-ci/latest-linux-arm64.yml \
+            --clobber
